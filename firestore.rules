@@ -1,0 +1,22 @@
+rules_version = '2';
+// Règles de sécurité Firestore pour Pelland.
+// - Tout joueur connecté (connexion anonyme automatique) peut lire les terrains et les parties.
+// - Tout joueur peut ajouter ou corriger un terrain.
+// - Seul le téléphone qui a créé une partie (le responsable) peut la modifier.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /courses/{courseId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null;
+      allow delete: if false;
+    }
+    match /games/{gameId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if request.auth != null
+                    && resource.data.ownerUid == request.auth.uid
+                    && request.resource.data.ownerUid == resource.data.ownerUid;
+      allow delete: if false;
+    }
+  }
+}
