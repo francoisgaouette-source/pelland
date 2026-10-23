@@ -1,10 +1,9 @@
-// Collez ici la configuration de votre projet Firebase (voir GUIDE.md, étape 2).
-// Tant que apiKey est vide, l'app fonctionne en mode local : les parties restent sur ce téléphone.
+ Configuration du projet Firebase « pelland » (base de données partagée).
 window.PELLAND_FIREBASE = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyBrR-IFwk3YevxFogdAtTTPdqg4sn72Xi4",
+  authDomain: "pelland.firebaseapp.com",
+  projectId: "pelland",
+  storageBucket: "pelland.firebasestorage.app",
+  messagingSenderId: "397221570595",
+  appId: "1:397221570595:web:9fa21379926ded162a6996"
 };
