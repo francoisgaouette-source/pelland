@@ -264,17 +264,21 @@
         </div>
       </section>
       <section class="card">
-        <div class="step">7 · Coups de chacun</div>
+        <div class="step">7 · Coups et équipes</div>
         <div id="pv" class="preview">${previewHtml(d)}</div>
         <button class="btn" id="create" type="button">Créer la carte de pointage</button>
       </section>`;
   }
   function previewHtml(d) {
     const pv = draftPreview(d);
-    if (!pv || !pv.ready) return '<p class="note">Entrez les quatre prénoms et index pour voir les coups.</p>';
+    if (!pv || !pv.ready) return '<p class="note">Entrez les quatre prénoms et index pour voir les coups et les équipes.</p>';
     return `<table><thead><tr><th>Joueur</th><th>Tertre</th><th style="text-align:right">Index</th><th style="text-align:right">Hcp</th><th style="text-align:right">Coups</th></tr></thead><tbody>
       ${pv.ps.map(p => `<tr><td>${esc(p.name)}</td><td>${esc(p.tee)}</td><td class="n">${String(p.index).replace('.', ',')}</td><td class="n">${p.courseHandicap}</td><td class="n"><b>${p.strokes}</b></td></tr>`).join('')}
-      </tbody></table><p class="note">Hcp = handicap de parcours = index × slope ÷ 113 + (évaluation − normale), arrondi.</p>`;
+      </tbody></table>${teamsHtml(pv.ps, L.makeTeams(pv.ps))}<p class="note">Hcp = handicap de parcours = index × slope ÷ 113 + (évaluation − normale), arrondi.</p>`;
+  }
+
+  function teamsHtml(players, teams) {
+    return `<div class="teams">${teams.map((t, k) => `<div class="team"><span class="step">Équipe ${k + 1}</span><b>${t.map(i => esc(players[i].name)).join(' et ')}</b><span class="note">index ${t.map(i => String(players[i].index).replace('.', ',')).join(' et ')}</span></div>`).join('')}</div>`;
   }
 
   // ---------------- Rejoindre ----------------
@@ -346,8 +350,9 @@
         ${owner ? `<button class="btn small" data-hole="${h}" style="background:var(--flag);color:var(--flag-ink)">Pressé, reroll, par 3, skin…</button>` : ''}
       </section>
 
+      ${teamsHtml(g.players, L.getTeams(g))}
       <section class="board">
-        ${g.players.map((p, i) => { const t = tots[i]; return `<div class="tot ${t.played && t.netToPar === best ? 'lead' : ''}"><div class="nm">${esc(p.name)}</div><div class="big">${t.played ? fmt(t.netToPar) : '–'} <small style="font-size:15px">net</small></div><div class="sub">${t.played ? `${t.gross} brut · ${t.net} net · ${t.played} tr.` : `${p.strokes} coups`}${t.skins ? ` · ${t.skins} skin${t.skins > 1 ? 's' : ''}` : ''}${t.par3 ? ` · ${t.par3} par 3` : ''}</div></div>`; }).join('')}
+        ${g.players.map((p, i) => { const t = tots[i]; return `<div class="tot ${t.played && t.netToPar === best ? 'lead' : ''}"><div class="nm">${esc(p.name)} <span class="tm">É${L.getTeams(g).findIndex(x => x.includes(i)) + 1}</span></div><div class="big">${t.played ? fmt(t.netToPar) : '–'} <small style="font-size:15px">net</small></div><div class="sub">${t.played ? `${t.gross} brut · ${t.net} net · ${t.played} tr.` : `${p.strokes} coups`}${t.skins ? ` · ${t.skins} skin${t.skins > 1 ? 's' : ''}` : ''}${t.par3 ? ` · ${t.par3} par 3` : ''}</div></div>`; }).join('')}
       </section>
 
       <div class="card-scroll"><table class="sc">
@@ -359,7 +364,7 @@
         <h2>${owner ? 'Vous êtes le responsable' : 'Vous suivez la partie'}</h2>
         <p class="note">${owner
           ? 'Dites par exemple : « Trou 4, François 5, Marc 4, Luc 6, Pierre 5 » · « Marc par, Luc bogey » · « Marc presse » · « Reroll » · « Luc gagne le par 3 » · « Skin pour Marc » · « Annule » · « Trou suivant ».'
-          : 'Posez vos questions : « Qui a des coups au 7 ? » · « Combien de coups pour Marc ? » · « Où en est Luc ? » · « Combien de skins ? » · « Classement ».'}</p>
+          : 'Posez vos questions : « Qui a des coups au 7 ? » · « Combien de coups pour Marc ? » · « Où en est Luc ? » · « Combien de skins ? » · « Avec qui joue Marc ? » · « Les équipes » · « Classement ».'}</p>
         <p class="note">${esc(g.mode === 'bas' ? 'Bas handicap' : 'Full handicap')} · ${g.players.map(p => `${esc(p.name)} ${esc(p.tee)}, index ${String(p.index).replace('.', ',')}, ${p.strokes} coups`).join(' · ')}</p>
         ${Store.mode === 'firebase' ? `<p class="note">Code à donner aux autres joueurs : <b class="num" style="font-size:22px;letter-spacing:.15em">${esc(g.id)}</b></p>` : ''}
       </section>`;
@@ -470,7 +475,7 @@
         ls.set('pelland.lastPlayers', d.players);
         const id = await Store.newCode();
         const g = { id, createdAt: Date.now(), ownerUid: Store.uid, course: pv.c, courseId: pv.c.id, mode: d.mode, responsable: d.responsable,
-          players: pv.ps, currentHole: 1, scores: {}, events: {}, status: 'en cours' };
+          players: pv.ps, teams: L.makeTeams(pv.ps), currentHole: 1, scores: {}, events: {}, status: 'en cours' };
         try { await Store.saveGame(g); S.draft = null; openGame(id); Voice.say(`Partie créée. ${g.players.map(p => `${p.name} ${p.strokes} coups`).join(', ')}. Trou 1, normale ${L.holeInfo(g, 1, 0).par}.`); }
         catch (e) { toast('Création impossible : ' + e.message); }
       };

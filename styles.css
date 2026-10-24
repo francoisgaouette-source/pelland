@@ -202,3 +202,11 @@ table.sc tr.sum td { font-family: var(--display); font-size: 18px; font-weight: 
   .hole-players, .board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .prow { grid-template-columns: 1fr 76px 96px; }
 }
+
+/* Équipes */
+.teams { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.team { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; display: grid; gap: 2px; min-width: 0; }
+.team b { font-family: var(--display); font-size: 20px; line-height: 1.15; }
+.team .note { font-size: 13px; }
+.card .team { background: var(--bg); }
+.tm { font-size: 11px; font-weight: 700; padding: 1px 5px; border-radius: 4px; background: var(--line); color: var(--ink); vertical-align: 2px; }

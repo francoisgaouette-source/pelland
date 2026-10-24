@@ -53,6 +53,17 @@
     return -(Math.floor(g / 18) + ((19 - si) <= g % 18 ? 1 : 0));
   }
 
+  // Équipes de 2 : le meilleur (plus bas index) joue avec le moins bon,
+  // les deux du milieu ensemble. Égalité d'index : handicap de parcours, puis ordre d'inscription.
+  function makeTeams(players) {
+    const order = players.map((p, i) => i).sort((a, b) =>
+      (Number(players[a].index) - Number(players[b].index)) ||
+      ((players[a].courseHandicap || 0) - (players[b].courseHandicap || 0)) || (a - b));
+    return [[order[0], order[3]], [order[1], order[2]]];
+  }
+  function getTeams(game) { return game.teams || makeTeams(game.players); }
+  function teamName(game, t) { return getTeams(game)[t].map(i => game.players[i].name).join(' et '); }
+
   function buildPlayers(course, players, mode) {
     const chs = players.map(p => {
       const tee = course.tees.find(t => t.name === p.tee) || course.tees[0];
@@ -179,14 +190,15 @@
       }
       if (toks[i] === 'au' && /^\d+$/.test(toks[i + 1]) && +toks[i + 1] <= 18 && i > 0 && /coup/.test(toks[i - 1])) { hole = +toks[i + 1]; break; }
     }
-    const hasQuestionWord = /^(qui|combien|quel|quelle|quels|ou|est ce|c est quoi|donne|dis|resultat|pointage|classement|score|qu)/.test(t) || /\b(qui|combien|ou en|classement)\b/.test(t);
+    const hasQuestionWord = /^(qui|combien|quel|quelle|quels|ou|est ce|c est quoi|donne|dis|resultat|pointage|classement|score|qu)/.test(t) || /\b(qui|combien|ou en|classement|equipes?)\b/.test(t);
     const mentioned = [];
     toks.forEach(tk => { const m = matchPlayer(tk, names); if (m >= 0 && !mentioned.includes(m)) mentioned.push(m); });
 
     // ----- Questions -----
     if (hasQuestionWord || !isResp) {
       let topic = 'leaderboard';
-      if (/coup/.test(t)) topic = 'strokes';
+      if (/equipe|partenaire|avec qui|joue avec|team/.test(t)) topic = 'teams';
+      else if (/coup/.test(t)) topic = 'strokes';
       else if (/skin/.test(t)) topic = 'skins';
       else if (/par3/.test(t)) topic = 'par3';
       else if (/press/.test(t)) topic = 'presses';
@@ -258,6 +270,14 @@
     const list = arr => arr.length <= 1 ? arr.join('') : arr.slice(0, -1).join(', ') + ' et ' + arr[arr.length - 1];
 
     switch (q.topic) {
+      case 'teams': {
+        const T = getTeams(game);
+        if (q.players.length === 1) {
+          const pi = q.players[0]; const t = T.findIndex(x => x.includes(pi)); const mate = T[t].find(x => x !== pi);
+          return `${P[pi].name} joue avec ${P[mate].name}.`;
+        }
+        return `Équipe 1 : ${teamName(game, 0)}. Équipe 2 : ${teamName(game, 1)}.`;
+      }
       case 'strokes': {
         if (q.players.length && !q.hole) {
           return q.players.map(pi => {
@@ -344,6 +364,6 @@
     return { game: g, say: say.join(' ') };
   }
 
-  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply };
+  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, makeTeams, getTeams, teamName, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PellandLogic = api;
 })(this);
