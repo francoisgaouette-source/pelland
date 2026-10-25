@@ -1,4 +1,3 @@
- Configuration du projet Firebase « pelland » (base de données partagée).
 window.PELLAND_FIREBASE = {
   apiKey: "AIzaSyBrR-IFwk3YevxFogdAtTTPdqg4sn72Xi4",
   authDomain: "pelland.firebaseapp.com",
@@ -7,3 +6,4 @@ window.PELLAND_FIREBASE = {
   messagingSenderId: "397221570595",
   appId: "1:397221570595:web:9fa21379926ded162a6996"
 };
+
