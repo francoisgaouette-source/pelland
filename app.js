@@ -13,9 +13,11 @@
   // Base de données : Firebase si configuré, sinon stockage local
   // =====================================================================
   const Store = {
-    mode: 'local', uid: null, db: null,
+    mode: 'local', uid: null, db: null, error: '',
     async init() {
       const cfg = window.PELLAND_FIREBASE;
+      if (!cfg || !cfg.apiKey) this.error = 'Le fichier firebase-config.js en ligne ne contient pas de clé (apiKey vide). Remplacez-le sur GitHub.';
+      else if (typeof firebase === 'undefined') this.error = 'Les outils Firebase n\'ont pas pu se charger (réseau ou bloqueur de contenu).';
       if (cfg && cfg.apiKey && typeof firebase !== 'undefined') {
         try {
           firebase.initializeApp(cfg);
@@ -25,7 +27,16 @@
           try { await this.db.enablePersistence({ synchronizeTabs: true }); } catch (e) { /* déjà active ou non supportée */ }
           this.mode = 'firebase';
         } catch (e) {
-          console.error(e); toast('Base partagée injoignable : mode local.');
+          console.error(e);
+          const c = (e && e.code) || '';
+          this.error = c === 'auth/admin-restricted-operation' || c === 'auth/operation-not-allowed'
+            ? 'La connexion « Anonymous » n\'est pas activée dans Firebase (Authentication → Sign-in method).'
+            : c === 'auth/unauthorized-domain' || /domain/i.test(e.message || '')
+            ? 'Le domaine francoisgaouette-source.github.io n\'est pas dans Authentication → Settings → Authorized domains.'
+            : /referer|referrer|API key|api-key|blocked/i.test((e && e.message) || '')
+            ? 'La clé Firebase est restreinte et refuse ce site. Vérifiez les « Website restrictions » de la clé dans Google Cloud.'
+            : 'Erreur Firebase : ' + (c || '') + ' ' + ((e && e.message) || e);
+          toast('Base partagée injoignable : mode local.');
         }
       }
       if (this.mode === 'local') {
@@ -215,7 +226,8 @@
         <button class="tile" data-go="history"><span class="pin">≡</span><div><strong>Historique</strong><span>Toutes les parties enregistrées</span></div></button>
         <button class="tile" data-go="courses"><span class="pin">⛳</span><div><strong>Terrains</strong><span>Bibliothèque des parcours, ajout et correction</span></div></button>
       </div>
-      <p class="note">${Store.mode === 'firebase' ? 'Base partagée active : les autres joueurs voient la partie en direct avec le code.' : 'Mode local : les parties restent sur ce téléphone. Voir le guide pour activer la base partagée.'}</p>`;
+      <p class="note">${Store.mode === 'firebase' ? 'Base partagée active : les autres joueurs voient la partie en direct avec le code.' : 'Mode local : les parties restent sur ce téléphone.'}</p>
+      ${Store.mode === 'local' && Store.error ? `<div class="warn"><b>Pourquoi le mode local :</b> ${esc(Store.error)}</div>` : ''}`;
   }
 
   // ---------------- Nouvelle partie ----------------
