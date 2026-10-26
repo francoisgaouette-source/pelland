@@ -138,6 +138,17 @@
     const d = pts[0] - pts[1];
     return d >= 0 ? [d, 0] : [0, -d];
   }
+  // Nombre de fois que le meneur change (une égalité entre deux ne compte pas comme un changement).
+  function leadChanges(game) {
+    const t = [0, 0]; let last = null, n = 0;
+    for (let h = 1; h <= 18; h++) {
+      const ht = holeTotal(game, h); if (!ht) continue;
+      t[0] += ht[0]; t[1] += ht[1];
+      const lead = t[0] === t[1] ? null : (t[0] > t[1] ? 0 : 1);
+      if (lead != null) { if (last != null && lead !== last) n++; last = lead; }
+    }
+    return n;
+  }
   function totalText(game) {
     const t = teamPoints(game).tot;
     return t[0] === t[1] ? 'Partie égale.' : `Les ${TEAMS[t[0] > t[1] ? 0 : 1]} mènent par ${Math.abs(t[0] - t[1])}.`;
@@ -210,14 +221,17 @@
     const P = game.players, ini = initials(P), nm = a => a.map(i => ini[i]).join('+');
     const cab = cabaneTeam(game, hole);
     const st = skinTeam(game, hole);
-    if (cab != null) return `Oiselet + skin + haut : cabane ${TEAMS[cab]} ${CABANE_POINTS}`;
+    // Notation courte : ↓ plus bas net, ↑ plus haut net, R/B équipe qui reçoit, ×2 press, ×4 reroll, S skin, C cabane, = résultat net
+    const RB = t => t === 0 ? 'R' : 'B';
+    if (cab != null) return `C\u00a0${RB(cab)}${CABANE_POINTS}`;
     const v = POINTS * r.mult, parts = [];
-    parts.push(r.low.team != null ? `Bas ${nm(r.low.players)} +${v} ${TEAMS[r.low.team]}` : 'Bas égal');
-    if (r.low.net !== r.high.net) parts.push(r.high.team != null ? `Haut ${nm(r.high.players)} +${v} ${TEAMS[1 - r.high.team]}` : 'Haut égal');
-    if (r.mult > 1) parts.push(r.mult === 4 ? 'reroll ×4' : 'pressé ×2');
-    if (st === 0 || st === 1) parts.push(`skin +1 ${TEAMS[st]}`);
-    const nt = holeNetText(game, hole); if (nt) parts.push('→ ' + nt);
-    return parts.join(' · ');
+    parts.push(r.low.team != null ? `↓${nm(r.low.players)} ${RB(r.low.team)}${v}` : '↓=');
+    if (r.low.net !== r.high.net) parts.push(r.high.team != null ? `↑${nm(r.high.players)} ${RB(1 - r.high.team)}${v}` : '↑=');
+    if (r.mult > 1) parts.push('×' + r.mult);
+    if (st === 0 || st === 1) parts.push(`S ${RB(st)}`);
+    const ht = holeTotal(game, hole);
+    if (ht) parts.push(ht[0] === ht[1] ? '= 0' : ht[0] > ht[1] ? `= R+${ht[0]}` : `= B+${ht[1]}`);
+    return parts.map(x => x.replace(/ /g, '\u00a0')).join(' ');
   }
   function describeSkin(game, hole) {
     const st = skinTeam(game, hole);
@@ -375,6 +389,7 @@
       if (/\bpoints?\b|la game|resultat|qui gagne|qui mene/.test(t)) topic = 'points';
       else if (/equipe|partenaire|avec qui|joue avec|team/.test(t)) topic = 'teams';
       else if (/coup/.test(t)) topic = 'strokes';
+      else if (/changement|change de|chang/.test(t) && /mene|leader|tete/.test(t)) topic = 'leadchanges';
       else if (/cabane/.test(t)) topic = 'cabanes';
       else if (/skin/.test(t)) topic = 'skins';
       else if (/par3|normale 3|normale trois|dollar|argent|cagnotte|\bpot\b/.test(t)) topic = 'par3';
@@ -492,6 +507,10 @@
           .filter(x => x.k !== 0 && (!q.players.length || q.players.includes(x.i)));
         if (!who.length) return `Au trou ${h}, handicap ${si}, personne ne reçoit de coup.`;
         return `Au trou ${h}, handicap ${si} : ` + who.map(x => `${x.p.name} ${x.k > 0 ? 'reçoit ' + plural(x.k, 'coup') : 'redonne ' + plural(-x.k, 'coup')}`).join(', ') + '.';
+      }
+      case 'leadchanges': {
+        const n = leadChanges(game);
+        return n === 0 ? 'Le meneur n\'a pas encore changé.' : `Le meneur a changé ${n} fois.`;
       }
       case 'cabanes': {
         const c = cabanes(game);
@@ -809,6 +828,6 @@
     return null;
   }
 
-  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, TEAMS, teamFromText, makeTeams, orderTeams, getTeams, teamName, netScore, holeMultiplier, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, cabaneTeam, cabanes, calcText, par3Results, describePar3, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup, resolveName, nextPrompt, trailingTeam, pressTeamOf, initials };
+  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, TEAMS, teamFromText, makeTeams, orderTeams, getTeams, teamName, netScore, holeMultiplier, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, cabaneTeam, cabanes, calcText, par3Results, describePar3, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup, resolveName, nextPrompt, trailingTeam, pressTeamOf, initials, leadChanges };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PellandLogic = api;
 })(this);

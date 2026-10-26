@@ -430,9 +430,8 @@
       const status = e.reroll ? 'Reroll' : (e.presses || []).length ? 'Press' : (played || e.noPress) ? 'Normal' : '';
       const st = status ? [`<i class="${status === 'Normal' ? '' : 'p'}">${status}</i>`] : [];
       let calc = L.calcText(g, hole);
-      if (ih.par === 3) { const x = p3.results.find(r => r.hole === hole); if (x && x.status === 'won') calc += ` · normale 3 : ${x.amount} $ ${L.TEAMS[x.team]}`; else if (x && x.status === 'carried') calc += ` · normale 3 : ${x.value} $ reporté`; }
-      if (L.holePoints(g, hole) && L.skinTeam(g, hole) == null) calc += ' · skin ?';
-      else if (L.skinTeam(g, hole) === -1) calc += ' · pas de skin';
+      if (L.holePoints(g, hole) && L.skinTeam(g, hole) == null) calc += ' S?';
+      if (ih.par === 3) { const x = p3.results.find(r => r.hole === hole); if (x && x.status === 'won') calc += ` $${x.amount}${x.team === 0 ? 'R' : 'B'}`; else if (x && x.status === 'carried') calc += ` $${x.value}→`; }
       const hp = L.holeTotal(g, hole);
       if (hp) { cum[0] += hp[0]; cum[1] += hp[1]; }
       const tot = hp ? leadHtml(cum) : '';
@@ -457,7 +456,9 @@
           <div class="hole-meta">Normale <b>${hi.par}</b> · Handicap <b>${hi.si}</b>${meta.map(m => ` · <b>${m}</b>`).join('')}</div>
           <div class="hole-nav"><button data-nav="-1" aria-label="Trou précédent">‹</button><button data-nav="1" aria-label="Trou suivant">›</button></div>
         </div>
-        <div class="team-blocks">${L.getTeams(g).map((tm, k) => {
+        ${(() => { const t = L.teamPoints(g).tot, d = Math.abs(t[0] - t[1]), w = t[0] === t[1] ? -1 : (t[0] > t[1] ? 0 : 1);
+          return `<div class="lead-box ${w >= 0 ? 'lb' + w : ''}">${w < 0 ? '<span class="lb-t">Partie égale</span>' : `<span class="lb-l">Meneur</span><span class="lb-t">${L.TEAMS[w]}</span><span class="lb-p">+${d} <small>point${d > 1 ? 's' : ''} net${d > 1 ? 's' : ''}</small></span>`}<span class="lb-c">Changements de meneur : <b>${L.leadChanges(g)}</b></span></div>`; })()}
+        <div class="team-blocks">${[1, 0].map(k => { const tm = L.getTeams(g)[k], teamPts = L.teamPoints(g).tot;
           const tt = L.trailingTeam(g, h), pt = L.pressTeamOf(g, h), started = ((g.scores || {})[h] || []).some(v => v != null);
           let btn = '';
           if (owner && !started && tt === k && !(ev.presses || []).length) btn = `<button type="button" class="tb-btn t${k}" data-press-team="${k}">Press</button>`;
@@ -465,17 +466,16 @@
           else if (owner && pt != null && pt !== k) btn = `<button type="button" class="tb-btn t${k} ${ev.reroll ? 'on' : ''}" data-reroll-team="${ev.reroll ? 0 : 1}" ${started ? 'disabled' : ''}>${ev.reroll ? 'Reroll ✓' : 'Reroll'}</button>`;
           else if (!owner && pt === k) btn = `<span class="tb-btn t${k} on">Pressé</span>`;
           else if (!owner && pt != null && ev.reroll) btn = `<span class="tb-btn t${k} on">Reroll</span>`;
-          return `<div class="team-block t${k}"><div class="tb-name">${L.TEAMS[k]}</div><div class="hole-players two">${tm.map(pi => { const p = g.players[pi]; const k = L.strokesOnHole(p.strokes, hi.si); const s = L.getScore(g, h, pi); return `<${owner ? `button type="button" data-allscores="${h}"` : 'div'} class="hp"><div class="nm tc${teamOf(g, pi)}">${esc(p.name)}${g.responsable === pi ? ' ★' : ''}</div><div class="sc">${s == null ? '–' : s}</div><div class="dots">${k ? dots(k) + ' ' + (k > 0 ? 'coup' + (k > 1 ? 's' : '') : 'redonne') : ''}</div></${owner ? 'button' : 'div'}>`; }).join('')}</div>${btn}</div>`; }).join('')}</div>
+          return `<div class="team-block t${k}"><div class="tb-name">${L.TEAMS[k]}</div><div class="hole-players two">${tm.map(pi => { const p = g.players[pi]; const k = L.strokesOnHole(p.strokes, hi.si); const s = L.getScore(g, h, pi); return `<${owner ? `button type="button" data-allscores="${h}"` : 'div'} class="hp"><div class="nm tc${teamOf(g, pi)}">${esc(p.name)}${g.responsable === pi ? ' ★' : ''} <span class="hp-idx">${String(p.index).replace('.', ',')}</span></div><div class="sc">${s == null ? '–' : s}</div><div class="dots">${k ? dots(k) + ' ' + (k > 0 ? 'coup' + (k > 1 ? 's' : '') : 'redonne') : ''}</div><div class="hp-tot">${tots[pi].played ? `Brut <b>${tots[pi].gross}</b><br>Net <b>${tots[pi].net}</b><br>${tots[pi].played} trou${tots[pi].played > 1 ? 's' : ''} joué${tots[pi].played > 1 ? 's' : ''}` : 'Aucun trou joué'}</div></${owner ? 'button' : 'div'}>`; }).join('')}</div>${btn}<div class="tb-foot"><b>${teamPts[k]}</b> point${teamPts[k] > 1 ? 's' : ''} · <b>${p3.money[k]} $</b></div></div>`; }).join('')}</div>
         ${holeChips.length ? `<div class="chips">${holeChips.join('')}</div>` : ''}
       </section>
 
-      ${summaryHtml(g, tots, p3)}
 
       <div class="card-scroll"><table class="sc">
-        <thead><tr><th>Trou</th><th>Norm.</th><th>Handicap</th>${g.players.map((p, i) => `<th class="tc${teamOf(g, i)}" title="${esc(p.name)}">${esc(ini[i])}</th>`).join('')}<th>Statut</th><th>Calcul</th><th class="tc1">Bleu</th><th class="tc0">Rouge</th><th>Total</th></tr></thead>
+        <thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${g.players.map((p, i) => `<th class="tc${teamOf(g, i)}" title="${esc(p.name)}">${esc(ini[i])}</th>`).join('')}<th>Statut</th><th>Calcul</th><th class="tc1">Bleu</th><th class="tc0">Rouge</th><th>Total</th></tr></thead>
         <tbody>${Array.from({ length: 9 }, (_, i) => row(i + 1)).join('')}${sumRow('Aller', 1, 9)}${Array.from({ length: 9 }, (_, i) => row(i + 10)).join('')}${sumRow('Retour', 10, 18)}${sumRow('Total', 1, 18, true)}</tbody>
       </table></div>
-      <div class="legend"><span>● coup reçu · petit chiffre = net</span><span>Noms à la couleur de l'équipe : <b class="tc1">Bleus</b> · <b class="tc0">Rouges</b></span><span>Total = l'équipe qui mène et son total</span><span>${g.players.map((p, i) => `<b class="tc${teamOf(g, i)}">${esc(ini[i])}</b> ${esc(p.name)}`).join(' · ')}</span><span>Faites glisser la carte vers la gauche pour voir le calcul</span></div>
+      <div class="legend"><span>● coup reçu · petit chiffre = net</span><span>Calcul : ↓ plus bas net · ↑ plus haut net · R/B équipe qui reçoit · ×2 press · ×4 reroll · S skin · C cabane · $ normale 3 · = résultat net</span><span>Noms à la couleur de l'équipe : <b class="tc1">Bleus</b> · <b class="tc0">Rouges</b></span><span>Total = l'équipe qui mène et son total</span><span>${g.players.map((p, i) => `<b class="tc${teamOf(g, i)}">${esc(ini[i])}</b> ${esc(p.name)}`).join(' · ')}</span><span>Faites glisser la carte vers la gauche pour voir le calcul</span></div>
       <section class="card">
         <h2>${owner ? 'Vous êtes le responsable' : 'Vous suivez la partie'}</h2>
         <p class="note">${owner

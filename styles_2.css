@@ -243,11 +243,11 @@ table.sc tr.sum td { font-family: var(--display); font-size: 18px; font-weight: 
 .team.t1 b { color: var(--team1); }
 
 /* Carte : colonnes Statut, Calcul, Bleu, Rouge, Total */
-table.sc { min-width: 760px; }
+table.sc { min-width: 560px; }
 table.sc th.h, table.sc thead th:first-child { position: sticky; left: 0; background: var(--surface); z-index: 1; }
 table.sc tr.cur th.h { background: color-mix(in srgb, var(--flag) 16%, var(--surface)); }
 table.sc td.stat { min-width: 96px; padding: 2px 4px; }
-table.sc td.calc { min-width: 190px; max-width: 240px; text-align: left; font-size: 12px; line-height: 1.3; color: var(--muted); padding: 4px 6px; }
+table.sc td.calc { min-width: 92px; max-width: 130px; text-align: left; font-size: 12px; line-height: 1.3; color: var(--muted); padding: 4px 6px; white-space: normal; }
 table.sc td.tp0, table.sc td.tp1, table.sc td.tot { font-family: var(--display); font-size: 19px; font-weight: 700; min-width: 48px; }
 table.sc td.tp0 { color: var(--team0); }
 table.sc td.tp1 { color: var(--team1); }
@@ -265,3 +265,81 @@ button.hp { border: 0; text-align: left; color: inherit; font: inherit; cursor: 
 .as-n.par { border-color: var(--green); }
 .as-n[aria-pressed=true] { background: var(--green); color: var(--green-ink); border-color: var(--green); }
 .as-n.more { color: var(--muted); }
+
+/* Chiffre choisi bien visible */
+.as-n[aria-pressed=true] { background: var(--flag); color: var(--flag-ink); border: 3px solid var(--ink); font-weight: 700; transform: scale(1.08); }
+.as-row.done .as-n:not([aria-pressed=true]):not(.more) { opacity: .45; }
+.as-row.done .as-name::after { content: " ✓"; color: var(--green); }
+
+/* Carte du trou : joueurs groupés par équipe, bouton Press / Reroll sous l'équipe */
+.team-blocks { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.team-block { display: grid; gap: 6px; align-content: start; border-radius: 10px; padding: 6px; }
+.team-block.t0 { border: 2px solid #ff8a80; background: rgba(255,138,128,.08); }
+.team-block.t1 { border: 2px solid #8ab8ff; background: rgba(138,184,255,.08); }
+.tb-name { font-family: var(--display); font-size: 15px; letter-spacing: .06em; text-transform: uppercase; padding: 2px 2px 0; }
+.team-block.t0 .tb-name { color: #ff8a80; }
+.team-block.t1 .tb-name { color: #8ab8ff; }
+.hole-players.two { grid-template-columns: 1fr 1fr; }
+.tb-btn { display: grid; place-items: center; min-height: 46px; border-radius: 10px; border: 2px solid currentColor; background: transparent; font-family: var(--display); font-size: 20px; font-weight: 700; }
+.tb-btn.t0 { color: #ff8a80; }
+.tb-btn.t1 { color: #8ab8ff; }
+.tb-btn.on.t0 { background: var(--team0); border-color: var(--team0); color: #fff; }
+.tb-btn.on.t1 { background: var(--team1); border-color: var(--team1); color: #fff; }
+.tb-btn:disabled { opacity: .7; }
+@media (max-width: 420px) { .hole-players.two { grid-template-columns: 1fr 1fr; gap: 4px; } .hole-players.two .hp { padding: 6px 4px; } .team-blocks { gap: 6px; } .team-block { padding: 4px; } }
+
+.pl-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pl-row b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-row b { flex: 1; }
+.pl-row .row { flex-wrap: nowrap; flex: none; }
+.pl-row.dup { border-color: var(--flag); }
+.dup-flag { font-family: var(--body); font-size: 12px; font-weight: 700; background: var(--flag); color: var(--flag-ink); border-radius: 99px; padding: 2px 8px; vertical-align: 3px; }
+.pl-row b { white-space: normal; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+#missingNote:empty { display: none; }
+#missingNote { color: var(--red); font-weight: 600; }
+.lead-line { font-family: var(--display); font-size: 20px; }
+.lead-line b { font-weight: 700; }
+
+/* Résumé des équipes : Bleus à gauche, Rouges à droite */
+.summary { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-radius: var(--r); overflow: hidden; border: 2px solid var(--bar); }
+.sm-team { display: grid; grid-template-rows: 1fr auto; color: #fff; min-width: 0; }
+.sm-team.t1 { background: #185e83; }
+.sm-team.t0 { background: #e10600; }
+.sm-players { display: grid; grid-template-columns: 1fr 1fr; }
+.sm-p { padding: 10px 6px 12px; text-align: center; border-right: 1px solid rgba(0,0,0,.35); min-width: 0; display: grid; gap: 2px; align-content: start; }
+.sm-n { font-weight: 600; font-size: 15px; line-height: 1.2; overflow-wrap: anywhere; }
+.sm-i { font-size: 12px; opacity: .9; }
+.sm-s { font-family: var(--display); font-size: 34px; font-weight: 700; line-height: 1.1; margin-top: 6px; }
+.sm-foot { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid rgba(0,0,0,.35); }
+.sm-foot > div { padding: 10px 6px; text-align: center; font-size: 15px; border-right: 1px solid rgba(0,0,0,.35); }
+.sm-foot b { font-family: var(--display); font-size: 24px; }
+@media (max-width: 420px) { .sm-n { font-size: 13px; } .sm-s { font-size: 28px; } .sm-i { font-size: 11px; } }
+.hole-players.two .hp .nm { white-space: normal; overflow-wrap: anywhere; line-height: 1.15; font-size: 13px; }
+.hole-players.two .hp .sc { font-size: 26px; }
+.hole-players.two .hp .dots { font-size: 11px; letter-spacing: 0; }
+.hole-players.two .hp .nm { overflow-wrap: normal; word-break: keep-all; font-size: 12px; min-height: 2.4em; }
+.hole-players.two .hp { align-content: start; }
+button.hp { display: grid; align-content: start; }
+
+/* Une case par joueur : nom + index, score du trou, brut/net/trous ; points et $ sous le bouton */
+.hp-idx { font-weight: 400; opacity: .75; font-size: .9em; white-space: nowrap; }
+.hp-tot { font-size: 11px; opacity: .85; margin-top: 4px; line-height: 1.25; }
+.tb-foot { text-align: center; font-size: 15px; padding: 4px 0 2px; }
+.tb-foot b { font-family: var(--display); font-size: 22px; }
+.team-block.t0 .tb-foot { color: #ff8a80; }
+.team-block.t1 .tb-foot { color: #8ab8ff; }
+.hp-tot b { font-family: var(--display); font-size: 15px; }
+
+/* Case du meneur */
+.lead-box { display: flex; align-items: baseline; justify-content: center; gap: 10px; flex-wrap: wrap; padding: 8px 12px; border-radius: 10px; border: 2px solid rgba(255,255,255,.3); text-align: center; }
+.lead-box.lb0 { border-color: #ff8a80; background: rgba(225,6,0,.25); }
+.lead-box.lb1 { border-color: #8ab8ff; background: rgba(24,94,131,.45); }
+.lb-l { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; opacity: .85; }
+.lb-t { font-family: var(--display); font-size: 24px; font-weight: 700; }
+.lead-box.lb0 .lb-t, .lead-box.lb0 .lb-p { color: #ffb3ab; }
+.lead-box.lb1 .lb-t, .lead-box.lb1 .lb-p { color: #b5d3ff; }
+.lb-p { font-family: var(--display); font-size: 30px; font-weight: 700; }
+.lb-p small { font-size: 15px; font-weight: 500; }
+.lb-c { flex-basis: 100%; font-size: 14px; opacity: .9; }
+.lb-c b { font-family: var(--display); font-size: 18px; }
