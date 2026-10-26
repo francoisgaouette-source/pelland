@@ -109,6 +109,10 @@
       if (this.mode === 'firebase') { await this.db.collection('players').doc(id).delete(); return; }
       ls.set('pelland.players', ls.get('pelland.players', []).filter(x => x.id !== id));
     },
+    async deleteGame(id) {
+      if (this.mode === 'firebase') { await this.db.collection('games').doc(id).delete(); return; }
+      const all = ls.get('pelland.games', {}); delete all[id]; ls.set('pelland.games', all);
+    },
     async listGames() {
       if (this.mode === 'firebase') {
         const snap = await this.db.collection('games').orderBy('createdAt', 'desc').limit(100).get();
@@ -236,6 +240,7 @@
     if (S.unwatch && view !== 'game') { S.unwatch(); S.unwatch = null; S.game = null; }
     if (view !== 'game' && view !== 'setup' && Voice.wake) Voice.setWake(false);
     S.view = view; Object.assign(S, opts);
+    if (view === 'history') { S.historyList = null; S.confirmDelGame = null; }
     if (view === 'setup') { setHeard('Touchez le micro et dites les joueurs et leurs index.'); setReply(''); }
     if (view === 'game') { setHeard('Appuyez sur le micro et parlez.'); setReply(''); }
     render(); window.scrollTo(0, 0);
@@ -260,7 +265,7 @@
     const info = ls.get('pelland.lastGameInfo', null);
     const lastDate = info && info.id === last && info.createdAt ? new Date(info.createdAt).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' }) : null;
     return `
-      <div class="hero"><h1>La game à Pelland</h1><p>Carte de pointage à la voix pour quatre joueurs.</p></div>
+      <div class="hero"><h1>La game à Pelland</h1><p>Carte de pointage pour quatre joueurs.</p></div>
       <div class="tiles">
         <button class="tile" data-go="courses"><span class="pin">⛳</span><div><strong>Terrains</strong><span>Ajouter ou corriger un terrain avant la partie</span></div></button>
         <button class="tile" data-go="players"><span class="pin">☺</span><div><strong>Joueurs</strong><span>Ajouter ou retirer des joueurs avant la partie</span></div></button>
@@ -466,9 +471,12 @@
       <section class="hole-card" aria-live="polite">
         <div class="hole-top">
           <div class="hole-no">${h}</div>
-          <div class="hole-meta">Normale <b>${hi.par}</b> · Handicap <b>${hi.si}</b>${g.stake ? ` · Mise initiale <b>${fmt$(g.stake)}</b>` : ''}${meta.map(m => ` · <b>${m}</b>`).join('')}</div>
-          <div class="hole-changes">Changements de meneur <b>${L.leadChanges(g)}</b>${g.leadChangeValue ? ` · <b>${fmt$(L.leadChanges(g) * g.leadChangeValue)}</b>` : ''}</div>
+          <div class="hole-meta">Normale <b>${hi.par}</b> · Handicap <b>${hi.si}</b>${meta.map(m => ` · <b>${m}</b>`).join('')}</div>
           <div class="hole-nav"><button data-nav="-1" aria-label="Trou précédent">‹</button><button data-nav="1" aria-label="Trou suivant">›</button></div>
+        </div>
+        <div class="money-boxes">
+          <div class="mbox green"><span>Mise initiale</span><b>${g.stake ? fmt$(g.stake) : '—'}</b></div>
+          <div class="mbox yellow"><span>Changements de meneur</span><b>${L.leadChanges(g)}${g.leadChangeValue ? ` · ${fmt$(L.leadChanges(g) * g.leadChangeValue)}` : ''}</b></div>
         </div>
         <div class="team-blocks">${[1, 0].map(k => { const tm = L.getTeams(g)[k], teamPts = L.teamPoints(g).tot;
           const tt = L.trailingTeam(g, h), pt = L.pressTeamOf(g, h), started = ((g.scores || {})[h] || []).some(v => v != null);
@@ -495,6 +503,12 @@
           : 'La carte se met à jour en direct à chaque score entré par le responsable.'}</p>
         <p class="note">${esc(g.mode === 'bas' ? 'Bas handicap' : 'Full handicap')} · ${g.players.map(p => `${esc(p.name)} ${esc(p.tee)}, index ${String(p.index).replace('.', ',')}, ${p.strokes} coups`).join(' · ')}</p>
         ${Store.mode === 'firebase' ? `<p class="note">Code à donner aux autres joueurs : <b class="num" style="font-size:22px;letter-spacing:.15em">${esc(g.id)}</b></p>` : ''}
+        ${owner ? `<div class="row game-actions">${g.status === 'terminée'
+          ? '<span class="note">Partie terminée et sauvegardée.</span><button class="btn ghost small" data-reopen type="button">Rouvrir</button>'
+          : '<button class="btn small" data-finish type="button">Terminer et sauvegarder</button>'}
+          ${S.confirmDelGame === g.id
+            ? '<button class="btn small" data-delthis type="button" style="background:var(--red)">Confirmer l\'effacement</button><button class="btn ghost small" data-canceldelgame type="button">Annuler</button>'
+            : '<button class="btn ghost small" data-askdelthis type="button">Effacer la partie</button>'}</div>` : ''}
       </section>`;
   }
 
@@ -502,15 +516,21 @@
   let historyCache = null;
   function vHistory() {
     $('#barTitle').textContent = 'Historique';
-    if (!historyCache) { Store.listGames().then(l => { historyCache = l; if (S.view === 'history') render(); }).catch(e => toast(e.message)); return '<p class="note">Chargement…</p>'; }
-    const list = historyCache; historyCache = null;
+    if (S.historyList == null) { Store.listGames().then(l => { S.historyList = l; if (S.view === 'history') render(); }).catch(e => toast(e.message)); return '<p class="note">Chargement…</p>'; }
+    const list = S.historyList;
     if (!list.length) return '<section class="card"><h2>Aucune partie encore</h2><p class="note">Les parties apparaîtront ici dès leur création.</p></section>';
     return `<div class="list">${list.map(g => {
       const d = new Date(g.createdAt);
-      const played = Object.keys(g.scores || {}).length;
-      const lead = g.players.map((p, i) => ({ p, t: L.totals(g, i) })).filter(x => x.t.played).sort((a, b) => a.t.netToPar - b.t.netToPar)[0];
-      return `<button class="item" data-open="${esc(g.id)}"><b>${d.toLocaleDateString('fr-CA', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })} · ${esc(g.course.name.replace(/^Club de golf /i, ''))}</b>
-        <span>${g.players.map(p => esc(p.name)).join(', ')} · ${played}/18 trous${lead ? ` · meilleur net : ${esc(lead.p.name)}` : ''} · code ${esc(g.id)}</span></button>`;
+      const played = Object.keys(g.scores || {}).filter(k => (g.scores[k] || []).some(v => v != null)).length;
+      const t = L.teamPoints(g).tot;
+      const res = t[0] === t[1] ? 'égalité' : `${L.TEAMS[t[0] > t[1] ? 0 : 1]} +${Math.abs(t[0] - t[1])}`;
+      const mine = g.ownerUid === Store.uid;
+      const done = g.status === 'terminée';
+      return `<div class="item hist ${done ? 'done' : ''}"><button class="hist-open" data-open="${esc(g.id)}" type="button"><b>${d.toLocaleDateString('fr-CA', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })} · ${esc(g.course.name.replace(/^Club de golf /i, ''))}</b>
+        <span><span class="hist-st">${done ? 'Terminée' : 'En cours'}</span> ${g.players.map(p => esc(p.name)).join(', ')} · ${played}/18 trous · ${res}</span></button>
+        ${mine ? (S.confirmDelGame === g.id
+          ? `<span class="row"><button class="btn small" data-delgame="${esc(g.id)}" type="button" style="background:var(--red)">Effacer</button><button class="btn ghost small" data-canceldelgame type="button">Annuler</button></span>`
+          : `<button class="btn ghost small" data-askdelgame="${esc(g.id)}" type="button">Effacer</button>`) : ''}</div>`;
     }).join('')}</div>`;
   }
 
@@ -583,7 +603,15 @@
       $('#joinBtn').onclick = () => { const code = $('#code').value.trim().toUpperCase(); if (code) openGame(code); };
       $('#code').onkeydown = e => { if (e.key === 'Enter') $('#joinBtn').click(); };
     },
-    history(v) { commonNav(v); },
+    history(v) {
+      commonNav(v);
+      v.querySelectorAll('[data-askdelgame]').forEach(b => b.onclick = () => { S.confirmDelGame = b.dataset.askdelgame; render(); });
+      v.querySelectorAll('[data-canceldelgame]').forEach(b => b.onclick = () => { S.confirmDelGame = null; render(); });
+      v.querySelectorAll('[data-delgame]').forEach(b => b.onclick = async () => {
+        try { await removeGame(b.dataset.delgame); S.historyList = S.historyList.filter(x => x.id !== b.dataset.delgame); S.confirmDelGame = null; toast('Partie effacée.'); render(); }
+        catch (e) { toast('Effacement impossible : ' + e.message); }
+      });
+    },
     courses(v) {
       commonNav(v);
       v.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => go('course', { editCourse: JSON.parse(JSON.stringify(S.courses.find(c => c.id === b.dataset.edit))) }));
@@ -653,7 +681,7 @@
         const id = await Store.newCode();
         const g = { id, createdAt: Date.now(), ownerUid: Store.uid, course: pv.c, courseId: pv.c.id, mode: d.mode, responsable: d.responsable,
           players: pv.ps, teams: draftTeams(d, pv.ps), teamMode: d.teamMode, stake: money(d.stake), leadChangeValue: money(d.leadChangeValue), currentHole: 1, scores: {}, events: {}, status: 'en cours' };
-        try { await Store.saveGame(g); S.draft = null; openGame(id); const msg = `Partie créée. ${g.players.map(p => `${p.name} ${p.strokes} coup${Math.abs(p.strokes) > 1 ? 's' : ''}`).join(', ')}. Rouges : ${L.teamName(g, 0)}. Bleus : ${L.teamName(g, 1)}. Trou 1, normale ${L.holeInfo(g, 1, 0).par}.`; setHeard('« Créer la partie »'); setReply(msg); Voice.say(msg); }
+        try { await Store.saveGame(g); S.draft = null; openGame(id); const msg = 'Partie créée.'; setHeard('« Créer la partie »'); setReply(msg); Voice.say(msg); }
         catch (e) { toast('Création impossible : ' + e.message); }
       };
     },
@@ -665,6 +693,17 @@
       });
       v.querySelectorAll('[data-cell]').forEach(b => b.onclick = () => { const [h] = b.dataset.cell.split(':').map(Number); allScoresSheet(h); });
       v.querySelectorAll('[data-allscores]').forEach(b => b.onclick = () => allScoresSheet(+b.dataset.allscores));
+      const fin = v.querySelector('[data-finish]'); if (fin) fin.onclick = async () => {
+        const ng = JSON.parse(JSON.stringify(S.game)); ng.status = 'terminée'; ng.finishedAt = Date.now();
+        try { await Store.saveGame(ng); S.game = ng; toast('Partie terminée et sauvegardée dans l\'historique.'); ls.set('pelland.lastGame', null); go('home'); } catch (e) { toast('Sauvegarde impossible : ' + e.message); }
+      };
+      const reo = v.querySelector('[data-reopen]'); if (reo) reo.onclick = async () => { const ng = JSON.parse(JSON.stringify(S.game)); ng.status = 'en cours'; delete ng.finishedAt; S.game = ng; render(); await Store.saveGame(ng); };
+      const ask = v.querySelector('[data-askdelthis]'); if (ask) ask.onclick = () => { S.confirmDelGame = S.game.id; render(); };
+      const can = v.querySelector('[data-canceldelgame]'); if (can) can.onclick = () => { S.confirmDelGame = null; render(); };
+      const del = v.querySelector('[data-delthis]'); if (del) del.onclick = async () => {
+        const id = S.game.id;
+        try { if (S.unwatch) { S.unwatch(); S.unwatch = null; } await removeGame(id); S.confirmDelGame = null; toast('Partie effacée.'); go('home'); } catch (e) { toast('Effacement impossible : ' + e.message); }
+      };
       const hh = S.game.currentHole || 1;
       v.querySelectorAll('[data-press-team]').forEach(b => b.onclick = () => commit([{ type: 'press', hole: hh, team: +b.dataset.pressTeam, player: null }]));
       v.querySelectorAll('[data-unpress]').forEach(b => b.onclick = () => commit([{ type: 'unpress', hole: hh }]));
@@ -677,6 +716,10 @@
     v.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openGame(b.dataset.open));
   }
 
+  async function removeGame(id) {
+    await Store.deleteGame(id);
+    if (ls.get('pelland.lastGame', null) === id) { ls.set('pelland.lastGame', null); ls.set('pelland.lastGameInfo', null); }
+  }
   function openGame(id) {
     if (S.unwatch) S.unwatch();
     S.undo = [];
@@ -834,7 +877,7 @@
         }).join('')}</div>
         <div class="toggles"><div class="tg"><span>Skin à… (joueurs qui ont fait la normale)</span>${eligible.length ? eligible.map(pi => `<button type="button" class="pill team-pill t${teamOf(g, pi)}" data-skinp="${pi}" aria-pressed="${skinPlayer === pi}">${esc(P[pi].name)}</button>`).join('') : `<span class="note" style="width:auto">${vals.every(v => v == null) ? 'Entrez les scores d\'abord.' : 'Personne n\'a fait la normale.'}</span>`}<button type="button" class="pill" data-skinp="-1" aria-pressed="${skin === -1}">Pas de skin</button></div>
         <p class="note">${skin === 0 || skin === 1 ? `Skin pour les ${L.TEAMS[skin]}.` : skin === -1 ? 'Pas de skin.' : 'Skin pas encore indiquée.'}</p></div>
-        <div class="row"><button type="button" class="btn" data-save>Enregistrer</button><button type="button" class="btn ghost small" data-close>Annuler</button></div>`;
+        <div class="sheet-foot"><button type="button" class="btn ghost small" data-close>Annuler</button><button type="button" class="btn" data-save>Enregistrer</button></div>`;
       sheet.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { const pi = +b.dataset.p, n = +b.dataset.n; vals[pi] = vals[pi] === n ? null : n; draw(); });
       sheet.querySelectorAll('[data-plus]').forEach(b => b.onclick = () => { const pi = +b.dataset.p; vals[pi] = (vals[pi] || Math.max(1, L.holeInfo(g, h, pi).par - 2) + 5) + 1; draw(); });
       sheet.querySelectorAll('[data-skinp]').forEach(b => b.onclick = () => {
