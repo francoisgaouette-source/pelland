@@ -184,9 +184,20 @@
     return `Normale 3 : personne ne gagne, ${x.value} $ reportés à la prochaine normale 3.`;
   }
   // Texte court pour la colonne « Calcul » de la carte.
+  // Initiales uniques : « Francois Gaouette » → FG ; un seul prénom → 2 lettres (« Marc » → Ma).
+  function initials(players) {
+    const words = players.map(p => String(p.name || '').trim().split(/[\s-]+/).filter(Boolean));
+    let out = words.map(w => w.length > 1 ? w.map(x => x[0].toUpperCase()).join('') : (w[0] || '?').slice(0, 2).replace(/^./, c => c.toUpperCase()));
+    for (let n = 3; n <= 6; n++) {
+      const dup = out.map((x, i) => out.indexOf(x) !== i || out.lastIndexOf(x) !== i);
+      if (!dup.some(Boolean)) break;
+      out = out.map((x, i) => dup[i] ? (words[i].length > 1 ? words[i][0].slice(0, n - 1).replace(/^./, c => c.toUpperCase()) + words[i].slice(1).map(w => w[0].toUpperCase()).join('') : words[i][0].slice(0, n).replace(/^./, c => c.toUpperCase())) : x);
+    }
+    return out;
+  }
   function calcText(game, hole) {
     const r = holePoints(game, hole); if (!r) return '';
-    const P = game.players, nm = a => a.map(i => P[i].name).join(' et ');
+    const P = game.players, ini = initials(P), nm = a => a.map(i => ini[i]).join('+');
     const cab = cabaneTeam(game, hole);
     const st = skinTeam(game, hole);
     if (cab != null) return `Oiselet + skin + haut : cabane ${TEAMS[cab]} ${CABANE_POINTS}`;
@@ -542,8 +553,18 @@
         if (row.every(v => v != null) && a.hole === (g.currentHole || 1) && a.hole < 18) { g.currentHole = a.hole + 1; say.push(`On passe au ${a.hole + 1}.`); }
       }
       if (a.type === 'nopress') { const e = ev(a.hole); e.presses = []; e.noPress = true; e.reroll = false; e.rerollSet = true; say.push(`Pas de press au ${a.hole}.`); }
-      if (a.type === 'press') { ev(a.hole).noPress = false; ev(a.hole).presses.push(a.player); say.push(`Trou ${a.hole} pressé${a.player != null ? ' par ' + g.players[a.player].name : ''}.`); }
-      if (a.type === 'reroll') { ev(a.hole).reroll = a.on; ev(a.hole).rerollSet = true; say.push(a.on ? `Reroll au trou ${a.hole}.` : `Pas de reroll au trou ${a.hole}.`); }
+      if (a.type === 'unpress') { const e = ev(a.hole); e.presses = []; e.pressTeam = null; e.noPress = false; e.reroll = false; e.rerollSet = false; say.push(`Press retirée au ${a.hole}.`); }
+      if (a.type === 'press') {
+        const tt = trailingTeam(g, a.hole);
+        const team = a.player != null ? getTeams(g).findIndex(x => x.includes(a.player)) : (a.team != null ? a.team : tt);
+        if (tt == null) { say.push('Égalité : personne ne peut presser.'); return; }
+        if (team !== tt) { say.push(`Seuls ${tl(tt)} peuvent presser, ils sont en déficit.`); return; }
+        if ((ev(a.hole).presses || []).length) { say.push(`Le ${a.hole} est déjà pressé.`); return; }
+        ev(a.hole).pressTeam = tt;
+      }
+      if (a.type === 'press') { ev(a.hole).noPress = false; ev(a.hole).presses.push(a.player); say.push(`${a.player != null ? g.players[a.player].name + ' presse' : 'Les ' + TEAMS[ev(a.hole).pressTeam] + ' pressent'} au ${a.hole}. Points fois 2.`); }
+      if (a.type === 'reroll' && a.on && !(ev(a.hole).presses || []).length) { say.push('Il faut une press avant un reroll.'); return; }
+      if (a.type === 'reroll') { ev(a.hole).reroll = a.on; ev(a.hole).rerollSet = true; say.push(a.on ? `Reroll au ${a.hole}. Points fois 4.` : `Pas de reroll au ${a.hole}.`); }
       if (a.type === 'par3') {
         if (holeInfo(g, a.hole, 0).par !== 3) { say.push(`Attention, le trou ${a.hole} n'est pas un par 3.`); return; }
         ev(a.hole).par3Winner = a.player; say.push(a.player == null ? `Personne au par 3 du ${a.hole}.` : `${g.players[a.player].name} gagne le par 3 du ${a.hole}.`);
@@ -600,7 +621,19 @@
   }
   function capName(n) { return n.split(/([\s-])/).map(x => x.length > 1 ? x[0].toUpperCase() + x.slice(1) : x).join(''); }
 
-  function parseSetup(text, draft, course) {
+  // Retrouve le nom complet dans la bibliothèque de joueurs (« Gaouette » → « François Gaouette »).
+  function resolveName(name, library) {
+    if (!library || !library.length) return name;
+    const n = norm(name), words = n.split(' ');
+    const lib = library.map(x => ({ name: x, n: norm(x) }));
+    const exact = lib.find(x => x.n === n); if (exact) return exact.name;
+    const hits = lib.filter(x => {
+      const lw = x.n.split(' ');
+      return words.every(w => lw.some(v => v === w || (w.length >= 4 && lev(v, w) <= 1)));
+    });
+    return hits.length === 1 ? hits[0].name : name;
+  }
+  function parseSetup(text, draft, course, library) {
     const d = JSON.parse(JSON.stringify(draft));
     const said = [];
     let t = wordsToDigits(text)
@@ -608,9 +641,14 @@
       .replace(/\bplus\s+(\d+(?:\.\d)?)/gi, '-$1');
     const low = plainWord(t) === '' ? '' : t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
     const findPlayer = name => {
-      const names = d.players.map(p => p.name || '');
-      const i = matchPlayer(norm(name).split(' ')[0], names.map(n => n || '§'));
-      return i;
+      const n = norm(name), words = n.split(' ');
+      const names = d.players.map(p => norm(p.name || ''));
+      const exact = names.indexOf(n); if (exact >= 0) return exact;
+      // prénom + nom : n'écrase un joueur existant que si celui-ci n'avait que ce prénom (« François » → « François Gaouette »)
+      if (words.length > 1) return names.findIndex(x => x && x.split(' ').length === 1 && x === words[0]);
+      // un seul mot : prénom ou nom de famille d'un joueur déjà inscrit
+      const hits = names.map((x, i) => x && x.split(' ').some(w => w === n || (n.length >= 4 && lev(w, n) <= 1)) ? i : -1).filter(i => i >= 0);
+      return hits.length === 1 ? hits[0] : (hits.length ? -2 : matchPlayer(n, d.players.map(p => p.name || '§')));
     };
 
     // Créer la partie
@@ -681,7 +719,9 @@
     // Application
     const done = [];
     found.forEach(f => {
+      f.name = resolveName(f.name, library);
       let i = f.slot != null ? f.slot : findPlayer(f.name);
+      if (i === -2) { said.push(`Deux joueurs s'appellent ${f.name}. Dites le prénom et le nom.`); return; }
       if (i < 0) i = d.players.findIndex(p => !String(p.name || '').trim());
       if (i < 0) return;
       if (f.index == null && norm(d.players[i].name || '') !== norm(f.name)) d.players[i].index = '';
@@ -730,6 +770,17 @@
   }
 
   // Prochaine question à poser au responsable : skin du trou terminé, press au trou en cours, puis reroll.
+  // Seule l'équipe en déficit (points avant ce trou) peut presser ; l'autre peut alors faire un reroll.
+  function trailingTeam(game, hole) {
+    const t = [0, 0];
+    for (let x = 1; x < hole; x++) { const ht = holeTotal(game, x); if (ht) { t[0] += ht[0]; t[1] += ht[1]; } }
+    return t[0] === t[1] ? null : (t[0] < t[1] ? 0 : 1);
+  }
+  function pressTeamOf(game, hole) {
+    const e = (game.events || {})[hole] || {};
+    if (!(e.presses || []).length) return null;
+    return e.pressTeam != null ? e.pressTeam : trailingTeam(game, hole);
+  }
   function nextPrompt(game) {
     const h = game.currentHole || 1;
     const complete = x => { const r = (game.scores || {})[x]; return r && r.length === game.players.length && r.every(v => v != null); };
@@ -738,11 +789,12 @@
     const e = (game.events || {})[h] || {};
     const started = ((game.scores || {})[h] || []).some(v => v != null);
     const pressed = (e.presses || []).length > 0;
-    if (!pressed && !e.noPress && !started) return { type: 'press', hole: h, text: `Press au ${h} ?` };
-    if (pressed && !e.rerollSet) return { type: 'reroll', hole: h, text: 'Reroll ?' };
+    const tt = trailingTeam(game, h);
+    if (!pressed && !e.noPress && !started && tt != null) return { type: 'press', hole: h, team: tt, text: `Les ${TEAMS[tt]}, press au ${h} ?` };
+    if (pressed && !e.rerollSet && !started) { const pt = pressTeamOf(game, h); return { type: 'reroll', hole: h, team: pt == null ? null : 1 - pt, text: pt == null ? 'Reroll ?' : `Les ${TEAMS[1 - pt]}, reroll ?` }; }
     return null;
   }
 
-  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, TEAMS, teamFromText, makeTeams, orderTeams, getTeams, teamName, netScore, holeMultiplier, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, cabaneTeam, cabanes, calcText, par3Results, describePar3, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup, nextPrompt };
+  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, TEAMS, teamFromText, makeTeams, orderTeams, getTeams, teamName, netScore, holeMultiplier, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, cabaneTeam, cabanes, calcText, par3Results, describePar3, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup, resolveName, nextPrompt, trailingTeam, pressTeamOf, initials };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PellandLogic = api;
 })(this);
