@@ -75,6 +75,13 @@
     const s = getScore(game, hole, pi); if (s == null) return null;
     return s - strokesOnHole(game.players[pi].strokes, game.course.holes[hole - 1].si);
   }
+  // Pressé : points du trou × 2. Reroll : points du trou × 4. (La skin reste à 1 point.)
+  function holeMultiplier(game, hole) {
+    const e = (game.events || {})[hole] || {};
+    if (e.reroll) return 4;
+    if ((e.presses || []).length) return 2;
+    return 1;
+  }
   function holePoints(game, hole) {
     const T = getTeams(game);
     const teamOf = pi => T.findIndex(t => t.includes(pi));
@@ -83,14 +90,15 @@
     const lo = Math.min(...nets), hi = Math.max(...nets);
     const loP = nets.map((n, i) => n === lo ? i : -1).filter(i => i >= 0);
     const hiP = nets.map((n, i) => n === hi ? i : -1).filter(i => i >= 0);
+    const mult = holeMultiplier(game, hole);
     const pts = [0, 0];
     const loTeams = [...new Set(loP.map(teamOf))], hiTeams = [...new Set(hiP.map(teamOf))];
     const low = { players: loP, net: lo, team: loTeams.length === 1 ? loTeams[0] : null };
     const high = { players: hiP, net: hi, team: hiTeams.length === 1 ? hiTeams[0] : null };
     if (lo === hi) { low.team = null; high.team = null; }
-    if (low.team != null) pts[low.team] += POINTS;
-    if (high.team != null) pts[1 - high.team] += POINTS;
-    return { pts, low, high, nets };
+    if (low.team != null) pts[low.team] += POINTS * mult;
+    if (high.team != null) pts[1 - high.team] += POINTS * mult;
+    return { pts, low, high, nets, mult };
   }
   // Skin : l'équipe qui a la skin gagne 1 point. skinTeam : 0 ou 1 = équipe, -1 = pas de skin, null = pas encore dit.
   const SKIN_POINTS = 1;
@@ -101,9 +109,13 @@
     if (Array.isArray(e.skins) && e.skins.length) return getTeams(game).findIndex(t => t.includes(e.skins[0]));
     return null;
   }
+  // Cabane : l'équipe reçoit 12 points pour le trou (au lieu des points habituels et de la skin).
+  const CABANE_POINTS = 12;
   function holeTotal(game, hole) {
     const r = holePoints(game, hole); const st = skinTeam(game, hole);
     if (!r && (st == null || st < 0)) return null;
+    const cab = cabaneTeam(game, hole);
+    if (cab != null) { const pts = [0, 0]; pts[cab] = CABANE_POINTS; return pts; }
     const pts = r ? r.pts.slice() : [0, 0];
     if (st === 0 || st === 1) pts[st] += SKIN_POINTS;
     return pts;
@@ -111,13 +123,53 @@
   function teamPoints(game) {
     const tot = [0, 0], skins = [0, 0]; let holes = 0;
     for (let h = 1; h <= 18; h++) {
-      const r = holePoints(game, h); if (r) { tot[0] += r.pts[0]; tot[1] += r.pts[1]; holes++; }
-      const st = skinTeam(game, h); if (st === 0 || st === 1) { tot[st] += SKIN_POINTS; skins[st]++; }
+      const r = holePoints(game, h); if (r) holes++;
+      const st = skinTeam(game, h); if (st === 0 || st === 1) skins[st]++;
+      const ht = holeTotal(game, h); if (ht) { tot[0] += ht[0]; tot[1] += ht[1]; }
     }
     return { tot, holes, skins };
   }
+  // Cabane : une équipe fait un oiselet brut (un de ses joueurs), a la skin
+  // et obtient les points du plus mauvais score (le plus haut net est dans l'autre équipe).
+  // Retourne l'équipe (0 ou 1) ou null. La valeur de la cabane reste à définir.
+  function cabaneTeam(game, hole) {
+    const st = skinTeam(game, hole); if (st !== 0 && st !== 1) return null;
+    const r = holePoints(game, hole); if (!r || r.high.team == null || r.high.team === st) return null;
+    const birdie = getTeams(game)[st].some(pi => { const sc = getScore(game, hole, pi); return sc != null && sc < holeInfo(game, hole, pi).par; });
+    return birdie ? st : null;
+  }
+  function cabanes(game) {
+    const c = [0, 0]; for (let h = 1; h <= 18; h++) { const t = cabaneTeam(game, h); if (t != null) c[t]++; } return c;
+  }
+  // Normales 3 : l'équipe qui a la skin ET dont un joueur fait la normale (score brut ≤ normale) gagne 5 $.
+  // Sinon les 5 $ sont reportés et ajoutés à la prochaine normale 3.
+  const PAR3_DOLLARS = 5;
+  function par3Results(game) {
+    let pot = 0; const results = []; const money = [0, 0]; let blocked = false; let next = null;
+    for (let h = 1; h <= 18; h++) {
+      if (game.course.holes[h - 1].par !== 3) continue;
+      const value = pot + PAR3_DOLLARS;
+      const row = (game.scores || {})[h];
+      const complete = row && row.length === game.players.length && row.every(v => v != null);
+      const st = skinTeam(game, h);
+      if (blocked || !complete || st == null) { results.push({ hole: h, status: 'pending', value }); if (!blocked) { next = h; blocked = true; } continue; }
+      const made = st >= 0 && getTeams(game)[st].some(pi => getScore(game, h, pi) <= holeInfo(game, h, pi).par);
+      if (made) { results.push({ hole: h, status: 'won', team: st, amount: value }); money[st] += value; pot = 0; }
+      else { results.push({ hole: h, status: 'carried', value }); pot = value; }
+    }
+    const nextValue = next ? results.find(x => x.hole === next).value : null;
+    return { results, money, pot, next, nextValue };
+  }
+  function describePar3(game, hole) {
+    if (game.course.holes[hole - 1].par !== 3) return '';
+    const x = par3Results(game).results.find(r => r.hole === hole);
+    if (!x || x.status === 'pending') return '';
+    if (x.status === 'won') return `Normale 3 : l'équipe ${x.team + 1} gagne ${x.amount} $.`;
+    return `Normale 3 : personne ne gagne, ${x.value} $ reportés à la prochaine normale 3.`;
+  }
   function describeSkin(game, hole) {
     const st = skinTeam(game, hole);
+    if ((st === 0 || st === 1) && cabaneTeam(game, hole) != null) return `Skin pour l'équipe ${st + 1} et cabane : ${CABANE_POINTS} points pour le trou.`;
     if (st === 0 || st === 1) return `Skin pour l'équipe ${st + 1}, 1 point.`;
     if (st === -1) return 'Pas de skin.';
     return 'Skin pas encore indiquée.';
@@ -126,9 +178,11 @@
     const r = holePoints(game, hole); if (!r) return '';
     const P = game.players, names = a => a.map(i => P[i].name).join(' et ');
     const parts = [];
-    if (r.low.team != null) parts.push(`${names(r.low.players)} plus bas net ${r.low.net}, 2 points pour l'équipe ${r.low.team + 1}`);
+    const v = POINTS * r.mult;
+    if (r.mult > 1) parts.push(r.mult === 4 ? 'Reroll, points fois 4' : 'Pressé, points fois 2');
+    if (r.low.team != null) parts.push(`${names(r.low.players)} plus bas net ${r.low.net}, ${v} points pour l'équipe ${r.low.team + 1}`);
     else parts.push(`égalité au plus bas net ${r.low.net}, pas de points`);
-    if (r.high.team != null) parts.push(`${names(r.high.players)} plus haut net ${r.high.net}, 2 points à l'équipe ${2 - r.high.team}`);
+    if (r.high.team != null) parts.push(`${names(r.high.players)} plus haut net ${r.high.net}, ${v} points à l'équipe ${2 - r.high.team}`);
     else if (r.low.net !== r.high.net) parts.push(`égalité au plus haut net, pas de points`);
     return parts.join(' ; ') + '.';
   }
@@ -269,8 +323,9 @@
       if (/\bpoints?\b|la game|resultat|qui gagne|qui mene/.test(t)) topic = 'points';
       else if (/equipe|partenaire|avec qui|joue avec|team/.test(t)) topic = 'teams';
       else if (/coup/.test(t)) topic = 'strokes';
+      else if (/cabane/.test(t)) topic = 'cabanes';
       else if (/skin/.test(t)) topic = 'skins';
-      else if (/par3/.test(t)) topic = 'par3';
+      else if (/par3|normale 3|normale trois|dollar|argent|cagnotte|\bpot\b/.test(t)) topic = 'par3';
       else if (/press/.test(t)) topic = 'presses';
       else if (/reroll/.test(t)) topic = 'rerolls';
       else if (hole && /\b(par|handicap|difficile|info)\b/.test(t)) topic = 'hole';
@@ -289,20 +344,20 @@
 
     const h = hole || current;
 
+    if (/\bpress/.test(t) && /\b(pas de|pas d|aucune?|sans|non|personne)\b/.test(t)) {
+      actions.push({ type: 'nopress', hole: h }); return { kind: 'command', actions };
+    }
     if (/\bpress/.test(t)) {
       const who = mentioned.length ? mentioned : [null];
       who.forEach(p => actions.push({ type: 'press', hole: h, player: p }));
       return { kind: 'command', actions };
     }
     if (/\breroll\b/.test(t)) { actions.push({ type: 'reroll', hole: h, on: !/\b(pas|enleve|retire)\b/.test(t) }); return { kind: 'command', actions }; }
-    if (/par3/.test(t) || /plus pres/.test(t)) {
-      if (mentioned.length) actions.push({ type: 'par3', hole: h, player: mentioned[0] });
-      else if (/\b(personne|aucun)\b/.test(t)) actions.push({ type: 'par3', hole: h, player: null });
-      return actions.length ? { kind: 'command', actions } : { kind: 'unknown' };
-    }
+    if (/par3|normale 3|normale trois|plus pres|dollar|argent|cagnotte|pot\b/.test(t)) return { kind: 'question', q: { topic: 'par3', hole, players: mentioned } };
     if (skinCmd) {
       // sans numéro de trou : le trou en cours s'il a des scores, sinon le trou qui vient de se terminer
       let sh = hole;
+      if (!sh) { const np = nextPrompt(game); if (np && np.type === 'skin') sh = np.hole; }
       if (!sh) { const row = (game.scores || {})[current]; sh = row && row.some(v => v != null) ? current : Math.max(1, current - 1); }
       let team = null;
       const tm = t.match(/equipe\s+(1|un|une|2|deux)\b/);
@@ -385,15 +440,24 @@
         if (!who.length) return `Au trou ${h}, handicap ${si}, personne ne reçoit de coup.`;
         return `Au trou ${h}, handicap ${si} : ` + who.map(x => `${x.p.name} ${x.k > 0 ? 'reçoit ' + plural(x.k, 'coup') : 'redonne ' + plural(-x.k, 'coup')}`).join(', ') + '.';
       }
+      case 'cabanes': {
+        const c = cabanes(game);
+        if (!c[0] && !c[1]) return 'Aucune cabane pour l\'instant.';
+        return `Cabanes : équipe 1, ${c[0]} ; équipe 2, ${c[1]}.`;
+      }
       case 'skins': {
         const sk = teamPoints(game).skins;
         if (!sk[0] && !sk[1]) return 'Aucune skin pour l\'instant.';
         return `Skins : équipe 1, ${plural(sk[0], 'skin')} ; équipe 2, ${plural(sk[1], 'skin')}.`;
       }
       case 'par3': {
-        const ev = game.events || {}; const out = [];
-        for (let h = 1; h <= 18; h++) if (ev[h] && ev[h].par3Winner != null) out.push(`trou ${h}, ${P[ev[h].par3Winner].name}`);
-        return out.length ? 'Par 3 gagnés : ' + out.join(' ; ') + '.' : 'Aucun par 3 attribué pour l\'instant.';
+        const r = par3Results(game);
+        const done = r.results.filter(x => x.status !== 'pending');
+        let out = done.map(x => x.status === 'won' ? `au ${x.hole}, l'équipe ${x.team + 1} gagne ${x.amount} $` : `au ${x.hole}, personne, reporté`).join(' ; ');
+        out = out ? 'Normales 3 : ' + out + '. ' : 'Aucune normale 3 jouée pour l\'instant. ';
+        out += `Argent : équipe 1, ${r.money[0]} $ ; équipe 2, ${r.money[1]} $.`;
+        if (r.next) out += ` La prochaine normale 3, au ${r.next}, vaut ${r.nextValue} $.`;
+        return out;
       }
       case 'presses': {
         const ev = game.events || {}; const out = [];
@@ -445,10 +509,10 @@
           const tp = teamPoints(g).tot; say.push(`Total : ${tp[0]} à ${tp[1]}.`);
         }
         if (row.every(v => v != null) && a.hole === (g.currentHole || 1) && a.hole < 18) { g.currentHole = a.hole + 1; say.push(`On passe au ${a.hole + 1}.`); }
-        if (row.every(v => v != null) && skinTeam(g, a.hole) == null) say.push(`Skin ou pas de skin au ${a.hole} ?`);
       }
-      if (a.type === 'press') { ev(a.hole).presses.push(a.player); say.push(`Trou ${a.hole} pressé${a.player != null ? ' par ' + g.players[a.player].name : ''}.`); }
-      if (a.type === 'reroll') { ev(a.hole).reroll = a.on; say.push(a.on ? `Reroll au trou ${a.hole}.` : `Reroll retiré au trou ${a.hole}.`); }
+      if (a.type === 'nopress') { const e = ev(a.hole); e.presses = []; e.noPress = true; e.reroll = false; e.rerollSet = true; say.push(`Pas de press au ${a.hole}.`); }
+      if (a.type === 'press') { ev(a.hole).noPress = false; ev(a.hole).presses.push(a.player); say.push(`Trou ${a.hole} pressé${a.player != null ? ' par ' + g.players[a.player].name : ''}.`); }
+      if (a.type === 'reroll') { ev(a.hole).reroll = a.on; ev(a.hole).rerollSet = true; say.push(a.on ? `Reroll au trou ${a.hole}.` : `Pas de reroll au trou ${a.hole}.`); }
       if (a.type === 'par3') {
         if (holeInfo(g, a.hole, 0).par !== 3) { say.push(`Attention, le trou ${a.hole} n'est pas un par 3.`); return; }
         ev(a.hole).par3Winner = a.player; say.push(a.player == null ? `Personne au par 3 du ${a.hole}.` : `${g.players[a.player].name} gagne le par 3 du ${a.hole}.`);
@@ -456,6 +520,8 @@
       if (a.type === 'skin') {
         const e = ev(a.hole); e.skinTeam = a.team; e.skins = [];
         say.push(a.team === -1 ? `Pas de skin au trou ${a.hole}.` : `Skin au trou ${a.hole} pour l'équipe ${a.team + 1}, ${teamName(g, a.team)}. 1 point.`);
+        { const p3 = describePar3(g, a.hole); if (p3) say.push(p3); }
+        if (cabaneTeam(g, a.hole) != null) say.push(`Cabane pour l'équipe ${a.team + 1} ! ${CABANE_POINTS} points pour le trou.`);
         const tp = teamPoints(g).tot; say.push(`Total : ${tp[0]} à ${tp[1]}.`);
       }
       if (a.type === 'skins') { ev(a.hole).skins = a.players; say.push(a.players.length ? `Skin au trou ${a.hole} : ${a.players.map(i => g.players[i].name).join(', ')}.` : `Pas de skin au trou ${a.hole}.`); }
@@ -608,9 +674,42 @@
       if (!String(p.name || '').trim()) missing.push(`le joueur ${i + 1}`);
       else if (p.index === '' || p.index == null) missing.push(`l'index de ${p.name}`);
     });
+    // Équipes : « oui » / « le meilleur avec le moins bon » → automatique ; « François avec Marc » → choisies
+    const plain = norm(text);
+    const names = d.players.map(p => p.name || '§');
+    let teamMsg = null;
+    let pm = plain.match(/([a-z-]+)\s+(?:joue\s+|jouera\s+|va\s+)?avec\s+([a-z-]+)/) || plain.match(/([a-z-]+)\s+et\s+([a-z-]+)\s+ensemble/) || plain.match(/equipe\s+([a-z-]+)\s+(?:et\s+)?([a-z-]+)/);
+    if (pm && !/meilleur|moins bon/.test(plain)) {
+      const a = matchPlayer(pm[1], names), b = matchPlayer(pm[2], names);
+      if (a >= 0 && b >= 0 && a !== b) {
+        const others = [0, 1, 2, 3].filter(i => i !== a && i !== b);
+        d.teamMode = 'manual'; d.teams = [[a, b], others];
+        teamMsg = `Équipes : ${d.players[a].name} et ${d.players[b].name} contre ${d.players[others[0]].name} et ${d.players[others[1]].name}.`;
+      }
+    } else if (/meilleur.*(moins bon|pire|plus haut)|(moins bon|pire).*meilleur|automatique/.test(plain) ||
+               (d.teamMode == null && /^(oui|ok|exact|correct|parfait|c est ca|d accord|oui c est ca)$/.test(plain))) {
+      d.teamMode = 'auto'; teamMsg = 'Équipes : le meilleur avec le moins bon.';
+    } else if (d.teamMode == null && /^(non|pas vraiment|non merci)$/.test(plain)) {
+      teamMsg = 'D\'accord. Dites qui joue avec qui, par exemple « François avec Marc ».';
+    }
+    if (teamMsg) said.push(teamMsg);
     return { draft: d, said: said.join(' '), missing, create: create && !said.length, understood: said.length > 0 };
   }
 
-  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, makeTeams, getTeams, teamName, netScore, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup };
+  // Prochaine question à poser au responsable : skin du trou terminé, press au trou en cours, puis reroll.
+  function nextPrompt(game) {
+    const h = game.currentHole || 1;
+    const complete = x => { const r = (game.scores || {})[x]; return r && r.length === game.players.length && r.every(v => v != null); };
+    for (const x of [h - 1, h]) if (x >= 1 && complete(x) && skinTeam(game, x) == null) return { type: 'skin', hole: x, text: `Skin ou pas de skin au ${x} ?` };
+    if (complete(h)) return null;
+    const e = (game.events || {})[h] || {};
+    const started = ((game.scores || {})[h] || []).some(v => v != null);
+    const pressed = (e.presses || []).length > 0;
+    if (!pressed && !e.noPress && !started) return { type: 'press', hole: h, text: `Press au ${h} ?` };
+    if (pressed && !e.rerollSet) return { type: 'reroll', hole: h, text: 'Reroll ?' };
+    return null;
+  }
+
+  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, makeTeams, getTeams, teamName, netScore, holeMultiplier, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, cabaneTeam, cabanes, par3Results, describePar3, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup, nextPrompt };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PellandLogic = api;
 })(this);
