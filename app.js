@@ -96,9 +96,9 @@
     async listPlayers() {
       if (this.mode === 'firebase') {
         const snap = await this.db.collection('players').get();
-        return snap.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => a.name.localeCompare(b.name));
+        return snap.docs.map(d => ({ ...d.data(), id: d.id })).sort(byName);
       }
-      return ls.get('pelland.players', []).sort((a, b) => a.name.localeCompare(b.name));
+      return ls.get('pelland.players', []).sort(byName);
     },
     async savePlayer(name) {
       const p = { id: slug(name) + '-' + Math.random().toString(36).slice(2, 6), name: name.trim(), updatedAt: Date.now() };
@@ -126,6 +126,18 @@
   function fromDb(o) {
     if (o && o.teams && !Array.isArray(o.teams)) o.teams = [o.teams.e1, o.teams.e2];
     return o;
+  }
+  const byName = (a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
+  // Doublons possibles : même nom à une lettre ou deux près (accents, fautes), ou même nom de famille et même initiale.
+  function duplicateMap(list) {
+    const L2 = window.PellandLogic, n = list.map(p => L2.norm(p.name)), out = {};
+    const lev = (a, b) => { const m = a.length, k = b.length; let pr = Array.from({ length: k + 1 }, (_, j) => j); for (let i = 1; i <= m; i++) { const c = [i]; for (let j = 1; j <= k; j++) c[j] = Math.min(pr[j] + 1, c[j - 1] + 1, pr[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); pr = c; } return pr[k]; };
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+      const a = n[i], b = n[j], wa = a.split(' '), wb = b.split(' ');
+      const similar = lev(a, b) <= 2 || (wa.length > 1 && wb.length > 1 && wa[wa.length - 1] === wb[wb.length - 1] && wa[0][0] === wb[0][0]) || (wa.length === 1 || wb.length === 1) && (wa[0] === wb[0]);
+      if (similar) { (out[list[i].id] = out[list[i].id] || []).push(list[j].name); (out[list[j].id] = out[list[j].id] || []).push(list[i].name); }
+    }
+    return out;
   }
   function slug(s) { return L.norm(s).replace(/\s+/g, '-').slice(0, 30) || 'terrain'; }
 
@@ -268,10 +280,21 @@
       players: [0, 1, 2, 3].map(() => ({ name: '', index: '', tee: 'II' }))
     };
   }
+  // Ce qui manque avant de pouvoir créer la partie
+  function validIndex(v) { const x = parseFloat(String(v).replace(',', '.')); return String(v).trim() !== '' && /^[-+]?\d+([.,]\d)?$/.test(String(v).trim()) && x >= -10 && x <= 54; }
+  function missingList(d) {
+    const out = [];
+    d.players.forEach((p, i) => {
+      if (!String(p.name || '').trim()) out.push(`le nom du joueur ${i + 1}`);
+      else if (!String(p.index).trim()) out.push(`l'index de ${p.name.trim()}`);
+      else if (!validIndex(p.index)) out.push(`un index valide pour ${p.name.trim()} (ex. 12,4)`);
+    });
+    return out;
+  }
   function draftPreview(d) {
     const c = S.courses.find(x => x.id === d.courseId);
     if (!c) return null;
-    const ok = d.players.every(p => p.name.trim() && p.index !== '' && !isNaN(parseFloat(String(p.index).replace(',', '.'))));
+    const ok = !missingList(d).length;
     if (!ok) return { c, ready: false };
     const ps = L.buildPlayers(c, d.players.map(p => ({ name: p.name.trim(), index: parseFloat(String(p.index).replace(',', '.')), tee: p.tee })), d.mode);
     return { c, ready: true, ps };
@@ -283,7 +306,7 @@
     if (c && !c.tees.find(t => t.name === d.players[0].tee)) d.players.forEach(p => (p.tee = c.tees[0].name));
     const teeOpts = sel => (c ? c.tees : []).map(t => `<option value="${esc(t.name)}" ${t.name === sel ? 'selected' : ''}>${esc(t.name)}</option>`).join('');
     return `
-      <datalist id="playerList">${S.players.map(p => `<option value="${esc(p.name)}"></option>`).join('')}</datalist>
+      ${d.players.map((_, i) => `<datalist id="playerList${i}">${listOptions(d, i)}</datalist>`).join('')}
       <section class="card voice-help">
         <div class="step">Configuration à la voix</div>
         <p class="note">Touchez le micro en bas et dites, par exemple : « On joue au Pinegrove » · « François 12,4, Marc 8,1, Luc 18,6 et Pierre 3,2 » · « Marc est responsable » · « Tout le monde au tertre deux » · « Luc au tertre deux trois » · « Bas handicap » · « Oui » (meilleur avec le moins bon) ou « François avec Marc » · puis « Créer la partie ».</p>
@@ -297,8 +320,8 @@
         <div class="step">2 à 5 · Joueurs, responsable, index, tertre</div>
         ${d.players.map((p, i) => `
           <div class="prow">
-            <label>Joueur ${i + 1}<input id="pn${i}" type="text" list="playerList" value="${esc(p.name)}" placeholder="Prénom et nom" autocapitalize="words"></label>
-            <label>Index<input id="pi${i}" type="text" inputmode="decimal" value="${esc(p.index)}" placeholder="12,4"></label>
+            <label>Joueur ${i + 1}<input id="pn${i}" type="text" list="playerList${i}" value="${esc(p.name)}" placeholder="Prénom et nom" autocapitalize="words"></label>
+            <label>Index<input id="pi${i}" type="text" inputmode="decimal" value="${esc(p.index)}" placeholder="" aria-label="Index de ${esc(p.name || 'joueur ' + (i + 1))}"></label>
             <label>Tertre<select id="pt${i}">${teeOpts(p.tee)}</select></label>
             <label class="resp"><input type="radio" name="resp" value="${i}" ${d.responsable === i ? 'checked' : ''}> Responsable de la partie</label>
           </div>`).join('')}
@@ -321,8 +344,14 @@
       <section class="card">
         <div class="step">8 · Coups et équipes</div>
         <div id="pv" class="preview">${previewHtml(d)}</div>
-        <button class="btn" id="create" type="button">Créer la carte de pointage</button>
+        <p class="note" id="missingNote">${missingList(d).length ? 'Il manque ' + esc(missingList(d).join(', ')) + '.' : ''}</p>
+        <button class="btn" id="create" type="button" ${missingList(d).length ? 'disabled' : ''}>Créer la carte de pointage</button>
       </section>`;
+  }
+  // Noms de la bibliothèque pas encore choisis dans les autres cases
+  function listOptions(d, i) {
+    const taken = d.players.map((p, j) => j !== i ? L.norm(p.name || '') : '').filter(Boolean);
+    return S.players.filter(p => !taken.includes(L.norm(p.name))).map(p => `<option value="${esc(p.name)}"></option>`).join('');
   }
   function draftTeams(d, ps) { return d.teamMode === 'manual' && d.teams ? L.orderTeams(ps, d.teams) : L.makeTeams(ps); }
   function teamQuestion(d, ps) {
@@ -338,6 +367,16 @@
   }
 
   const teamOf = (g, i) => L.getTeams(g).findIndex(x => x.includes(i));
+  // Résumé : Bleus à gauche, Rouges à droite ; nom, index, score ; points et argent de l'équipe.
+  function summaryHtml(g, tots, p3) {
+    const T = L.getTeams(g), pts = L.teamPoints(g).tot, money = p3.money;
+    const fmt = n => n === 0 ? 'E' : (n > 0 ? '+' + n : '−' + (-n));
+    const cell = pi => { const p = g.players[pi], t = tots[pi]; return `<div class="sm-p"><div class="sm-n">${esc(p.name)}${g.responsable === pi ? ' ★' : ''}</div><div class="sm-i">Index ${String(p.index).replace('.', ',')}</div><div class="sm-s">${t.played ? t.gross : '–'}</div><div class="sm-i">${t.played ? `net ${t.net} (${fmt(t.netToPar)})` : '&nbsp;'}</div></div>`; };
+    return `<section class="summary">${[1, 0].map(k => `<div class="sm-team t${k}">
+        <div class="sm-players">${T[k].map(cell).join('')}</div>
+        <div class="sm-foot"><div><b>${pts[k]}</b> point${pts[k] > 1 ? 's' : ''}</div><div><b>${money[k]} $</b></div></div>
+      </div>`).join('')}</section>`;
+  }
   function teamsHtml(players, teams, pts, money) {
     const lead = pts && pts[0] !== pts[1] ? (pts[0] > pts[1] ? 0 : 1) : -1;
     return `<div class="teams">${teams.map((t, k) => `<div class="team t${k} ${lead === k ? 'lead' : ''}"><span class="step tn">${L.TEAMS[k]}</span><b>${t.map(i => esc(players[i].name)).join(' et ')}</b>${pts ? `<span class="tp num">${pts[k]} <small>pts</small>${money ? ` <small class="money">· ${money[k]} $</small>` : ''}</span>` : ''}<span class="note">index ${t.map(i => String(players[i].index).replace('.', ',')).join(' et ')}</span></div>`).join('')}</div>`;
@@ -428,12 +467,9 @@
           else if (!owner && pt != null && ev.reroll) btn = `<span class="tb-btn t${k} on">Reroll</span>`;
           return `<div class="team-block t${k}"><div class="tb-name">${L.TEAMS[k]}</div><div class="hole-players two">${tm.map(pi => { const p = g.players[pi]; const k = L.strokesOnHole(p.strokes, hi.si); const s = L.getScore(g, h, pi); return `<${owner ? `button type="button" data-allscores="${h}"` : 'div'} class="hp"><div class="nm tc${teamOf(g, pi)}">${esc(p.name)}${g.responsable === pi ? ' ★' : ''}</div><div class="sc">${s == null ? '–' : s}</div><div class="dots">${k ? dots(k) + ' ' + (k > 0 ? 'coup' + (k > 1 ? 's' : '') : 'redonne') : ''}</div></${owner ? 'button' : 'div'}>`; }).join('')}</div>${btn}</div>`; }).join('')}</div>
         ${holeChips.length ? `<div class="chips">${holeChips.join('')}</div>` : ''}
-              </section>
-
-      ${teamsHtml(g.players, L.getTeams(g), L.teamPoints(g).tot, p3.money)}
-      <section class="board">
-        ${g.players.map((p, i) => { const t = tots[i]; return `<div class="tot ${t.played && t.netToPar === best ? 'lead' : ''}"><div class="nm tc${teamOf(g, i)}">${esc(p.name)} <span class="tm t${teamOf(g, i)}">${L.TEAMS[teamOf(g, i)].slice(0, -1)}</span></div><div class="big">${t.played ? fmt(t.netToPar) : '–'} <small style="font-size:15px">net</small></div><div class="sub">${t.played ? `${t.gross} brut · ${t.net} net · ${t.played} tr.` : `${p.strokes} coups`}</div></div>`; }).join('')}
       </section>
+
+      ${summaryHtml(g, tots, p3)}
 
       <div class="card-scroll"><table class="sc">
         <thead><tr><th>Trou</th><th>Norm.</th><th>Handicap</th>${g.players.map((p, i) => `<th class="tc${teamOf(g, i)}" title="${esc(p.name)}">${esc(ini[i])}</th>`).join('')}<th>Statut</th><th>Calcul</th><th class="tc1">Bleu</th><th class="tc0">Rouge</th><th>Total</th></tr></thead>
@@ -472,9 +508,10 @@
     return `<section class="card"><h2>Ajouter un joueur</h2>
         <div class="row" style="flex-wrap:nowrap"><input id="newPlayer" type="text" placeholder="Prénom et nom" autocapitalize="words" style="flex:1;min-width:0"><button class="btn small" id="addPlayer" type="button">Ajouter</button></div>
         <p class="note">Les joueurs sont proposés en remplissant une nouvelle partie, et reconnus à la voix par leur prénom ou leur nom.</p></section>
-      <div class="list">${S.players.length ? S.players.map(p => `<div class="item pl-row"><b>${esc(p.name)}</b>${S.confirmDel === p.id
+      ${(() => { const dups = duplicateMap(S.players); const nd = Object.keys(dups).length; return nd ? `<div class="warn">${nd} joueurs semblent en double. Vérifiez les noms marqués « Doublon ? » et retirez celui de trop.</div>` : ''; })()}
+      <div class="list">${S.players.length ? (() => { const dups = duplicateMap(S.players); return S.players.map(p => `<div class="item pl-row ${dups[p.id] ? 'dup' : ''}"><b>${esc(p.name)}${dups[p.id] ? ` <span class="dup-flag" title="Ressemble à ${esc(dups[p.id].join(', '))}">Doublon ?</span>` : ''}</b>${S.confirmDel === p.id
         ? `<span class="row"><button class="btn small" data-delp="${esc(p.id)}" type="button" style="background:var(--red)">Confirmer</button><button class="btn ghost small" data-canceldel type="button">Annuler</button></span>`
-        : `<button class="btn ghost small" data-askdel="${esc(p.id)}" type="button">Retirer</button>`}</div>`).join('') : '<p class="note">Aucun joueur pour l\'instant.</p>'}</div>`;
+        : `<button class="btn ghost small" data-askdel="${esc(p.id)}" type="button">Retirer</button>`}</div>`).join(''); })() : '<p class="note">Aucun joueur pour l\'instant.</p>'}</div>`;
   }
   function vCourses() {
     $('#barTitle').textContent = 'Terrains';
@@ -515,6 +552,9 @@
       const add = async () => {
         const n = $('#newPlayer').value.trim(); if (!n) return;
         if (S.players.some(p => L.norm(p.name) === L.norm(n))) return toast(`${n} est déjà dans la liste.`);
+        const near = duplicateMap(S.players.concat([{ id: '__new', name: n }]))['__new'];
+        if (near && S.confirmAdd !== n) { S.confirmAdd = n; return toast(`Ressemble à ${near.join(', ')}. Touchez Ajouter de nouveau pour confirmer.`); }
+        S.confirmAdd = null;
         try { await Store.savePlayer(n); S.players = await Store.listPlayers(); toast(`${n} ajouté.`); render(); setTimeout(() => $('#newPlayer') && $('#newPlayer').focus(), 50); }
         catch (e) { toast('Ajout impossible : ' + e.message); }
       };
@@ -562,10 +602,22 @@
     setup(v) {
       commonNav(v);
       const d = S.draft;
-      const refresh = () => { $('#pv').innerHTML = previewHtml(d); };
+      const refresh = () => {
+        $('#pv').innerHTML = previewHtml(d);
+        const m = missingList(d);
+        $('#missingNote').textContent = m.length ? 'Il manque ' + m.join(', ') + '.' : '';
+        $('#create').disabled = m.length > 0;
+      };
       $('#course').onchange = e => { d.courseId = e.target.value; render(); };
       d.players.forEach((p, i) => {
-        $('#pn' + i).oninput = e => { p.name = e.target.value; refresh(); };
+        $('#pn' + i).oninput = e => { p.name = e.target.value; d.players.forEach((_, j) => { const dl = $('#playerList' + j); if (dl && j !== i) dl.innerHTML = listOptions(d, j); }); refresh(); };
+        $('#pn' + i).onchange = e => {
+          const n = L.norm(e.target.value);
+          if (n && d.players.some((q, j) => j !== i && L.norm(q.name || '') === n)) {
+            toast(`${e.target.value.trim()} est déjà choisi.`); p.name = ''; e.target.value = ''; refresh();
+            d.players.forEach((_, j) => { const dl = $('#playerList' + j); if (dl) dl.innerHTML = listOptions(d, j); });
+          }
+        };
         $('#pi' + i).oninput = e => { p.index = e.target.value; refresh(); };
         $('#pt' + i).onchange = e => { p.tee = e.target.value; refresh(); };
       });
@@ -579,10 +631,10 @@
       v.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { d.mode = b.dataset.mode; v.querySelectorAll('[data-mode]').forEach(x => x.setAttribute('aria-pressed', x === b)); refresh(); });
       $('#create').onclick = async () => {
         const pv = draftPreview(d);
-        if (!pv || !pv.ready) { toast('Il manque un prénom ou un index.'); setReply('Il manque un prénom ou un index.'); Voice.say('Il manque un prénom ou un index.'); return; }
+        if (!pv || !pv.ready) { const m = 'Il manque ' + missingList(d).slice(0, 2).join(' et ') + '.'; toast(m); setReply(m); Voice.say(m); return; }
         if (!d.teamMode) { const q = teamQuestion(d, pv.ps); setReply(q); Voice.say(q); toast('Choisissez la formation des équipes.'); return; }
         const names = pv.ps.map(p => L.norm(p.name));
-        if (new Set(names).size < 4) return toast('Deux joueurs ont le même prénom. Ajoutez une initiale.');
+        if (new Set(names).size < 4) return toast('Le même joueur est choisi deux fois.');
         ls.set('pelland.lastPlayers', d.players);
         const id = await Store.newCode();
         const g = { id, createdAt: Date.now(), ownerUid: Store.uid, course: pv.c, courseId: pv.c.id, mode: d.mode, responsable: d.responsable,
@@ -677,7 +729,7 @@
         .replace(/\b(on joue|terrain|au club|club de golf|au golf)\b/gi, ' ');
     }
     const r = L.parseSetup(rest, d, course || c, S.players.map(p => p.name));
-    if (r.create) { $('#create').click(); return; }
+    if (r.create) { $('#create').onclick(); return; }
     S.draft = Object.assign(d, r.draft);
     render();
     let reply = extra + (r.understood ? r.said : (extra ? '' : 'Je n\'ai pas compris. Exemple : « François 12,4, Marc 8,1 ».'));
