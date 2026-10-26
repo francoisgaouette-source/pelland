@@ -134,7 +134,17 @@
     if (cab != null) { const pts = [0, 0]; pts[cab] = CABANE_POINTS; return pts; }
     const pts = r ? r.pts.slice() : [0, 0];
     if (st === 0 || st === 1) pts[st] += SKIN_POINTS;
-    return pts;
+    // Les points sont au net : seule la différence compte (Rouges 3, Bleus 2 → Rouges +1).
+    const d = pts[0] - pts[1];
+    return d >= 0 ? [d, 0] : [0, -d];
+  }
+  function totalText(game) {
+    const t = teamPoints(game).tot;
+    return t[0] === t[1] ? 'Partie égale.' : `Les ${TEAMS[t[0] > t[1] ? 0 : 1]} mènent par ${Math.abs(t[0] - t[1])}.`;
+  }
+  function holeNetText(game, hole) {
+    const ht = holeTotal(game, hole); if (!ht) return '';
+    return ht[0] === ht[1] ? 'net : trou égal' : ht[0] > ht[1] ? `net : Rouges +${ht[0]}` : `net : Bleus +${ht[1]}`;
   }
   function teamPoints(game) {
     const tot = [0, 0], skins = [0, 0]; let holes = 0;
@@ -206,6 +216,7 @@
     if (r.low.net !== r.high.net) parts.push(r.high.team != null ? `Haut ${nm(r.high.players)} +${v} ${TEAMS[1 - r.high.team]}` : 'Haut égal');
     if (r.mult > 1) parts.push(r.mult === 4 ? 'reroll ×4' : 'pressé ×2');
     if (st === 0 || st === 1) parts.push(`skin +1 ${TEAMS[st]}`);
+    const nt = holeNetText(game, hole); if (nt) parts.push('→ ' + nt);
     return parts.join(' · ');
   }
   function describeSkin(game, hole) {
@@ -548,7 +559,7 @@
         say.push(`Trou ${a.hole} : ${parts.join(', ')}.`);
         if (row.every(v => v != null)) {
           const d = describeHolePoints(g, a.hole); if (d) say.push(d);
-          const tp = teamPoints(g).tot; say.push(`Total : ${tp[0]} à ${tp[1]}.`);
+          say.push(totalText(g));
         }
         if (row.every(v => v != null) && a.hole === (g.currentHole || 1) && a.hole < 18) { g.currentHole = a.hole + 1; say.push(`On passe au ${a.hole + 1}.`); }
       }
@@ -574,7 +585,8 @@
         say.push(a.team === -1 ? `Pas de skin au trou ${a.hole}.` : a.player != null ? `Skin au trou ${a.hole} pour ${g.players[a.player].name}, ${tl(a.team)}. 1 point.` : `Skin au trou ${a.hole} pour ${tl(a.team)}, ${teamName(g, a.team)}. 1 point.`);
         { const p3 = describePar3(g, a.hole); if (p3) say.push(p3); }
         if (cabaneTeam(g, a.hole) != null) say.push(`Cabane pour ${tl(a.team)} ! ${CABANE_POINTS} points pour le trou.`);
-        const tp = teamPoints(g).tot; say.push(`Total : ${tp[0]} à ${tp[1]}.`);
+        { const nt = holeNetText(g, a.hole); if (nt) say.push(`Trou ${a.hole}, ${nt}.`); }
+        say.push(totalText(g));
       }
       if (a.type === 'skins') { ev(a.hole).skins = a.players; say.push(a.players.length ? `Skin au trou ${a.hole} : ${a.players.map(i => g.players[i].name).join(', ')}.` : `Pas de skin au trou ${a.hole}.`); }
     });
@@ -724,6 +736,8 @@
       if (i === -2) { said.push(`Deux joueurs s'appellent ${f.name}. Dites le prénom et le nom.`); return; }
       if (i < 0) i = d.players.findIndex(p => !String(p.name || '').trim());
       if (i < 0) return;
+      const dupAt = d.players.findIndex((p, j) => j !== i && norm(p.name || '') === norm(f.name));
+      if (dupAt >= 0) { said.push(`${f.name} est déjà choisi comme joueur ${dupAt + 1}.`); return; }
       if (f.index == null && norm(d.players[i].name || '') !== norm(f.name)) d.players[i].index = '';
       d.players[i].name = f.name;
       if (f.index != null) d.players[i].index = String(f.index).replace('.', ',');
