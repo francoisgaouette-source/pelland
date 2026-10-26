@@ -456,7 +456,7 @@
       const hp = L.holeTotal(g, hole);
       if (hp) { cum[0] += hp[0]; cum[1] += hp[1]; }
       const tot = hp ? leadHtml(cum) : '';
-      return `<tr class="${hole === h ? 'cur' : ''}"><th class="h"><button class="cell" data-hole="${hole}" style="font-size:19px">${hole}</button></th><td class="m">${ih.par}</td><td class="m">${ih.si}</td>${cells}<td class="stat"><div class="ev">${st.join('')}</div></td><td class="calc">${esc(calc.replace(/^ · /, ''))}</td><td class="tp0">${hp ? hp[0] : ''}</td><td class="tp1">${hp ? hp[1] : ''}</td></tr>`;
+      return `<tr class="${hole === h ? 'cur' : ''}"><th class="h"><button class="cell" data-hole="${hole}" style="font-size:19px">${hole}</button></th><td class="m">${ih.par}</td><td class="m">${ih.si}</td>${cells}<td class="stat"><div class="ev">${st.join('')}</div></td><td class="calc">${esc(calc.replace(/^ · /, ''))}</td><td class="tp1">${hp ? hp[1] : ''}</td><td class="tp0">${hp ? hp[0] : ''}</td></tr>`;
     };
     const sumRow = (label, from, to, final) => {
       const cells = colOrder.map(pi => { const p = g.players[pi];
@@ -464,7 +464,7 @@
         return `<td>${any ? s : ''}</td>`;
       }).join('');
       let par = 0, tb = [0, 0]; for (let x = from; x <= to; x++) { par += L.holeInfo(g, x, 0).par; const hp = L.holeTotal(g, x); if (hp) { tb[0] += hp[0]; tb[1] += hp[1]; } }
-      return `<tr class="sum"><td colspan="2">${label}</td><td>${par}</td>${cells}<td></td><td></td><td class="tp0">${tb[0]}</td><td class="tp1">${tb[1]}</td></tr>`;
+      return `<tr class="sum"><td colspan="2">${label}</td><td>${par}</td>${cells}<td></td><td></td><td class="tp1">${tb[1]}</td><td class="tp0">${tb[0]}</td></tr>`;
     };
     const cum = [0, 0];
     const ini = L.initials(g.players);
@@ -496,7 +496,7 @@
 
 
       <div class="card-scroll"><table class="sc">
-        <thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${colOrder.map(i => { const p = g.players[i]; return `<th class="pc tc${teamOf(g, i)}" title="${esc(p.name)}">${esc(ini[i])}</th>`; }).join('')}<th>Statut</th><th>Calcul</th><th class="tc0">Rouge</th><th class="tc1">Bleu</th></tr></thead>
+        <thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${colOrder.map(i => { const p = g.players[i]; return `<th class="pc tc${teamOf(g, i)}" title="${esc(p.name)}">${esc(ini[i])}</th>`; }).join('')}<th>Statut</th><th>Calcul</th><th class="tc1">Bleu</th><th class="tc0">Rouge</th></tr></thead>
         <tbody>${Array.from({ length: 9 }, (_, i) => row(i + 1)).join('')}${sumRow('Aller', 1, 9)}${Array.from({ length: 9 }, (_, i) => row(i + 10)).join('')}${sumRow('Retour', 10, 18)}${sumRow('Total', 1, 18, true)}</tbody>
       </table></div>
       <div class="legend"><span>★ responsable de la partie (il entre les scores)</span><span>${BALL} coup reçu · petit chiffre = net</span><span>Calcul : ↓ plus bas net · ↑ plus haut net · R/B équipe qui reçoit · ×2 press · ×4 reroll · S skin · C cabane · $ normale 3 · = résultat net</span><span>Noms à la couleur de l'équipe : <b class="tc1">Bleus</b> · <b class="tc0">Rouges</b></span><span>${g.players.map((p, i) => `<b class="tc${teamOf(g, i)}">${esc(ini[i])}</b> ${esc(p.name)}`).join(' · ')}</span><span>Faites glisser la carte vers la gauche pour voir le calcul</span></div>
