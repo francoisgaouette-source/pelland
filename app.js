@@ -338,8 +338,8 @@
       <section class="card">
         <div class="step">Argent</div>
         <div class="row" style="flex-wrap:nowrap">
-          <label style="flex:1">Mise initiale ($)<input id="stake" type="text" inputmode="decimal" value="${esc(d.stake)}"></label>
-          <label style="flex:1">Par changement de meneur ($)<input id="lcv" type="text" inputmode="decimal" value="${esc(d.leadChangeValue)}"></label>
+          <label style="flex:1">La game vaut au minimum<span class="money-in"><input id="stake" type="text" inputmode="decimal" placeholder="0" value="${esc(fmtIn(d.stake))}"><i>$</i></span></label>
+          <label style="flex:1">$ quand la partie tourne<span class="money-in"><input id="lcv" type="text" inputmode="decimal" placeholder="0" value="${esc(fmtIn(d.leadChangeValue))}"><i>$</i></span></label>
         </div>
       </section>
       <section class="card">
@@ -363,7 +363,9 @@
     return S.players.filter(p => !taken.includes(L.norm(p.name))).map(p => `<option value="${esc(p.name)}"></option>`).join('');
   }
   function money(v) { const x = parseFloat(String(v || '').replace(',', '.').replace(/[^0-9.]/g, '')); return isNaN(x) ? 0 : x; }
-  const fmt$ = x => (Math.round(x * 100) / 100).toString().replace('.', ',') + ' $';
+  // « 20 » → « 20,00 » ; vide reste vide
+  function fmtIn(v) { if (String(v || '').trim() === '') return ''; return money(v).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  const fmt$ = x => Number(x || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' $';
   // « 11 coups : 1 2 3 4 5 7 8 9 10 12 14 » (un chiffre en double = 2 coups sur ce trou)
   function strokeHoles(g, p) {
     if (!p.strokes) return 'Aucun coup';
@@ -476,7 +478,7 @@
           <div class="hole-nav"><button data-nav="-1" aria-label="Trou précédent">‹</button><button data-nav="1" aria-label="Trou suivant">›</button></div>
         </div>
         <div class="money-boxes">
-          <div class="mbox green"><span>Mise initiale</span><b>${g.stake ? fmt$(g.stake) : '—'}</b></div>
+          <div class="mbox green"><span>La game vaut au minimum</span><b>${g.stake ? fmt$(g.stake) : '—'}</b></div>
           <div class="mbox yellow"><span>Changements de meneur</span><b>${L.leadChanges(g)}${g.leadChangeValue ? ` · ${fmt$(L.leadChanges(g) * g.leadChangeValue)}` : ''}</b></div>
         </div>
         <div class="team-blocks">${[1, 0].map(k => { const tm = L.getTeams(g)[k], teamPts = L.teamPoints(g).tot;
@@ -669,8 +671,10 @@
         render();
       });
       const pt = $('#partner'); if (pt) pt.onchange = () => { const j = +pt.value; d.teams = [[0, j], [1, 2, 3].filter(i => i !== j)]; refresh(); };
-      $('#stake').oninput = e => { d.stake = e.target.value; };
-      $('#lcv').oninput = e => { d.leadChangeValue = e.target.value; };
+      ['stake', 'lcv'].forEach(id => { const el = $('#' + id), key = id === 'stake' ? 'stake' : 'leadChangeValue';
+        el.oninput = e => { d[key] = e.target.value; };
+        el.onblur = e => { e.target.value = fmtIn(e.target.value); d[key] = e.target.value; };
+        el.onfocus = e => { e.target.select(); }; });
       v.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { d.mode = b.dataset.mode; v.querySelectorAll('[data-mode]').forEach(x => x.setAttribute('aria-pressed', x === b)); refresh(); });
       $('#create').onclick = async () => {
         const pv = draftPreview(d);
