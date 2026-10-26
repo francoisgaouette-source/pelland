@@ -196,8 +196,10 @@
 
   function go(view, opts = {}) {
     if (S.unwatch && view !== 'game') { S.unwatch(); S.unwatch = null; S.game = null; }
-    if (view !== 'game' && Voice.wake) Voice.setWake(false);
+    if (view !== 'game' && view !== 'setup' && Voice.wake) Voice.setWake(false);
     S.view = view; Object.assign(S, opts);
+    if (view === 'setup') { setHeard('Touchez le micro et dites les joueurs et leurs index.'); setReply(''); }
+    if (view === 'game') { setHeard('Appuyez sur le micro et parlez.'); setReply(''); }
     render(); window.scrollTo(0, 0);
   }
 
@@ -205,7 +207,7 @@
     const v = $('#view');
     $('#back').hidden = S.view === 'home';
     $('#dbBadge').textContent = Store.mode === 'firebase' ? 'Partagé' : 'Local';
-    const showDock = S.view === 'game' && S.game;
+    const showDock = (S.view === 'game' && S.game) || S.view === 'setup';
     $('#dock').hidden = !showDock; document.body.classList.toggle('no-dock', !showDock);
     const R = { home: vHome, setup: vSetup, game: vGame, join: vJoin, history: vHistory, courses: vCourses, course: vCourse }[S.view];
     v.innerHTML = R();
@@ -220,11 +222,11 @@
       <div class="hero"><h1>La game à Pelland</h1><p>Carte de pointage à la voix pour quatre joueurs.</p></div>
       ${Voice.supported ? '' : `<div class="warn">La dictée intégrée n'est pas disponible dans ce navigateur. Sur iPhone, ouvrez le lien dans Safari. En attendant, le micro du clavier fonctionne dans la zone de texte.</div>`}
       <div class="tiles">
-        <button class="tile primary" data-go="setup"><span class="pin">+</span><div><strong>Nouvelle partie</strong><span>Terrain, joueurs, index, tertres, handicap</span></div></button>
+        <button class="tile" data-go="courses"><span class="pin">⛳</span><div><strong>Terrains</strong><span>Ajouter ou corriger un terrain avant la partie</span></div></button>
+        <button class="tile primary" data-go="setup"><span class="pin">+</span><div><strong>Nouvelle partie</strong><span>Terrain, joueurs, index, tertres, handicap, à la voix</span></div></button>
         ${last ? `<button class="tile" data-open="${esc(last)}"><span class="pin">▶</span><div><strong>Reprendre la partie ${esc(last)}</strong><span>Dernière partie ouverte sur ce téléphone</span></div></button>` : ''}
         <button class="tile" data-go="join"><span class="pin">#</span><div><strong>Rejoindre une partie</strong><span>Avec le code donné par le responsable</span></div></button>
         <button class="tile" data-go="history"><span class="pin">≡</span><div><strong>Historique</strong><span>Toutes les parties enregistrées</span></div></button>
-        <button class="tile" data-go="courses"><span class="pin">⛳</span><div><strong>Terrains</strong><span>Bibliothèque des parcours, ajout et correction</span></div></button>
       </div>
       <p class="note">${Store.mode === 'firebase' ? 'Base partagée active : les autres joueurs voient la partie en direct avec le code.' : 'Mode local : les parties restent sur ce téléphone.'}</p>
       ${Store.mode === 'local' && Store.error ? `<div class="warn"><b>Pourquoi le mode local :</b> ${esc(Store.error)}</div>` : ''}`;
@@ -253,10 +255,14 @@
     if (c && !c.tees.find(t => t.name === d.players[0].tee)) d.players.forEach(p => (p.tee = c.tees[0].name));
     const teeOpts = sel => (c ? c.tees : []).map(t => `<option value="${esc(t.name)}" ${t.name === sel ? 'selected' : ''}>${esc(t.name)}</option>`).join('');
     return `
+      <section class="card voice-help">
+        <div class="step">Configuration à la voix</div>
+        <p class="note">Touchez le micro en bas et dites, par exemple : « On joue au Pinegrove » · « François 12,4, Marc 8,1, Luc 18,6 et Pierre 3,2 » · « Marc est responsable » · « Tout le monde au tertre deux » · « Luc au tertre deux trois » · « Bas handicap » · puis « Créer la partie ».</p>
+      </section>
       <section class="card">
         <div class="step">1 · Terrain</div>
         <select id="course">${S.courses.map(x => `<option value="${esc(x.id)}" ${x.id === d.courseId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
-        <button class="btn ghost small" data-go="course" data-new="1" type="button">Ajouter un terrain</button>
+        <p class="note">Le terrain n'est pas dans la liste ? Ajoutez-le d'abord dans <b>Terrains</b>, à l'accueil.</p>
       </section>
       <section class="card">
         <div class="step">2 à 5 · Joueurs, responsable, index, tertre</div>
@@ -289,8 +295,9 @@
       </tbody></table>${teamsHtml(pv.ps, L.makeTeams(pv.ps))}<p class="note">Hcp = handicap de parcours = index × slope ÷ 113 + (évaluation − normale), arrondi.</p>`;
   }
 
-  function teamsHtml(players, teams) {
-    return `<div class="teams">${teams.map((t, k) => `<div class="team"><span class="step">Équipe ${k + 1}</span><b>${t.map(i => esc(players[i].name)).join(' et ')}</b><span class="note">index ${t.map(i => String(players[i].index).replace('.', ',')).join(' et ')}</span></div>`).join('')}</div>`;
+  function teamsHtml(players, teams, pts) {
+    const lead = pts && pts[0] !== pts[1] ? (pts[0] > pts[1] ? 0 : 1) : -1;
+    return `<div class="teams">${teams.map((t, k) => `<div class="team ${lead === k ? 'lead' : ''}"><span class="step">Équipe ${k + 1}</span><b>${t.map(i => esc(players[i].name)).join(' et ')}</b>${pts ? `<span class="tp num">${pts[k]} <small>pts</small></span>` : ''}<span class="note">index ${t.map(i => String(players[i].index).replace('.', ',')).join(' et ')}</span></div>`).join('')}</div>`;
   }
 
   // ---------------- Rejoindre ----------------
@@ -322,7 +329,8 @@
     (ev.presses || []).forEach(x => holeChips.push(`<span class="chip">Pressé${x != null ? ' · ' + esc(g.players[x].name) : ''}</span>`));
     if (ev.reroll) holeChips.push('<span class="chip">Reroll</span>');
     if (ev.par3Winner != null) holeChips.push(`<span class="chip">Par 3 · ${esc(g.players[ev.par3Winner].name)}</span>`);
-    (ev.skins || []).forEach(x => holeChips.push(`<span class="chip">Skin · ${esc(g.players[x].name)}</span>`));
+    { const st = L.skinTeam(g, h); if (st === 0 || st === 1) holeChips.push(`<span class="chip">Skin · équipe ${st + 1}</span>`); else if (st === -1) holeChips.push('<span class="chip alt">Pas de skin</span>'); }
+    { const prev = h - 1; const row = (g.scores || {})[prev]; if (prev >= 1 && row && row.every(v => v != null) && L.skinTeam(g, prev) == null) holeChips.push(`<span class="chip alt">Skin du ${prev} ? (à dire)</span>`); }
 
     const row = hole => {
       const ih = L.holeInfo(g, hole, 0); const e = (g.events || {})[hole] || {};
@@ -336,7 +344,9 @@
       if ((e.presses || []).length) evs.push(`<i class="p">P${e.presses.length > 1 ? e.presses.length : ''}</i>`);
       if (e.reroll) evs.push('<i>R</i>');
       if (e.par3Winner != null) evs.push(`<i class="t">${esc(g.players[e.par3Winner].name.slice(0, 2))}</i>`);
-      (e.skins || []).forEach(x => evs.push(`<i class="s">${esc(g.players[x].name.slice(0, 2))}</i>`));
+      { const st = L.skinTeam(g, hole); if (st === 0 || st === 1) evs.push(`<i class="s">S${st + 1}</i>`); else if (st == null && L.holePoints(g, hole)) evs.push('<i>S?</i>'); }
+      const hp = L.holeTotal(g, hole);
+      if (hp) evs.unshift(`<i class="pts">${hp[0]}–${hp[1]}</i>`);
       return `<tr class="${hole === h ? 'cur' : ''}"><th class="h"><button class="cell" data-hole="${hole}" style="font-size:19px">${hole}</button></th><td class="m">${ih.par}</td><td class="m">${ih.si}</td>${cells}<td><div class="ev">${evs.join('')}</div></td></tr>`;
     };
     const sumRow = (label, from, to) => {
@@ -362,21 +372,21 @@
         ${owner ? `<button class="btn small" data-hole="${h}" style="background:var(--flag);color:var(--flag-ink)">Pressé, reroll, par 3, skin…</button>` : ''}
       </section>
 
-      ${teamsHtml(g.players, L.getTeams(g))}
+      ${teamsHtml(g.players, L.getTeams(g), L.teamPoints(g).tot)}
       <section class="board">
-        ${g.players.map((p, i) => { const t = tots[i]; return `<div class="tot ${t.played && t.netToPar === best ? 'lead' : ''}"><div class="nm">${esc(p.name)} <span class="tm">É${L.getTeams(g).findIndex(x => x.includes(i)) + 1}</span></div><div class="big">${t.played ? fmt(t.netToPar) : '–'} <small style="font-size:15px">net</small></div><div class="sub">${t.played ? `${t.gross} brut · ${t.net} net · ${t.played} tr.` : `${p.strokes} coups`}${t.skins ? ` · ${t.skins} skin${t.skins > 1 ? 's' : ''}` : ''}${t.par3 ? ` · ${t.par3} par 3` : ''}</div></div>`; }).join('')}
+        ${g.players.map((p, i) => { const t = tots[i]; return `<div class="tot ${t.played && t.netToPar === best ? 'lead' : ''}"><div class="nm">${esc(p.name)} <span class="tm">É${L.getTeams(g).findIndex(x => x.includes(i)) + 1}</span></div><div class="big">${t.played ? fmt(t.netToPar) : '–'} <small style="font-size:15px">net</small></div><div class="sub">${t.played ? `${t.gross} brut · ${t.net} net · ${t.played} tr.` : `${p.strokes} coups`}${t.par3 ? ` · ${t.par3} par 3` : ''}</div></div>`; }).join('')}
       </section>
 
       <div class="card-scroll"><table class="sc">
-        <thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${g.players.map(p => `<th>${esc(p.name)}</th>`).join('')}<th>Jeu</th></tr></thead>
+        <thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${g.players.map(p => `<th>${esc(p.name)}</th>`).join('')}<th>É1–É2</th></tr></thead>
         <tbody>${Array.from({ length: 9 }, (_, i) => row(i + 1)).join('')}${sumRow('Aller', 1, 9)}${Array.from({ length: 9 }, (_, i) => row(i + 10)).join('')}${sumRow('Retour', 10, 18)}${sumRow('Total', 1, 18)}</tbody>
       </table></div>
-      <div class="legend"><span>● coup reçu</span><span>petit chiffre = net</span><span>P pressé · R reroll</span><span>vert = par 3 · jaune = skin</span></div>
+      <div class="legend"><span>● coup reçu</span><span>petit chiffre = net</span><span>P pressé · R reroll</span><span>vert = par 3 · S1/S2 = skin de l'équipe</span><span>2–0 = points du trou, skin comprise (équipe 1–équipe 2)</span></div>
       <section class="card">
         <h2>${owner ? 'Vous êtes le responsable' : 'Vous suivez la partie'}</h2>
         <p class="note">${owner
-          ? 'Dites par exemple : « Trou 4, François 5, Marc 4, Luc 6, Pierre 5 » · « Marc par, Luc bogey » · « Marc presse » · « Reroll » · « Luc gagne le par 3 » · « Skin pour Marc » · « Annule » · « Trou suivant ».'
-          : 'Posez vos questions : « Qui a des coups au 7 ? » · « Combien de coups pour Marc ? » · « Où en est Luc ? » · « Combien de skins ? » · « Avec qui joue Marc ? » · « Les équipes » · « Classement ».'}</p>
+          ? 'Dites par exemple : « Trou 4, François 5, Marc 4, Luc 6, Pierre 5 » · « Marc par, Luc bogey » · « Marc presse » · « Reroll » · « Luc gagne le par 3 » · « Skin équipe 1 » · « Skin pour Marc » · « Pas de skin » · « Annule » · « Trou suivant ».'
+          : 'Posez vos questions : « Qui a des coups au 7 ? » · « Combien de coups pour Marc ? » · « Où en est Luc ? » · « Combien de skins ? » · « Combien de points ? » · « Les points au trou 5 » · « Avec qui joue Marc ? » · « Les équipes » · « Classement ».'}</p>
         <p class="note">${esc(g.mode === 'bas' ? 'Bas handicap' : 'Full handicap')} · ${g.players.map(p => `${esc(p.name)} ${esc(p.tee)}, index ${String(p.index).replace('.', ',')}, ${p.strokes} coups`).join(' · ')}</p>
         ${Store.mode === 'firebase' ? `<p class="note">Code à donner aux autres joueurs : <b class="num" style="font-size:22px;letter-spacing:.15em">${esc(g.id)}</b></p>` : ''}
       </section>`;
@@ -481,14 +491,14 @@
       v.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { d.mode = b.dataset.mode; v.querySelectorAll('[data-mode]').forEach(x => x.setAttribute('aria-pressed', x === b)); refresh(); });
       $('#create').onclick = async () => {
         const pv = draftPreview(d);
-        if (!pv || !pv.ready) return toast('Il manque un prénom ou un index.');
+        if (!pv || !pv.ready) { toast('Il manque un prénom ou un index.'); setReply('Il manque un prénom ou un index.'); Voice.say('Il manque un prénom ou un index.'); return; }
         const names = pv.ps.map(p => L.norm(p.name));
         if (new Set(names).size < 4) return toast('Deux joueurs ont le même prénom. Ajoutez une initiale.');
         ls.set('pelland.lastPlayers', d.players);
         const id = await Store.newCode();
         const g = { id, createdAt: Date.now(), ownerUid: Store.uid, course: pv.c, courseId: pv.c.id, mode: d.mode, responsable: d.responsable,
           players: pv.ps, teams: L.makeTeams(pv.ps), currentHole: 1, scores: {}, events: {}, status: 'en cours' };
-        try { await Store.saveGame(g); S.draft = null; openGame(id); Voice.say(`Partie créée. ${g.players.map(p => `${p.name} ${p.strokes} coups`).join(', ')}. Trou 1, normale ${L.holeInfo(g, 1, 0).par}.`); }
+        try { await Store.saveGame(g); S.draft = null; openGame(id); const msg = `Partie créée. ${g.players.map(p => `${p.name} ${p.strokes} coup${Math.abs(p.strokes) > 1 ? 's' : ''}`).join(', ')}. Équipes : ${L.teamName(g, 0)} contre ${L.teamName(g, 1)}. Trou 1, normale ${L.holeInfo(g, 1, 0).par}.`; setHeard('« Créer la partie »'); setReply(msg); Voice.say(msg); }
         catch (e) { toast('Création impossible : ' + e.message); }
       };
     },
@@ -538,7 +548,47 @@
   }
 
   // Traite une phrase (voix ou texte)
+  function levenshtein(a, b) {
+    const m = a.length, n = b.length; let prev = Array.from({ length: n + 1 }, (_, j) => j);
+    for (let i = 1; i <= m; i++) { const cur = [i]; for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = cur; }
+    return prev[n];
+  }
+  function handleSetup(text) {
+    const d = S.draft || (S.draft = newDraft());
+    const c = S.courses.find(x => x.id === d.courseId) || S.courses[0];
+    setHeard('« ' + text + ' »');
+    // terrain : « on joue au Pinegrove », « terrain Pinegrove »
+    const nt = L.norm(text);
+    const GENERIC = /^(club|golf|country|de|du|des|la|le|les|et|centre|parcours|terrain)$/;
+    const words = nt.split(' ');
+    const compact = nt.replace(/ /g, '');
+    const hit = x => L.norm(x.name).split(' ').filter(w => w.length > 3 && !GENERIC.test(w))
+      .some(w => nt.includes(w) || (w.length >= 6 && compact.includes(w)) || words.some(v => v.length >= 5 && L.norm(v) !== '' && levenshtein(v, w) <= 1));
+    const course = S.courses.find(hit);
+    let extra = '';
+    if (course) { if (course.id !== d.courseId) d.courseId = course.id; extra = `Terrain : ${course.name}. `; }
+    else if (/\b(terrain|on joue (au|a)|golf)\b/.test(nt)) {
+      const r0 = `Je ne trouve pas ce terrain. Terrains disponibles : ${S.courses.map(x => x.name).join(', ')}. Pour un nouveau terrain, ajoutez-le d'abord dans Terrains, à l'accueil.`;
+      setReply(r0); Voice.say(r0); return;
+    }
+    let rest = text;
+    if (course) {
+      const cw = L.norm(course.name).split(' ').filter(w => w.length > 3 && !GENERIC.test(w));
+      cw.forEach(w => { rest = rest.replace(new RegExp(w.split('').join('[\\s-]*'), 'ig'), ' '); });
+      rest = rest.split(/\s+/).filter(tok => { const n = L.norm(tok); return !n || !cw.some(w => n === w || (n.length >= 5 && levenshtein(n, w) <= 1)); }).join(' ')
+        .replace(/\b(on joue|terrain|au club|club de golf|au golf)\b/gi, ' ');
+    }
+    const r = L.parseSetup(rest, d, course || c);
+    if (r.create) { $('#create').click(); return; }
+    S.draft = Object.assign(d, r.draft);
+    render();
+    let reply = extra + (r.understood ? r.said : (extra ? '' : 'Je n\'ai pas compris. Exemple : « François 12,4, Marc 8,1 ».'));
+    if (r.understood || extra) reply += r.missing.length ? ` Il manque ${r.missing.slice(0, 2).join(' et ')}.` : ' Tout est prêt. Dites « Créer la partie ».';
+    setReply(reply); Voice.say(reply);
+  }
+
   function handle(text) {
+    if (S.view === 'setup') return handleSetup(text);
     if (!S.game) return;
     setHeard('« ' + text + ' »');
     const r = L.parse(text, S.game, { isResponsable: isOwner() });
@@ -582,7 +632,7 @@
           ${(e.presses || []).length ? `<button class="pill" data-clearpress>Retirer les pressés (${e.presses.length})</button>` : ''}</div>
         <div class="tg"><span>Reroll</span><button class="pill" data-reroll aria-pressed="${!!e.reroll}">${e.reroll ? 'Oui' : 'Non'}</button></div>
         ${isPar3 ? `<div class="tg"><span>Gagnant du par 3</span>${P.map((p, i) => `<button class="pill" data-par3="${i}" aria-pressed="${e.par3Winner === i}">${esc(p.name)}</button>`).join('')}<button class="pill" data-par3="" aria-pressed="${e.par3Winner == null}">Personne</button></div>` : ''}
-        <div class="tg"><span>Skin</span>${P.map((p, i) => `<button class="pill" data-skin="${i}" aria-pressed="${(e.skins || []).includes(i)}">${esc(p.name)}</button>`).join('')}</div>
+        <div class="tg"><span>Skin (1 point à l'équipe)</span>${[0, 1].map(k => `<button class="pill" data-skin="${k}" aria-pressed="${L.skinTeam(g, h) === k}">Équipe ${k + 1} · ${esc(L.teamName(g, k))}</button>`).join('')}<button class="pill" data-skin="-1" aria-pressed="${L.skinTeam(g, h) === -1}">Pas de skin</button></div>
       </div>
       <button class="btn ghost small" data-close>Fermer</button>`, s => {
       const done = acts => { closeSheet(); commit(acts, false); };
@@ -592,8 +642,7 @@
       s.querySelector('[data-reroll]').onclick = () => done([{ type: 'reroll', hole: h, on: !e.reroll }]);
       s.querySelectorAll('[data-par3]').forEach(b => b.onclick = () => done([{ type: 'par3', hole: h, player: b.dataset.par3 === '' ? null : +b.dataset.par3 }]));
       s.querySelectorAll('[data-skin]').forEach(b => b.onclick = () => {
-        const cur = new Set(e.skins || []); const i = +b.dataset.skin; cur.has(i) ? cur.delete(i) : cur.add(i);
-        done([{ type: 'skins', hole: h, players: [...cur].sort() }]);
+        done([{ type: 'skin', hole: h, team: +b.dataset.skin }]);
       });
       s.querySelector('[data-close]').onclick = closeSheet;
     });

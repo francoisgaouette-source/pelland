@@ -64,6 +64,75 @@
   function getTeams(game) { return game.teams || makeTeams(game.players); }
   function teamName(game, t) { return getTeams(game)[t].map(i => game.players[i].name).join(' et '); }
 
+  // ---------- Points de la game ----------
+  // Sur chaque trou (4 scores entrés) :
+  //  - le plus bas score net donne 2 points à l'équipe de ce joueur ;
+  //  - le plus haut score net donne 2 points à l'équipe adverse.
+  // Égalité entre joueurs d'équipes différentes : ces 2 points ne sont pas attribués.
+  // Égalité entre deux joueurs de la même équipe : l'équipe reçoit (ou donne) les 2 points une seule fois.
+  const POINTS = 2;
+  function netScore(game, hole, pi) {
+    const s = getScore(game, hole, pi); if (s == null) return null;
+    return s - strokesOnHole(game.players[pi].strokes, game.course.holes[hole - 1].si);
+  }
+  function holePoints(game, hole) {
+    const T = getTeams(game);
+    const teamOf = pi => T.findIndex(t => t.includes(pi));
+    const nets = game.players.map((p, pi) => netScore(game, hole, pi));
+    if (nets.some(n => n == null)) return null;
+    const lo = Math.min(...nets), hi = Math.max(...nets);
+    const loP = nets.map((n, i) => n === lo ? i : -1).filter(i => i >= 0);
+    const hiP = nets.map((n, i) => n === hi ? i : -1).filter(i => i >= 0);
+    const pts = [0, 0];
+    const loTeams = [...new Set(loP.map(teamOf))], hiTeams = [...new Set(hiP.map(teamOf))];
+    const low = { players: loP, net: lo, team: loTeams.length === 1 ? loTeams[0] : null };
+    const high = { players: hiP, net: hi, team: hiTeams.length === 1 ? hiTeams[0] : null };
+    if (lo === hi) { low.team = null; high.team = null; }
+    if (low.team != null) pts[low.team] += POINTS;
+    if (high.team != null) pts[1 - high.team] += POINTS;
+    return { pts, low, high, nets };
+  }
+  // Skin : l'équipe qui a la skin gagne 1 point. skinTeam : 0 ou 1 = équipe, -1 = pas de skin, null = pas encore dit.
+  const SKIN_POINTS = 1;
+  function skinTeam(game, hole) {
+    const e = (game.events || {})[hole];
+    if (!e) return null;
+    if (e.skinTeam !== undefined && e.skinTeam !== null) return e.skinTeam;
+    if (Array.isArray(e.skins) && e.skins.length) return getTeams(game).findIndex(t => t.includes(e.skins[0]));
+    return null;
+  }
+  function holeTotal(game, hole) {
+    const r = holePoints(game, hole); const st = skinTeam(game, hole);
+    if (!r && (st == null || st < 0)) return null;
+    const pts = r ? r.pts.slice() : [0, 0];
+    if (st === 0 || st === 1) pts[st] += SKIN_POINTS;
+    return pts;
+  }
+  function teamPoints(game) {
+    const tot = [0, 0], skins = [0, 0]; let holes = 0;
+    for (let h = 1; h <= 18; h++) {
+      const r = holePoints(game, h); if (r) { tot[0] += r.pts[0]; tot[1] += r.pts[1]; holes++; }
+      const st = skinTeam(game, h); if (st === 0 || st === 1) { tot[st] += SKIN_POINTS; skins[st]++; }
+    }
+    return { tot, holes, skins };
+  }
+  function describeSkin(game, hole) {
+    const st = skinTeam(game, hole);
+    if (st === 0 || st === 1) return `Skin pour l'équipe ${st + 1}, 1 point.`;
+    if (st === -1) return 'Pas de skin.';
+    return 'Skin pas encore indiquée.';
+  }
+  function describeHolePoints(game, hole) {
+    const r = holePoints(game, hole); if (!r) return '';
+    const P = game.players, names = a => a.map(i => P[i].name).join(' et ');
+    const parts = [];
+    if (r.low.team != null) parts.push(`${names(r.low.players)} plus bas net ${r.low.net}, 2 points pour l'équipe ${r.low.team + 1}`);
+    else parts.push(`égalité au plus bas net ${r.low.net}, pas de points`);
+    if (r.high.team != null) parts.push(`${names(r.high.players)} plus haut net ${r.high.net}, 2 points à l'équipe ${2 - r.high.team}`);
+    else if (r.low.net !== r.high.net) parts.push(`égalité au plus haut net, pas de points`);
+    return parts.join(' ; ') + '.';
+  }
+
   function buildPlayers(course, players, mode) {
     const chs = players.map(p => {
       const tee = course.tees.find(t => t.name === p.tee) || course.tees[0];
@@ -101,7 +170,6 @@
     let skins = 0, par3 = 0, presses = 0;
     Object.values(ev).forEach(e => {
       if (!e) return;
-      if ((e.skins || []).includes(pi)) skins++;
       if (e.par3Winner === pi) par3++;
       presses += (e.presses || []).filter(x => x === pi).length;
     });
@@ -190,14 +258,16 @@
       }
       if (toks[i] === 'au' && /^\d+$/.test(toks[i + 1]) && +toks[i + 1] <= 18 && i > 0 && /coup/.test(toks[i - 1])) { hole = +toks[i + 1]; break; }
     }
-    const hasQuestionWord = /^(qui|combien|quel|quelle|quels|ou|est ce|c est quoi|donne|dis|resultat|pointage|classement|score|qu)/.test(t) || /\b(qui|combien|ou en|classement|equipes?)\b/.test(t);
+    const hasQuestionWord = /^(qui|combien|quel|quelle|quels|ou|est ce|c est quoi|donne|dis|resultat|pointage|classement|score|qu)/.test(t) || /\b(qui|combien|ou en|classement|equipes?|points?)\b/.test(t);
     const mentioned = [];
     toks.forEach(tk => { const m = matchPlayer(tk, names); if (m >= 0 && !mentioned.includes(m)) mentioned.push(m); });
 
+    const skinCmd = isResp && /skin/.test(t) && !/\b(qui|combien|quel|quelle|ou en)\b/.test(t);
     // ----- Questions -----
-    if (hasQuestionWord || !isResp) {
+    if ((hasQuestionWord || !isResp) && !skinCmd) {
       let topic = 'leaderboard';
-      if (/equipe|partenaire|avec qui|joue avec|team/.test(t)) topic = 'teams';
+      if (/\bpoints?\b|la game|resultat|qui gagne|qui mene/.test(t)) topic = 'points';
+      else if (/equipe|partenaire|avec qui|joue avec|team/.test(t)) topic = 'teams';
       else if (/coup/.test(t)) topic = 'strokes';
       else if (/skin/.test(t)) topic = 'skins';
       else if (/par3/.test(t)) topic = 'par3';
@@ -230,10 +300,18 @@
       else if (/\b(personne|aucun)\b/.test(t)) actions.push({ type: 'par3', hole: h, player: null });
       return actions.length ? { kind: 'command', actions } : { kind: 'unknown' };
     }
-    if (/skin/.test(t)) {
-      if (mentioned.length) actions.push({ type: 'skins', hole: h, players: mentioned });
-      else if (/\b(personne|aucun|pas de)\b/.test(t)) actions.push({ type: 'skins', hole: h, players: [] });
-      return actions.length ? { kind: 'command', actions } : { kind: 'unknown' };
+    if (skinCmd) {
+      // sans numéro de trou : le trou en cours s'il a des scores, sinon le trou qui vient de se terminer
+      let sh = hole;
+      if (!sh) { const row = (game.scores || {})[current]; sh = row && row.some(v => v != null) ? current : Math.max(1, current - 1); }
+      let team = null;
+      const tm = t.match(/equipe\s+(1|un|une|2|deux)\b/);
+      if (/\b(pas de|pas d|aucune?|personne|non|sans)\b/.test(t)) team = -1;
+      else if (tm) team = /^(1|un|une)$/.test(tm[1]) ? 0 : 1;
+      else if (mentioned.length) team = getTeams(game).findIndex(x => x.includes(mentioned[0]));
+      if (team == null) return { kind: 'unknown' };
+      actions.push({ type: 'skin', hole: sh, team });
+      return { kind: 'command', actions };
     }
 
     // scores : « Marc 5 Luc 4 » ou « Marc par Luc bogey »
@@ -270,6 +348,18 @@
     const list = arr => arr.length <= 1 ? arr.join('') : arr.slice(0, -1).join(', ') + ' et ' + arr[arr.length - 1];
 
     switch (q.topic) {
+      case 'points': {
+        if (q.hole) {
+          const d = describeHolePoints(game, q.hole);
+          return d ? `Trou ${q.hole} : ${d} ${describeSkin(game, q.hole)}` : `Le trou ${q.hole} n'est pas complété.`;
+        }
+        const { tot, holes, skins } = teamPoints(game);
+        if (!holes) return 'Aucun trou complété pour l\'instant.';
+        const lead = tot[0] === tot[1] ? 'Égalité' : `L'équipe ${tot[0] > tot[1] ? 1 : 2} mène par ${Math.abs(tot[0] - tot[1])}`;
+        let s = `Après ${plural(holes, 'trou')} : équipe 1, ${teamName(game, 0)}, ${plural(tot[0], 'point')} ; équipe 2, ${teamName(game, 1)}, ${plural(tot[1], 'point')}${skins[0] || skins[1] ? `, skins comprises` : ''}. ${lead}.`;
+        if (q.players.length === 1) { const t = getTeams(game).findIndex(x => x.includes(q.players[0])); s = `${P[q.players[0]].name} est dans l'équipe ${t + 1}. ` + s; }
+        return s;
+      }
       case 'teams': {
         const T = getTeams(game);
         if (q.players.length === 1) {
@@ -296,9 +386,9 @@
         return `Au trou ${h}, handicap ${si} : ` + who.map(x => `${x.p.name} ${x.k > 0 ? 'reçoit ' + plural(x.k, 'coup') : 'redonne ' + plural(-x.k, 'coup')}`).join(', ') + '.';
       }
       case 'skins': {
-        const parts = P.map((p, i) => ({ n: p.name, s: totals(game, i).skins })).filter(x => x.s > 0);
-        if (!parts.length) return 'Aucune skin pour l\'instant.';
-        return 'Skins : ' + parts.map(x => `${x.n} ${x.s}`).join(', ') + '.';
+        const sk = teamPoints(game).skins;
+        if (!sk[0] && !sk[1]) return 'Aucune skin pour l\'instant.';
+        return `Skins : équipe 1, ${plural(sk[0], 'skin')} ; équipe 2, ${plural(sk[1], 'skin')}.`;
       }
       case 'par3': {
         const ev = game.events || {}; const out = [];
@@ -324,7 +414,6 @@
           const t = totals(game, pi); const p = P[pi];
           if (!t.played) return `${p.name} n'a pas encore de score.`;
           let s = `${p.name}, après ${plural(t.played, 'trou')} : ${t.gross} brut, ${signed(t.toPar)} ; ${t.net} net, ${signed(t.netToPar)}.`;
-          if (t.skins) s += ` ${plural(t.skins, 'skin')}.`;
           if (t.par3) s += ` ${plural(t.par3, 'par 3 gagné', 'par 3 gagnés')}.`;
           return s;
         }).join(' ');
@@ -343,7 +432,7 @@
     const g = JSON.parse(JSON.stringify(game));
     g.scores = g.scores || {}; g.events = g.events || {};
     const say = [];
-    const ev = h => (g.events[h] = g.events[h] || { presses: [], skins: [], reroll: false, par3Winner: null });
+    const ev = h => (g.events[h] = g.events[h] || { presses: [], skins: [], skinTeam: null, reroll: false, par3Winner: null });
     actions.forEach(a => {
       if (a.type === 'goto') { g.currentHole = a.hole; say.push(`Trou ${a.hole}, normale ${holeInfo(g, a.hole, 0).par}.`); }
       if (a.type === 'scores') {
@@ -351,7 +440,12 @@
         const parts = [];
         Object.entries(a.scores).forEach(([pi, v]) => { row[pi] = v; parts.push(`${g.players[pi].name} ${v}`); });
         say.push(`Trou ${a.hole} : ${parts.join(', ')}.`);
+        if (row.every(v => v != null)) {
+          const d = describeHolePoints(g, a.hole); if (d) say.push(d);
+          const tp = teamPoints(g).tot; say.push(`Total : ${tp[0]} à ${tp[1]}.`);
+        }
         if (row.every(v => v != null) && a.hole === (g.currentHole || 1) && a.hole < 18) { g.currentHole = a.hole + 1; say.push(`On passe au ${a.hole + 1}.`); }
+        if (row.every(v => v != null) && skinTeam(g, a.hole) == null) say.push(`Skin ou pas de skin au ${a.hole} ?`);
       }
       if (a.type === 'press') { ev(a.hole).presses.push(a.player); say.push(`Trou ${a.hole} pressé${a.player != null ? ' par ' + g.players[a.player].name : ''}.`); }
       if (a.type === 'reroll') { ev(a.hole).reroll = a.on; say.push(a.on ? `Reroll au trou ${a.hole}.` : `Reroll retiré au trou ${a.hole}.`); }
@@ -359,11 +453,164 @@
         if (holeInfo(g, a.hole, 0).par !== 3) { say.push(`Attention, le trou ${a.hole} n'est pas un par 3.`); return; }
         ev(a.hole).par3Winner = a.player; say.push(a.player == null ? `Personne au par 3 du ${a.hole}.` : `${g.players[a.player].name} gagne le par 3 du ${a.hole}.`);
       }
+      if (a.type === 'skin') {
+        const e = ev(a.hole); e.skinTeam = a.team; e.skins = [];
+        say.push(a.team === -1 ? `Pas de skin au trou ${a.hole}.` : `Skin au trou ${a.hole} pour l'équipe ${a.team + 1}, ${teamName(g, a.team)}. 1 point.`);
+        const tp = teamPoints(g).tot; say.push(`Total : ${tp[0]} à ${tp[1]}.`);
+      }
       if (a.type === 'skins') { ev(a.hole).skins = a.players; say.push(a.players.length ? `Skin au trou ${a.hole} : ${a.players.map(i => g.players[i].name).join(', ')}.` : `Pas de skin au trou ${a.hole}.`); }
     });
     return { game: g, say: say.join(' ') };
   }
 
-  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, makeTeams, getTeams, teamName, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply };
+
+  // ---------- Configuration de la partie à la voix ----------
+  // Comprend par exemple :
+  //  « François 12,4, Marc 8,1, Luc 18,6 et Pierre 3,2 »
+  //  « Joueur 3 Luc index 18 virgule 6 » · « Les joueurs sont François, Marc, Luc et Pierre »
+  //  « François est responsable » · « Responsable Marc »
+  //  « Tout le monde au tertre deux » · « Luc au tertre deux trois »
+  //  « Bas handicap » · « Full handicap » · « Créer la partie »
+  const SETUP_STOP = new Set(['index', 'joueur', 'joueurs', 'et', 'avec', 'a', 'est', 'le', 'la', 'les', 'de', 'du', 'puis', 'ensuite', 'alors', 'sont',
+    'numero', 'pour', 'au', 'aux', 'qui', 'son', 'sa', 'ses', 'un', 'une', 'des', 'il', 'elle', 'on', 'joue', 'jouent', 'handicap', 'tertre', 'tertres',
+    'responsable', 'partie', 'game', 'pelland', 'virgule', 'point', 'plus', 'moins', 'c', 'cest', 'ok', 'oui', 'non', 'ca', 'fait', 'et puis', 'premier', 'deuxieme', 'troisieme', 'quatrieme']);
+  const ORD = { premier: 1, un: 1, deux: 2, deuxieme: 2, second: 2, trois: 3, troisieme: 3, quatre: 4, quatrieme: 4 };
+  function plainWord(w) { return String(w).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9-]/g, ''); }
+  function wordsToDigits(text) {
+    // « douze virgule quatre » → « 12 virgule 4 » ; « dix-huit » → 18
+    return String(text).replace(/[A-Za-zÀ-ÿ]+(?:[-\s](?:sept|huit|neuf))?/g, w => {
+      const k = plainWord(w).replace(/[-\s]/g, '');
+      if (['dixsept', 'dixhuit', 'dixneuf'].includes(k)) return String(NUM_WORDS[k]);
+      const one = plainWord(w);
+      const map = { zero: 0, un: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, six: 6, sept: 7, huit: 8, neuf: 9, dix: 10, onze: 11, douze: 12, treize: 13,
+        quatorze: 14, quinze: 15, seize: 16, vingt: 20, trente: 30, quarante: 40 };
+      return one in map ? String(map[one]) : w;
+    });
+  }
+  function teeFromWords(words, course) {
+    const roman = ['', 'I', 'II', 'III', 'IV', 'V'];
+    const parts = [];
+    for (const w of words) {
+      const p = plainWord(w);
+      if (/^championnat|^champion|^noir|^or$/.test(p)) return course.tees.find(t => /champ/i.test(t.name)) || null;
+      const n = /^\d$/.test(p) ? +p : ({ un: 1, deux: 2, trois: 3, quatre: 4, cinq: 5 })[p];
+      if (n >= 1 && n <= 5) parts.push(roman[n]); else if (/^(i|ii|iii|iv|v)$/i.test(w)) parts.push(w.toUpperCase()); else if (parts.length) break;
+      if (parts.length === 2) break;
+    }
+    if (!parts.length) return null;
+    const want = parts.join('-');
+    return course.tees.find(t => t.name.toUpperCase() === want) || course.tees.find(t => t.name.toUpperCase() === parts[0]) || null;
+  }
+  function capName(n) { return n.split(/([\s-])/).map(x => x.length > 1 ? x[0].toUpperCase() + x.slice(1) : x).join(''); }
+
+  function parseSetup(text, draft, course) {
+    const d = JSON.parse(JSON.stringify(draft));
+    const said = [];
+    let t = wordsToDigits(text)
+      .replace(/(\d)\s*(?:,|\.|virgule|point)\s*(\d)/gi, '$1.$2')
+      .replace(/\bplus\s+(\d+(?:\.\d)?)/gi, '-$1');
+    const low = plainWord(t) === '' ? '' : t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const findPlayer = name => {
+      const names = d.players.map(p => p.name || '');
+      const i = matchPlayer(norm(name).split(' ')[0], names.map(n => n || '§'));
+      return i;
+    };
+
+    // Créer la partie
+    const create = /\b(cree|creer|creez|cre|lance|lancer|demarre|demarrer|commence|commencer|c est parti|go)\b.*\b(partie|carte|game)?/.test(low) && /\b(partie|carte|game|c est parti|go)\b/.test(low) && !/\d/.test(low);
+    // Mode
+    if (/\bbas\s+handicap|\bhandicap\s+bas|\bbas\s+hcp/.test(low)) { d.mode = 'bas'; said.push('Bas handicap.'); }
+    if (/\b(full|plein|complet)\b.*handicap|handicap\s+(complet|full|plein)/.test(low)) { d.mode = 'full'; said.push('Full handicap.'); }
+
+    // Joueurs avec numéro explicite : « joueur 3 Luc 18.6 »
+    const toks = t.replace(/[,;:!?]/g, ' ').replace(/\s+/g, ' ').trim().split(' ');
+    const isNum = w => /^-?\d+(\.\d+)?$/.test(w);
+    const isStop = w => SETUP_STOP.has(plainWord(w)) || plainWord(w).length < 2;
+    let slot = null;
+    const consumed = new Set();
+    // Responsable
+    let respName = null;
+    let m = low.match(/responsable\s+(?:c\s*est\s+|est\s+|sera\s+|:)?([a-z-]+)/);
+    if (m && !SETUP_STOP.has(m[1])) respName = m[1];
+    m = low.match(/([a-z-]+)\s+(?:est|sera|c est)\s+(?:le\s+|la\s+)?responsable/);
+    if (m && !SETUP_STOP.has(m[1])) respName = m[1];
+    if (respName) toks.forEach((w, i) => { if (plainWord(w) === respName) consumed.add(i); });
+
+    // Tertres : « tout le monde au tertre deux », « Luc au tertre deux trois », « tertre deux pour Luc »
+    const teeAssign = [];
+    toks.forEach((w, i) => {
+      if (!/^tertres?$/i.test(plainWord(w))) return;
+      const tee = teeFromWords(toks.slice(i + 1, i + 4), course);
+      if (!tee) return;
+      for (let k = i + 1; k < Math.min(toks.length, i + 4); k++) { const p = plainWord(toks[k]); if (/^\d$|^(un|deux|trois|quatre|cinq|i|ii|iii|iv|v|championnat)$/.test(p)) consumed.add(k); else break; }
+      const before = toks.slice(Math.max(0, i - 6), i).map(plainWord);
+      const after = toks.slice(i + 1, i + 7).map(plainWord);
+      if (before.some(x => /^(tous|tout|toutes|monde|chacun)$/.test(x)) || after.some(x => /^(tous|monde)$/.test(x))) { teeAssign.push({ all: true, tee }); return; }
+      const pi = after.indexOf('pour');
+      let nameTok = pi >= 0 ? toks[i + 1 + pi + 1] : null;
+      if (!nameTok) for (let k = i - 1; k >= Math.max(0, i - 3); k--) if (!isStop(toks[k]) && !isNum(toks[k])) { nameTok = toks[k]; consumed.add(k); break; }
+      if (nameTok) teeAssign.push({ name: nameTok, tee });
+    });
+
+    // Noms + index
+    const found = [];
+    for (let i = 0; i < toks.length; i++) {
+      if (consumed.has(i)) continue;
+      const w = toks[i];
+      if (/^joueur$/i.test(plainWord(w)) && toks[i + 1]) {
+        const n = isNum(toks[i + 1]) ? +toks[i + 1] : ORD[plainWord(toks[i + 1])];
+        if (n >= 1 && n <= 4) { slot = n - 1; i++; continue; }
+      }
+      if (isNum(w)) {
+        // nom = 1 ou 2 mots juste avant (en sautant « index », « a », etc.)
+        let k = i - 1; while (k >= 0 && isStop(toks[k]) && !consumed.has(k) && i - k <= 3) k--;
+        if (k < 0 || isNum(toks[k]) || consumed.has(k) || isStop(toks[k])) continue;
+        let name = toks[k];
+        if (k - 1 >= 0 && !isStop(toks[k - 1]) && !isNum(toks[k - 1]) && !consumed.has(k - 1) && /^[A-ZÀ-Ý]/.test(toks[k - 1]) && /^[A-ZÀ-Ý]/.test(toks[k]) && !found.some(f => f.k === k - 1)) name = toks[k - 1] + ' ' + toks[k];
+        const val = parseFloat(w);
+        if (val < -10 || val > 54) continue;
+        found.push({ name: capName(name.replace(/[.]/g, '')), index: val, slot, k });
+        slot = null;
+      }
+    }
+    // Liste de noms sans index : « les joueurs sont François, Marc, Luc et Pierre »
+    if (!found.length) {
+      const lm = text.match(/joueurs?\s*(?:sont|:|c'est|ce sont)?\s+(.+)/i);
+      if (lm && !/\d/.test(lm[1])) {
+        lm[1].split(/,|\bet\b/i).map(x => x.trim()).filter(x => x && !isStop(x)).slice(0, 4).forEach((n, i) => found.push({ name: capName(n), index: null, slot: i }));
+      }
+    }
+
+    // Application
+    const done = [];
+    found.forEach(f => {
+      let i = f.slot != null ? f.slot : findPlayer(f.name);
+      if (i < 0) i = d.players.findIndex(p => !String(p.name || '').trim());
+      if (i < 0) return;
+      if (f.index == null && norm(d.players[i].name || '') !== norm(f.name)) d.players[i].index = '';
+      d.players[i].name = f.name;
+      if (f.index != null) d.players[i].index = String(f.index).replace('.', ',');
+      done.push(f.index != null ? `${f.name} ${String(f.index).replace('.', ',')}` : f.name);
+    });
+    if (done.length) said.unshift(done.join(', ') + '.');
+    teeAssign.forEach(a => {
+      if (a.all) { d.players.forEach(p => (p.tee = a.tee.name)); said.push(`Tout le monde au tertre ${a.tee.name}.`); return; }
+      const i = findPlayer(a.name);
+      if (i >= 0) { d.players[i].tee = a.tee.name; said.push(`${d.players[i].name} au tertre ${a.tee.name}.`); }
+    });
+    if (respName) {
+      const i = findPlayer(respName);
+      if (i >= 0) { d.responsable = i; said.push(`${d.players[i].name} est responsable.`); }
+      else said.push(`Je ne trouve pas ${capName(respName)} parmi les joueurs.`);
+    }
+    const missing = [];
+    d.players.forEach((p, i) => {
+      if (!String(p.name || '').trim()) missing.push(`le joueur ${i + 1}`);
+      else if (p.index === '' || p.index == null) missing.push(`l'index de ${p.name}`);
+    });
+    return { draft: d, said: said.join(' '), missing, create: create && !said.length, understood: said.length > 0 };
+  }
+
+  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, makeTeams, getTeams, teamName, netScore, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PellandLogic = api;
 })(this);
