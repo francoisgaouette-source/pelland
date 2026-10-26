@@ -72,12 +72,12 @@
       return 'P' + Date.now().toString(36).toUpperCase().slice(-5);
     },
     async getGame(id) {
-      if (this.mode === 'firebase') { const d = await this.db.collection('games').doc(id).get(); return d.exists ? d.data() : null; }
+      if (this.mode === 'firebase') { const d = await this.db.collection('games').doc(id).get(); return d.exists ? fromDb(d.data()) : null; }
       return ls.get('pelland.games', {})[id] || null;
     },
     async saveGame(g) {
       g.updatedAt = Date.now();
-      if (this.mode === 'firebase') { await this.db.collection('games').doc(g.id).set(JSON.parse(JSON.stringify(g))); return; }
+      if (this.mode === 'firebase') { await this.db.collection('games').doc(g.id).set(toDb(g)); return; }
       const all = ls.get('pelland.games', {}); all[g.id] = g; ls.set('pelland.games', all);
       this._emit(g);
     },
@@ -85,7 +85,7 @@
     _emit(g) { (this._subs[g.id] || []).forEach(cb => cb(g)); },
     watchGame(id, cb) {
       if (this.mode === 'firebase') {
-        return this.db.collection('games').doc(id).onSnapshot(d => { if (d.exists) cb(d.data()); }, e => toast('Lecture impossible : ' + e.message));
+        return this.db.collection('games').doc(id).onSnapshot(d => { if (d.exists) cb(fromDb(d.data())); }, e => toast('Lecture impossible : ' + e.message));
       }
       (this._subs[id] = this._subs[id] || []).push(cb);
       this.getGame(id).then(g => g && cb(g));
@@ -96,11 +96,21 @@
     async listGames() {
       if (this.mode === 'firebase') {
         const snap = await this.db.collection('games').orderBy('createdAt', 'desc').limit(100).get();
-        return snap.docs.map(d => d.data());
+        return snap.docs.map(d => fromDb(d.data()));
       }
       return Object.values(ls.get('pelland.games', {})).sort((a, b) => b.createdAt - a.createdAt);
     }
   };
+  // Firestore refuse les tableaux imbriqués : les équipes sont stockées comme { e1: [...], e2: [...] }.
+  function toDb(g) {
+    const o = JSON.parse(JSON.stringify(g));
+    if (Array.isArray(o.teams)) o.teams = { e1: o.teams[0], e2: o.teams[1] };
+    return o;
+  }
+  function fromDb(o) {
+    if (o && o.teams && !Array.isArray(o.teams)) o.teams = [o.teams.e1, o.teams.e2];
+    return o;
+  }
   function slug(s) { return L.norm(s).replace(/\s+/g, '-').slice(0, 30) || 'terrain'; }
 
   // =====================================================================
@@ -234,10 +244,9 @@
 
   // ---------------- Nouvelle partie ----------------
   function newDraft() {
-    const prev = ls.get('pelland.lastPlayers', null);
     return {
       courseId: (S.courses[0] || {}).id || 'pinegrove', mode: 'bas', responsable: 0, teamMode: null, teams: null,
-      players: prev || [0, 1, 2, 3].map(() => ({ name: '', index: '', tee: 'II' }))
+      players: [0, 1, 2, 3].map(() => ({ name: '', index: '', tee: 'II' }))
     };
   }
   function draftPreview(d) {
@@ -537,7 +546,7 @@
     }
   };
   function commonNav(v) {
-    v.querySelectorAll('[data-go]').forEach(b => b.onclick = () => go(b.dataset.go, b.dataset.new ? { editCourse: null } : {}));
+    v.querySelectorAll('[data-go]').forEach(b => b.onclick = () => go(b.dataset.go, b.dataset.go === 'setup' ? { draft: null } : b.dataset.new ? { editCourse: null } : {}));
     v.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openGame(b.dataset.open));
   }
 
