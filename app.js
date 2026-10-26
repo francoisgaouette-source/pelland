@@ -295,7 +295,7 @@
         <button class="btn" id="create" type="button">Créer la carte de pointage</button>
       </section>`;
   }
-  function draftTeams(d, ps) { return d.teamMode === 'manual' && d.teams ? d.teams : L.makeTeams(ps); }
+  function draftTeams(d, ps) { return d.teamMode === 'manual' && d.teams ? L.orderTeams(ps, d.teams) : L.makeTeams(ps); }
   function teamQuestion(d, ps) {
     const t = L.makeTeams(ps), n = i => ps[i].name;
     return `Pour les équipes, le meilleur avec le moins bon, donc ${n(t[0][0])} et ${n(t[0][1])} contre ${n(t[1][0])} et ${n(t[1][1])} ? Dites oui, ou dites qui joue avec qui.`;

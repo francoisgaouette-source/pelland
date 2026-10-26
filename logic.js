@@ -61,6 +61,12 @@
       ((players[a].courseHandicap || 0) - (players[b].courseHandicap || 0)) || (a - b));
     return [[order[0], order[3]], [order[1], order[2]]];
   }
+  // L'équipe 1 est toujours celle du meilleur joueur (plus bas index) ; dans chaque équipe, le meilleur est nommé en premier.
+  function orderTeams(players, teams) {
+    const key = i => Number(String(players[i].index).replace(',', '.'));
+    const t = teams.map(x => x.slice().sort((a, b) => key(a) - key(b) || a - b));
+    return Math.min(...t[0].map(key)) <= Math.min(...t[1].map(key)) ? t : [t[1], t[0]];
+  }
   function getTeams(game) { return game.teams || makeTeams(game.players); }
   function teamName(game, t) { return getTeams(game)[t].map(i => game.players[i].name).join(' et '); }
 
@@ -684,7 +690,9 @@
       if (a >= 0 && b >= 0 && a !== b) {
         const others = [0, 1, 2, 3].filter(i => i !== a && i !== b);
         d.teamMode = 'manual'; d.teams = [[a, b], others];
-        teamMsg = `Équipes : ${d.players[a].name} et ${d.players[b].name} contre ${d.players[others[0]].name} et ${d.players[others[1]].name}.`;
+        const ok = d.players.every(p => p.index !== '' && p.index != null);
+        const T = ok ? orderTeams(d.players, d.teams) : d.teams;
+        teamMsg = `Équipe 1 : ${d.players[T[0][0]].name} et ${d.players[T[0][1]].name}. Équipe 2 : ${d.players[T[1][0]].name} et ${d.players[T[1][1]].name}.`;
       }
     } else if (/meilleur.*(moins bon|pire|plus haut)|(moins bon|pire).*meilleur|automatique/.test(plain) ||
                (d.teamMode == null && /^(oui|ok|exact|correct|parfait|c est ca|d accord|oui c est ca)$/.test(plain))) {
@@ -710,6 +718,6 @@
     return null;
   }
 
-  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, makeTeams, getTeams, teamName, netScore, holeMultiplier, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, cabaneTeam, cabanes, par3Results, describePar3, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup, nextPrompt };
+  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, makeTeams, orderTeams, getTeams, teamName, netScore, holeMultiplier, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, cabaneTeam, cabanes, par3Results, describePar3, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup, nextPrompt };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PellandLogic = api;
 })(this);
