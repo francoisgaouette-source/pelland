@@ -203,7 +203,7 @@
         else if (!on && this.wakeLock) { await this.wakeLock.release(); this.wakeLock = null; }
       } catch (e) { /* refusé : sans gravité */ }
     },
-    say(text) {
+    say(text) { return; /* voix retirée */
       if (!('speechSynthesis' in window) || !text) return;
       const u = new SpeechSynthesisUtterance(text);
       u.lang = 'fr-CA';
@@ -226,10 +226,10 @@
 
   function toast(msg) {
     const t = $('#toast'); t.textContent = msg; t.hidden = false;
-    clearTimeout(toast._t); toast._t = setTimeout(() => (t.hidden = true), 2600);
+    clearTimeout(toast._t); toast._t = setTimeout(() => (t.hidden = true), Math.min(9000, 2200 + msg.length * 45));
   }
   function setHeard(t) { $('#heard').textContent = t; }
-  function setReply(t) { $('#reply').textContent = t; }
+  function setReply(t) { if (t) toast(t); }
   function updateMic() { $('#micBtn').classList.toggle('on', Voice.listening && !Voice.wake); }
 
   function go(view, opts = {}) {
@@ -245,7 +245,7 @@
     const v = $('#view');
     $('#back').hidden = S.view === 'home';
     $('#dbBadge').textContent = Store.mode === 'firebase' ? 'Partagé' : 'Local';
-    const showDock = (S.view === 'game' && S.game) || S.view === 'setup';
+    const showDock = false; // plus d'interface vocale
     $('#dock').hidden = !showDock; document.body.classList.toggle('no-dock', !showDock);
     const R = { home: vHome, setup: vSetup, game: vGame, join: vJoin, history: vHistory, courses: vCourses, course: vCourse, players: vPlayers }[S.view];
     v.innerHTML = R();
@@ -260,11 +260,10 @@
     const lastDate = info && info.id === last && info.createdAt ? new Date(info.createdAt).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' }) : null;
     return `
       <div class="hero"><h1>La game à Pelland</h1><p>Carte de pointage à la voix pour quatre joueurs.</p></div>
-      ${Voice.supported ? '' : `<div class="warn">La dictée intégrée n'est pas disponible dans ce navigateur. Sur iPhone, ouvrez le lien dans Safari. En attendant, le micro du clavier fonctionne dans la zone de texte.</div>`}
       <div class="tiles">
         <button class="tile" data-go="courses"><span class="pin">⛳</span><div><strong>Terrains</strong><span>Ajouter ou corriger un terrain avant la partie</span></div></button>
         <button class="tile" data-go="players"><span class="pin">☺</span><div><strong>Joueurs</strong><span>Ajouter ou retirer des joueurs avant la partie</span></div></button>
-        <button class="tile primary" data-go="setup"><span class="pin">+</span><div><strong>Nouvelle partie</strong><span>Terrain, joueurs, index, tertres, handicap, à la voix</span></div></button>
+        <button class="tile primary" data-go="setup"><span class="pin">+</span><div><strong>Nouvelle partie</strong><span>Terrain, joueurs, index, tertres, handicap</span></div></button>
         ${last ? `<button class="tile" data-open="${esc(last)}"><span class="pin">▶</span><div><strong>Reprendre la partie${lastDate ? ' du ' + esc(lastDate) : ''}</strong><span>${info && info.id === last ? `${esc(info.course.replace(/^Club de golf /i, ''))} · ${esc(info.players.join(', '))} · trou ${info.hole}` : 'Dernière partie ouverte sur ce téléphone'}</span></div></button>` : ''}
         <button class="tile" data-go="join"><span class="pin">#</span><div><strong>Rejoindre une partie</strong><span>Avec le code donné par le responsable</span></div></button>
         <button class="tile" data-go="history"><span class="pin">≡</span><div><strong>Historique</strong><span>Toutes les parties enregistrées</span></div></button>
@@ -307,10 +306,6 @@
     const teeOpts = sel => (c ? c.tees : []).map(t => `<option value="${esc(t.name)}" ${t.name === sel ? 'selected' : ''}>${esc(t.name)}</option>`).join('');
     return `
       ${d.players.map((_, i) => `<datalist id="playerList${i}">${listOptions(d, i)}</datalist>`).join('')}
-      <section class="card voice-help">
-        <div class="step">Configuration à la voix</div>
-        <p class="note">Touchez le micro en bas et dites, par exemple : « On joue au Pinegrove » · « François 12,4, Marc 8,1, Luc 18,6 et Pierre 3,2 » · « Marc est responsable » · « Tout le monde au tertre deux » · « Luc au tertre deux trois » · « Bas handicap » · « Oui » (meilleur avec le moins bon) ou « François avec Marc » · puis « Créer la partie ».</p>
-      </section>
       <section class="card">
         <div class="step">1 · Terrain</div>
         <select id="course">${S.courses.map(x => `<option value="${esc(x.id)}" ${x.id === d.courseId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
@@ -435,7 +430,7 @@
       const hp = L.holeTotal(g, hole);
       if (hp) { cum[0] += hp[0]; cum[1] += hp[1]; }
       const tot = hp ? leadHtml(cum) : '';
-      return `<tr class="${hole === h ? 'cur' : ''}"><th class="h"><button class="cell" data-hole="${hole}" style="font-size:19px">${hole}</button></th><td class="m">${ih.par}</td><td class="m">${ih.si}</td>${cells}<td class="stat"><div class="ev">${st.join('')}</div></td><td class="calc">${esc(calc.replace(/^ · /, ''))}</td><td class="tp1">${hp ? hp[1] : ''}</td><td class="tp0">${hp ? hp[0] : ''}</td><td class="tot">${tot}</td></tr>`;
+      return `<tr class="${hole === h ? 'cur' : ''}"><th class="h"><button class="cell" data-hole="${hole}" style="font-size:19px">${hole}</button></th><td class="m">${ih.par}</td><td class="m">${ih.si}</td>${cells}<td class="stat"><div class="ev">${st.join('')}</div></td><td class="calc">${esc(calc.replace(/^ · /, ''))}</td><td class="tp1">${hp ? hp[1] : ''}</td><td class="tp0">${hp ? hp[0] : ''}</td></tr>`;
     };
     const sumRow = (label, from, to, final) => {
       const cells = g.players.map((p, pi) => {
@@ -443,7 +438,7 @@
         return `<td>${any ? s : ''}</td>`;
       }).join('');
       let par = 0, tb = [0, 0]; for (let x = from; x <= to; x++) { par += L.holeInfo(g, x, 0).par; const hp = L.holeTotal(g, x); if (hp) { tb[0] += hp[0]; tb[1] += hp[1]; } }
-      return `<tr class="sum"><td colspan="2">${label}</td><td>${par}</td>${cells}<td></td><td></td><td class="tp1">${tb[1]}</td><td class="tp0">${tb[0]}</td><td class="tot">${final ? leadHtml(tb) : ''}</td></tr>`;
+      return `<tr class="sum"><td colspan="2">${label}</td><td>${par}</td>${cells}<td></td><td></td><td class="tp1">${tb[1]}</td><td class="tp0">${tb[0]}</td></tr>`;
     };
     const cum = [0, 0];
     const ini = L.initials(g.players);
@@ -466,21 +461,21 @@
           else if (owner && pt != null && pt !== k) btn = `<button type="button" class="tb-btn t${k} ${ev.reroll ? 'on' : ''}" data-reroll-team="${ev.reroll ? 0 : 1}" ${started ? 'disabled' : ''}>${ev.reroll ? 'Reroll ✓' : 'Reroll'}</button>`;
           else if (!owner && pt === k) btn = `<span class="tb-btn t${k} on">Pressé</span>`;
           else if (!owner && pt != null && ev.reroll) btn = `<span class="tb-btn t${k} on">Reroll</span>`;
-          return `<div class="team-block t${k}"><div class="tb-name">${L.TEAMS[k]}</div><div class="hole-players two">${tm.map(pi => { const p = g.players[pi]; const k = L.strokesOnHole(p.strokes, hi.si); const s = L.getScore(g, h, pi); return `<${owner ? `button type="button" data-allscores="${h}"` : 'div'} class="hp"><div class="nm tc${teamOf(g, pi)}">${esc(p.name)}${g.responsable === pi ? ' ★' : ''} <span class="hp-idx">${String(p.index).replace('.', ',')}</span></div><div class="sc">${s == null ? '–' : s}</div><div class="dots">${k ? dots(k) + ' ' + (k > 0 ? 'coup' + (k > 1 ? 's' : '') : 'redonne') : ''}</div><div class="hp-tot">${tots[pi].played ? `Brut <b>${tots[pi].gross}</b><br>Net <b>${tots[pi].net}</b><br>${tots[pi].played} trou${tots[pi].played > 1 ? 's' : ''} joué${tots[pi].played > 1 ? 's' : ''}` : 'Aucun trou joué'}</div></${owner ? 'button' : 'div'}>`; }).join('')}</div>${btn}<div class="tb-foot"><b>${teamPts[k]}</b> point${teamPts[k] > 1 ? 's' : ''} · <b>${p3.money[k]} $</b></div></div>`; }).join('')}</div>
+          return `<div class="team-block t${k}"><div class="tb-name">${L.TEAMS[k]}</div><div class="hole-players two">${tm.map(pi => { const p = g.players[pi]; const k = L.strokesOnHole(p.strokes, hi.si); const s = L.getScore(g, h, pi); return `<${owner ? `button type="button" data-allscores="${h}"` : 'div'} class="hp"><div class="nm tc${teamOf(g, pi)}">${esc(p.name)}${g.responsable === pi ? ' ★' : ''}</div><div class="hp-idx">Index ${String(p.index).replace('.', ',')}</div><div class="dots">${k ? dots(k) + ' ' + (k > 0 ? 'coup' + (k > 1 ? 's' : '') : 'redonne') : ''}</div><div class="hp-tot">${tots[pi].played ? `Brut <b>${tots[pi].gross}</b> · Net <b>${tots[pi].net}</b><br>${tots[pi].played} trou${tots[pi].played > 1 ? 's' : ''} joué${tots[pi].played > 1 ? 's' : ''}` : 'Aucun trou joué'}</div></${owner ? 'button' : 'div'}>`; }).join('')}</div><div class="tb-foot"><b>${teamPts[k]}</b> point${teamPts[k] > 1 ? 's' : ''} · <b>${p3.money[k]} $</b></div>${btn}</div>`; }).join('')}</div>
         ${holeChips.length ? `<div class="chips">${holeChips.join('')}</div>` : ''}
       </section>
 
 
       <div class="card-scroll"><table class="sc">
-        <thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${g.players.map((p, i) => `<th class="tc${teamOf(g, i)}" title="${esc(p.name)}">${esc(ini[i])}</th>`).join('')}<th>Statut</th><th>Calcul</th><th class="tc1">Bleu</th><th class="tc0">Rouge</th><th>Total</th></tr></thead>
+        <thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${g.players.map((p, i) => `<th class="tc${teamOf(g, i)}" title="${esc(p.name)}">${esc(ini[i])}</th>`).join('')}<th>Statut</th><th>Calcul</th><th class="tc1">Bleu</th><th class="tc0">Rouge</th></tr></thead>
         <tbody>${Array.from({ length: 9 }, (_, i) => row(i + 1)).join('')}${sumRow('Aller', 1, 9)}${Array.from({ length: 9 }, (_, i) => row(i + 10)).join('')}${sumRow('Retour', 10, 18)}${sumRow('Total', 1, 18, true)}</tbody>
       </table></div>
-      <div class="legend"><span>● coup reçu · petit chiffre = net</span><span>Calcul : ↓ plus bas net · ↑ plus haut net · R/B équipe qui reçoit · ×2 press · ×4 reroll · S skin · C cabane · $ normale 3 · = résultat net</span><span>Noms à la couleur de l'équipe : <b class="tc1">Bleus</b> · <b class="tc0">Rouges</b></span><span>Total = l'équipe qui mène et son total</span><span>${g.players.map((p, i) => `<b class="tc${teamOf(g, i)}">${esc(ini[i])}</b> ${esc(p.name)}`).join(' · ')}</span><span>Faites glisser la carte vers la gauche pour voir le calcul</span></div>
+      <div class="legend"><span>● coup reçu · petit chiffre = net</span><span>Calcul : ↓ plus bas net · ↑ plus haut net · R/B équipe qui reçoit · ×2 press · ×4 reroll · S skin · C cabane · $ normale 3 · = résultat net</span><span>Noms à la couleur de l'équipe : <b class="tc1">Bleus</b> · <b class="tc0">Rouges</b></span><span>${g.players.map((p, i) => `<b class="tc${teamOf(g, i)}">${esc(ini[i])}</b> ${esc(p.name)}`).join(' · ')}</span><span>Faites glisser la carte vers la gauche pour voir le calcul</span></div>
       <section class="card">
         <h2>${owner ? 'Vous êtes le responsable' : 'Vous suivez la partie'}</h2>
         <p class="note">${owner
-          ? 'Dites par exemple : « Trou 4, François 5, Marc 4, Luc 6, Pierre 5 » · « Marc par, Luc bogey » · « Press ? Oui / Non » · « Marc presse » · « Reroll ? Oui / Non » · « Skin rouge » · « Skin bleue » · « Skin pour Marc » · « Pas de skin » · « Annule » · « Trou suivant ».'
-          : 'Posez vos questions : « Qui a des coups au 7 ? » · « Combien de coups pour Marc ? » · « Où en est Luc ? » · « Combien de skins ? » · « Combien de cabanes ? » · « L’argent des normales 3 ? » · « Combien de points ? » · « Les points au trou 5 » · « Avec qui joue Marc ? » · « Les équipes » · « Classement ».'}</p>
+          ? 'Touchez un joueur pour entrer les 4 scores et la skin du trou. Touchez une case de la carte pour corriger un autre trou. Le bouton Press apparaît sous l\'équipe en déficit, puis Reroll sous l\'autre.'
+          : 'La carte se met à jour en direct à chaque score entré par le responsable.'}</p>
         <p class="note">${esc(g.mode === 'bas' ? 'Bas handicap' : 'Full handicap')} · ${g.players.map(p => `${esc(p.name)} ${esc(p.tee)}, index ${String(p.index).replace('.', ',')}, ${p.strokes} coups`).join(' · ')}</p>
         ${Store.mode === 'firebase' ? `<p class="note">Code à donner aux autres joueurs : <b class="num" style="font-size:22px;letter-spacing:.15em">${esc(g.id)}</b></p>` : ''}
       </section>`;
@@ -632,7 +627,7 @@
       $('#create').onclick = async () => {
         const pv = draftPreview(d);
         if (!pv || !pv.ready) { const m = 'Il manque ' + missingList(d).slice(0, 2).join(' et ') + '.'; toast(m); setReply(m); Voice.say(m); return; }
-        if (!d.teamMode) { const q = teamQuestion(d, pv.ps); setReply(q); Voice.say(q); toast('Choisissez la formation des équipes.'); return; }
+        if (!d.teamMode) { toast('Choisissez la formation des équipes (étape 7).'); return; }
         const names = pv.ps.map(p => L.norm(p.name));
         if (new Set(names).size < 4) return toast('Le même joueur est choisi deux fois.');
         ls.set('pelland.lastPlayers', d.players);
@@ -689,9 +684,18 @@
       const r = L.apply(S.game, actions); next = r.game; say = r.say;
     }
     S.game = next;
+    // message court à l'écran
+    const sc = actions.find(a => a.type === 'scores' || a.type === 'skin');
+    if (sc && !undo) {
+      const hh = sc.hole, parts = [];
+      const nt = L.holeNetText(next, hh); if (nt) parts.push(`Trou ${hh} · ${nt}`); else parts.push(`Trou ${hh} enregistré`);
+      if (L.cabaneTeam(next, hh) != null) parts.push('Cabane !');
+      const p3 = L.describePar3(next, hh); if (p3) parts.push(p3.replace(/\.$/, ''));
+      parts.push(L.totalText(next).replace(/\.$/, ''));
+      say = parts.join(' · ');
+    }
     const pr = L.nextPrompt(next);
     S.pending = pr;
-    if (pr) say = (say ? say + ' ' : '') + pr.text;
     render();
     setReply(say); if (speak) Voice.say(say);
     try { await Store.saveGame(next); } catch (e) { toast('Non enregistré : ' + e.message); }
@@ -896,7 +900,7 @@
     else if (params.has('ecoute') || params.has('pelland')) {
       // Ouverture par le raccourci Siri : reprendre la dernière partie et écouter
       const last = ls.get('pelland.lastGame', null);
-      if (last) { openGame(last); setTimeout(() => Voice.setWake(true), 800); } else render();
+      if (last) openGame(last); else render();
     } else render();
   })();
 })();
