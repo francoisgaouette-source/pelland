@@ -61,7 +61,17 @@
       ((players[a].courseHandicap || 0) - (players[b].courseHandicap || 0)) || (a - b));
     return [[order[0], order[3]], [order[1], order[2]]];
   }
-  // L'équipe 1 est toujours celle du meilleur joueur (plus bas index) ; dans chaque équipe, le meilleur est nommé en premier.
+  // Équipes : 0 = Rouges, 1 = Bleus.
+  const TEAMS = ['Rouges', 'Bleus'];
+  const tl = t => 'les ' + TEAMS[t];
+  // « rouge », « bleu », « équipe 1 », « équipe 2 » → 0 ou 1 ; sinon null
+  function teamFromText(n) {
+    if (/\brouges?\b/.test(n)) return 0;
+    if (/\bbleu(e|s|es)?\b/.test(n)) return 1;
+    const m = n.match(/equipe\s+(1|un|une|2|deux)\b/);
+    return m ? (/^(1|un|une)$/.test(m[1]) ? 0 : 1) : null;
+  }
+  // Les Rouges sont toujours l'équipe du meilleur joueur (plus bas index) ; dans chaque équipe, le meilleur est nommé en premier.
   function orderTeams(players, teams) {
     const key = i => Number(String(players[i].index).replace(',', '.'));
     const t = teams.map(x => x.slice().sort((a, b) => key(a) - key(b) || a - b));
@@ -170,13 +180,27 @@
     if (game.course.holes[hole - 1].par !== 3) return '';
     const x = par3Results(game).results.find(r => r.hole === hole);
     if (!x || x.status === 'pending') return '';
-    if (x.status === 'won') return `Normale 3 : l'équipe ${x.team + 1} gagne ${x.amount} $.`;
+    if (x.status === 'won') return `Normale 3 : ${tl(x.team)} gagnent ${x.amount} $.`;
     return `Normale 3 : personne ne gagne, ${x.value} $ reportés à la prochaine normale 3.`;
+  }
+  // Texte court pour la colonne « Calcul » de la carte.
+  function calcText(game, hole) {
+    const r = holePoints(game, hole); if (!r) return '';
+    const P = game.players, nm = a => a.map(i => P[i].name).join(' et ');
+    const cab = cabaneTeam(game, hole);
+    const st = skinTeam(game, hole);
+    if (cab != null) return `Oiselet + skin + haut : cabane ${TEAMS[cab]} ${CABANE_POINTS}`;
+    const v = POINTS * r.mult, parts = [];
+    parts.push(r.low.team != null ? `Bas ${nm(r.low.players)} +${v} ${TEAMS[r.low.team]}` : 'Bas égal');
+    if (r.low.net !== r.high.net) parts.push(r.high.team != null ? `Haut ${nm(r.high.players)} +${v} ${TEAMS[1 - r.high.team]}` : 'Haut égal');
+    if (r.mult > 1) parts.push(r.mult === 4 ? 'reroll ×4' : 'pressé ×2');
+    if (st === 0 || st === 1) parts.push(`skin +1 ${TEAMS[st]}`);
+    return parts.join(' · ');
   }
   function describeSkin(game, hole) {
     const st = skinTeam(game, hole);
-    if ((st === 0 || st === 1) && cabaneTeam(game, hole) != null) return `Skin pour l'équipe ${st + 1} et cabane : ${CABANE_POINTS} points pour le trou.`;
-    if (st === 0 || st === 1) return `Skin pour l'équipe ${st + 1}, 1 point.`;
+    if ((st === 0 || st === 1) && cabaneTeam(game, hole) != null) return `Skin pour ${tl(st)} et cabane : ${CABANE_POINTS} points pour le trou.`;
+    if (st === 0 || st === 1) return `Skin pour ${tl(st)}, 1 point.`;
     if (st === -1) return 'Pas de skin.';
     return 'Skin pas encore indiquée.';
   }
@@ -186,9 +210,9 @@
     const parts = [];
     const v = POINTS * r.mult;
     if (r.mult > 1) parts.push(r.mult === 4 ? 'Reroll, points fois 4' : 'Pressé, points fois 2');
-    if (r.low.team != null) parts.push(`${names(r.low.players)} plus bas net ${r.low.net}, ${v} points pour l'équipe ${r.low.team + 1}`);
+    if (r.low.team != null) parts.push(`${names(r.low.players)} plus bas net ${r.low.net}, ${v} points pour ${tl(r.low.team)}`);
     else parts.push(`égalité au plus bas net ${r.low.net}, pas de points`);
-    if (r.high.team != null) parts.push(`${names(r.high.players)} plus haut net ${r.high.net}, ${v} points à l'équipe ${2 - r.high.team}`);
+    if (r.high.team != null) parts.push(`${names(r.high.players)} plus haut net ${r.high.net}, ${v} points pour ${tl(1 - r.high.team)}`);
     else if (r.low.net !== r.high.net) parts.push(`égalité au plus haut net, pas de points`);
     return parts.join(' ; ') + '.';
   }
@@ -366,12 +390,13 @@
       if (!sh) { const np = nextPrompt(game); if (np && np.type === 'skin') sh = np.hole; }
       if (!sh) { const row = (game.scores || {})[current]; sh = row && row.some(v => v != null) ? current : Math.max(1, current - 1); }
       let team = null;
-      const tm = t.match(/equipe\s+(1|un|une|2|deux)\b/);
+      const tt = teamFromText(t);
       if (/\b(pas de|pas d|aucune?|personne|non|sans)\b/.test(t)) team = -1;
-      else if (tm) team = /^(1|un|une)$/.test(tm[1]) ? 0 : 1;
-      else if (mentioned.length) team = getTeams(game).findIndex(x => x.includes(mentioned[0]));
+      else if (tt != null) team = tt;
+      let player = null;
+      if (team == null && mentioned.length) { team = getTeams(game).findIndex(x => x.includes(mentioned[0])); player = mentioned[0]; }
       if (team == null) return { kind: 'unknown' };
-      actions.push({ type: 'skin', hole: sh, team });
+      actions.push({ type: 'skin', hole: sh, team, player });
       return { kind: 'command', actions };
     }
 
@@ -416,9 +441,9 @@
         }
         const { tot, holes, skins } = teamPoints(game);
         if (!holes) return 'Aucun trou complété pour l\'instant.';
-        const lead = tot[0] === tot[1] ? 'Égalité' : `L'équipe ${tot[0] > tot[1] ? 1 : 2} mène par ${Math.abs(tot[0] - tot[1])}`;
-        let s = `Après ${plural(holes, 'trou')} : équipe 1, ${teamName(game, 0)}, ${plural(tot[0], 'point')} ; équipe 2, ${teamName(game, 1)}, ${plural(tot[1], 'point')}${skins[0] || skins[1] ? `, skins comprises` : ''}. ${lead}.`;
-        if (q.players.length === 1) { const t = getTeams(game).findIndex(x => x.includes(q.players[0])); s = `${P[q.players[0]].name} est dans l'équipe ${t + 1}. ` + s; }
+        const lead = tot[0] === tot[1] ? 'Égalité' : `Les ${TEAMS[tot[0] > tot[1] ? 0 : 1]} mènent par ${Math.abs(tot[0] - tot[1])}`;
+        let s = `Après ${plural(holes, 'trou')} : Rouges, ${teamName(game, 0)}, ${plural(tot[0], 'point')} ; Bleus, ${teamName(game, 1)}, ${plural(tot[1], 'point')}${skins[0] || skins[1] ? `, skins comprises` : ''}. ${lead}.`;
+        if (q.players.length === 1) { const t = getTeams(game).findIndex(x => x.includes(q.players[0])); s = `${P[q.players[0]].name} est chez ${tl(t)}. ` + s; }
         return s;
       }
       case 'teams': {
@@ -427,7 +452,7 @@
           const pi = q.players[0]; const t = T.findIndex(x => x.includes(pi)); const mate = T[t].find(x => x !== pi);
           return `${P[pi].name} joue avec ${P[mate].name}.`;
         }
-        return `Équipe 1 : ${teamName(game, 0)}. Équipe 2 : ${teamName(game, 1)}.`;
+        return `Rouges : ${teamName(game, 0)}. Bleus : ${teamName(game, 1)}.`;
       }
       case 'strokes': {
         if (q.players.length && !q.hole) {
@@ -449,19 +474,19 @@
       case 'cabanes': {
         const c = cabanes(game);
         if (!c[0] && !c[1]) return 'Aucune cabane pour l\'instant.';
-        return `Cabanes : équipe 1, ${c[0]} ; équipe 2, ${c[1]}.`;
+        return `Cabanes : Rouges, ${c[0]} ; Bleus, ${c[1]}.`;
       }
       case 'skins': {
         const sk = teamPoints(game).skins;
         if (!sk[0] && !sk[1]) return 'Aucune skin pour l\'instant.';
-        return `Skins : équipe 1, ${plural(sk[0], 'skin')} ; équipe 2, ${plural(sk[1], 'skin')}.`;
+        return `Skins : Rouges, ${plural(sk[0], 'skin')} ; Bleus, ${plural(sk[1], 'skin')}.`;
       }
       case 'par3': {
         const r = par3Results(game);
         const done = r.results.filter(x => x.status !== 'pending');
-        let out = done.map(x => x.status === 'won' ? `au ${x.hole}, l'équipe ${x.team + 1} gagne ${x.amount} $` : `au ${x.hole}, personne, reporté`).join(' ; ');
+        let out = done.map(x => x.status === 'won' ? `au ${x.hole}, ${tl(x.team)} gagnent ${x.amount} $` : `au ${x.hole}, personne, reporté`).join(' ; ');
         out = out ? 'Normales 3 : ' + out + '. ' : 'Aucune normale 3 jouée pour l\'instant. ';
-        out += `Argent : équipe 1, ${r.money[0]} $ ; équipe 2, ${r.money[1]} $.`;
+        out += `Argent : Rouges, ${r.money[0]} $ ; Bleus, ${r.money[1]} $.`;
         if (r.next) out += ` La prochaine normale 3, au ${r.next}, vaut ${r.nextValue} $.`;
         return out;
       }
@@ -524,10 +549,10 @@
         ev(a.hole).par3Winner = a.player; say.push(a.player == null ? `Personne au par 3 du ${a.hole}.` : `${g.players[a.player].name} gagne le par 3 du ${a.hole}.`);
       }
       if (a.type === 'skin') {
-        const e = ev(a.hole); e.skinTeam = a.team; e.skins = [];
-        say.push(a.team === -1 ? `Pas de skin au trou ${a.hole}.` : `Skin au trou ${a.hole} pour l'équipe ${a.team + 1}, ${teamName(g, a.team)}. 1 point.`);
+        const e = ev(a.hole); e.skinTeam = a.team; e.skins = []; e.skinPlayer = a.player != null ? a.player : null;
+        say.push(a.team === -1 ? `Pas de skin au trou ${a.hole}.` : a.player != null ? `Skin au trou ${a.hole} pour ${g.players[a.player].name}, ${tl(a.team)}. 1 point.` : `Skin au trou ${a.hole} pour ${tl(a.team)}, ${teamName(g, a.team)}. 1 point.`);
         { const p3 = describePar3(g, a.hole); if (p3) say.push(p3); }
-        if (cabaneTeam(g, a.hole) != null) say.push(`Cabane pour l'équipe ${a.team + 1} ! ${CABANE_POINTS} points pour le trou.`);
+        if (cabaneTeam(g, a.hole) != null) say.push(`Cabane pour ${tl(a.team)} ! ${CABANE_POINTS} points pour le trou.`);
         const tp = teamPoints(g).tot; say.push(`Total : ${tp[0]} à ${tp[1]}.`);
       }
       if (a.type === 'skins') { ev(a.hole).skins = a.players; say.push(a.players.length ? `Skin au trou ${a.hole} : ${a.players.map(i => g.players[i].name).join(', ')}.` : `Pas de skin au trou ${a.hole}.`); }
@@ -692,7 +717,7 @@
         d.teamMode = 'manual'; d.teams = [[a, b], others];
         const ok = d.players.every(p => p.index !== '' && p.index != null);
         const T = ok ? orderTeams(d.players, d.teams) : d.teams;
-        teamMsg = `Équipe 1 : ${d.players[T[0][0]].name} et ${d.players[T[0][1]].name}. Équipe 2 : ${d.players[T[1][0]].name} et ${d.players[T[1][1]].name}.`;
+        teamMsg = `Rouges : ${d.players[T[0][0]].name} et ${d.players[T[0][1]].name}. Bleus : ${d.players[T[1][0]].name} et ${d.players[T[1][1]].name}.`;
       }
     } else if (/meilleur.*(moins bon|pire|plus haut)|(moins bon|pire).*meilleur|automatique/.test(plain) ||
                (d.teamMode == null && /^(oui|ok|exact|correct|parfait|c est ca|d accord|oui c est ca)$/.test(plain))) {
@@ -718,6 +743,6 @@
     return null;
   }
 
-  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, makeTeams, orderTeams, getTeams, teamName, netScore, holeMultiplier, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, cabaneTeam, cabanes, par3Results, describePar3, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup, nextPrompt };
+  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, TEAMS, teamFromText, makeTeams, orderTeams, getTeams, teamName, netScore, holeMultiplier, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, cabaneTeam, cabanes, calcText, par3Results, describePar3, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup, nextPrompt };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PellandLogic = api;
 })(this);
