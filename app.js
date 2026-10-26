@@ -246,6 +246,7 @@
     $('#back').hidden = S.view === 'home';
     $('#dbBadge').textContent = Store.mode === 'firebase' ? 'Partagé' : 'Local';
     const showDock = false; // plus d'interface vocale
+    document.body.classList.toggle('view-game', S.view === 'game');
     $('#dock').hidden = !showDock; document.body.classList.toggle('no-dock', !showDock);
     const R = { home: vHome, setup: vSetup, game: vGame, join: vJoin, history: vHistory, courses: vCourses, course: vCourse, players: vPlayers }[S.view];
     v.innerHTML = R();
@@ -275,7 +276,7 @@
   // ---------------- Nouvelle partie ----------------
   function newDraft() {
     return {
-      courseId: (S.courses[0] || {}).id || 'pinegrove', mode: 'bas', responsable: 0, teamMode: null, teams: null,
+      courseId: (S.courses[0] || {}).id || 'pinegrove', mode: 'bas', responsable: 0, teamMode: null, teams: null, stake: '', leadChangeValue: '',
       players: [0, 1, 2, 3].map(() => ({ name: '', index: '', tee: 'II' }))
     };
   }
@@ -329,6 +330,13 @@
         </div>
       </section>
       <section class="card">
+        <div class="step">Argent</div>
+        <div class="row" style="flex-wrap:nowrap">
+          <label style="flex:1">Mise initiale ($)<input id="stake" type="text" inputmode="decimal" value="${esc(d.stake)}"></label>
+          <label style="flex:1">Par changement de meneur ($)<input id="lcv" type="text" inputmode="decimal" value="${esc(d.leadChangeValue)}"></label>
+        </div>
+      </section>
+      <section class="card">
         <div class="step">7 · Équipes</div>
         <div class="seg">
           <button type="button" data-tmode="auto" aria-pressed="${d.teamMode === 'auto'}"><b>Meilleur avec le moins bon</b><small>Les deux du milieu ensemble</small></button>
@@ -347,6 +355,15 @@
   function listOptions(d, i) {
     const taken = d.players.map((p, j) => j !== i ? L.norm(p.name || '') : '').filter(Boolean);
     return S.players.filter(p => !taken.includes(L.norm(p.name))).map(p => `<option value="${esc(p.name)}"></option>`).join('');
+  }
+  function money(v) { const x = parseFloat(String(v || '').replace(',', '.').replace(/[^0-9.]/g, '')); return isNaN(x) ? 0 : x; }
+  const fmt$ = x => (Math.round(x * 100) / 100).toString().replace('.', ',') + ' $';
+  // « 11 coups : 1 2 3 4 5 7 8 9 10 12 14 » (un chiffre en double = 2 coups sur ce trou)
+  function strokeHoles(g, p) {
+    if (!p.strokes) return 'Aucun coup';
+    const list = [];
+    for (let h = 1; h <= 18; h++) { const k = L.strokesOnHole(p.strokes, g.course.holes[h - 1].si); if (k > 0) list.push(k > 1 ? `${h}×${k}` : String(h)); else if (k < 0) list.push(`${h}(−)`); }
+    return `<b>${Math.abs(p.strokes)} coup${Math.abs(p.strokes) > 1 ? 's' : ''}${p.strokes < 0 ? ' à redonner' : ''}</b> : ${list.join(' ')}`;
   }
   function draftTeams(d, ps) { return d.teamMode === 'manual' && d.teams ? L.orderTeams(ps, d.teams) : L.makeTeams(ps); }
   function teamQuestion(d, ps) {
@@ -412,13 +429,14 @@
     { const st = L.skinTeam(g, h); if (st === 0 || st === 1) holeChips.push(`<span class="chip team t${st}">Skin · ${ev.skinPlayer != null ? esc(g.players[ev.skinPlayer].name) : L.TEAMS[st]}</span>`); else if (st === -1) holeChips.push('<span class="chip alt">Pas de skin</span>'); }
 
     const p3 = L.par3Results(g);
+    const colOrder = [...L.getTeams(g)[1], ...L.getTeams(g)[0]]; // Bleus puis Rouges
     const row = hole => {
       const ih = L.holeInfo(g, hole, 0); const e = (g.events || {})[hole] || {};
-      const cells = g.players.map((p, pi) => {
+      const cells = colOrder.map(pi => { const p = g.players[pi];
         const s = L.getScore(g, hole, pi); const k = L.strokesOnHole(p.strokes, ih.si);
         const par = L.holeInfo(g, hole, pi).par;
         const cls = s == null ? '' : (s - k < par ? 'birdie' : s - k > par ? 'bogey' : '');
-        return `<td><button class="cell ${cls}" data-cell="${hole}:${pi}" ${owner ? '' : 'disabled'} aria-label="Trou ${hole}, ${esc(p.name)}"><span>${s == null ? '' : s}</span>${k ? `<i class="d">${dots(k)}</i>` : ''}${s != null && k ? `<i class="nt">${s - k}</i>` : ''}</button></td>`;
+        return `<td class="pc"><button class="cell ${cls}" data-cell="${hole}:${pi}" ${owner ? '' : 'disabled'} aria-label="Trou ${hole}, ${esc(p.name)}"><span>${s == null ? '' : s}</span>${k ? `<i class="d">${dots(k)}</i>` : ''}${s != null && k ? `<i class="nt">${s - k}</i>` : ''}</button></td>`;
       }).join('');
       // Statut : Normal, Press ou Reroll
       const played = ((g.scores || {})[hole] || []).some(v => v != null);
@@ -433,7 +451,7 @@
       return `<tr class="${hole === h ? 'cur' : ''}"><th class="h"><button class="cell" data-hole="${hole}" style="font-size:19px">${hole}</button></th><td class="m">${ih.par}</td><td class="m">${ih.si}</td>${cells}<td class="stat"><div class="ev">${st.join('')}</div></td><td class="calc">${esc(calc.replace(/^ · /, ''))}</td><td class="tp1">${hp ? hp[1] : ''}</td><td class="tp0">${hp ? hp[0] : ''}</td></tr>`;
     };
     const sumRow = (label, from, to, final) => {
-      const cells = g.players.map((p, pi) => {
+      const cells = colOrder.map(pi => { const p = g.players[pi];
         let s = 0, any = false; for (let x = from; x <= to; x++) { const v = L.getScore(g, x, pi); if (v != null) { s += v; any = true; } }
         return `<td>${any ? s : ''}</td>`;
       }).join('');
@@ -448,11 +466,10 @@
       <section class="hole-card" aria-live="polite">
         <div class="hole-top">
           <div class="hole-no">${h}</div>
-          <div class="hole-meta">Normale <b>${hi.par}</b> · Handicap <b>${hi.si}</b>${meta.map(m => ` · <b>${m}</b>`).join('')}</div>
+          <div class="hole-meta">Normale <b>${hi.par}</b> · Handicap <b>${hi.si}</b>${g.stake ? ` · Mise initiale <b>${fmt$(g.stake)}</b>` : ''}${meta.map(m => ` · <b>${m}</b>`).join('')}</div>
+          <div class="hole-changes">Changements de meneur <b>${L.leadChanges(g)}</b>${g.leadChangeValue ? ` · <b>${fmt$(L.leadChanges(g) * g.leadChangeValue)}</b>` : ''}</div>
           <div class="hole-nav"><button data-nav="-1" aria-label="Trou précédent">‹</button><button data-nav="1" aria-label="Trou suivant">›</button></div>
         </div>
-        ${(() => { const t = L.teamPoints(g).tot, d = Math.abs(t[0] - t[1]), w = t[0] === t[1] ? -1 : (t[0] > t[1] ? 0 : 1);
-          return `<div class="lead-box ${w >= 0 ? 'lb' + w : ''}">${w < 0 ? '<span class="lb-t">Partie égale</span>' : `<span class="lb-l">Meneur</span><span class="lb-t">${L.TEAMS[w]}</span><span class="lb-p">+${d} <small>point${d > 1 ? 's' : ''} net${d > 1 ? 's' : ''}</small></span>`}<span class="lb-c">Changements de meneur : <b>${L.leadChanges(g)}</b></span></div>`; })()}
         <div class="team-blocks">${[1, 0].map(k => { const tm = L.getTeams(g)[k], teamPts = L.teamPoints(g).tot;
           const tt = L.trailingTeam(g, h), pt = L.pressTeamOf(g, h), started = ((g.scores || {})[h] || []).some(v => v != null);
           let btn = '';
@@ -461,13 +478,13 @@
           else if (owner && pt != null && pt !== k) btn = `<button type="button" class="tb-btn t${k} ${ev.reroll ? 'on' : ''}" data-reroll-team="${ev.reroll ? 0 : 1}" ${started ? 'disabled' : ''}>${ev.reroll ? 'Reroll ✓' : 'Reroll'}</button>`;
           else if (!owner && pt === k) btn = `<span class="tb-btn t${k} on">Pressé</span>`;
           else if (!owner && pt != null && ev.reroll) btn = `<span class="tb-btn t${k} on">Reroll</span>`;
-          return `<div class="team-block t${k}"><div class="tb-name">${L.TEAMS[k]}</div><div class="hole-players two">${tm.map(pi => { const p = g.players[pi]; const k = L.strokesOnHole(p.strokes, hi.si); const s = L.getScore(g, h, pi); return `<${owner ? `button type="button" data-allscores="${h}"` : 'div'} class="hp"><div class="nm tc${teamOf(g, pi)}">${esc(p.name)}${g.responsable === pi ? ' ★' : ''}</div><div class="hp-idx">Index ${String(p.index).replace('.', ',')}</div><div class="dots">${k ? dots(k) + ' ' + (k > 0 ? 'coup' + (k > 1 ? 's' : '') : 'redonne') : ''}</div><div class="hp-tot">${tots[pi].played ? `Brut <b>${tots[pi].gross}</b> · Net <b>${tots[pi].net}</b><br>${tots[pi].played} trou${tots[pi].played > 1 ? 's' : ''} joué${tots[pi].played > 1 ? 's' : ''}` : 'Aucun trou joué'}</div></${owner ? 'button' : 'div'}>`; }).join('')}</div><div class="tb-foot"><b>${teamPts[k]}</b> point${teamPts[k] > 1 ? 's' : ''} · <b>${p3.money[k]} $</b></div>${btn}</div>`; }).join('')}</div>
+          return `<div class="team-block t${k}"><div class="tb-name">${L.TEAMS[k]}</div><div class="hole-players two">${tm.map(pi => { const p = g.players[pi]; const k = L.strokesOnHole(p.strokes, hi.si); const s = L.getScore(g, h, pi); return `<${owner ? `button type="button" data-allscores="${h}"` : 'div'} class="hp"><div class="nm tc${teamOf(g, pi)}">${esc(p.name)}${g.responsable === pi ? ' ★' : ''}</div><div class="hp-idx">Index ${String(p.index).replace('.', ',')}</div><div class="hp-strk">${strokeHoles(g, p)}</div><div class="dots">${k ? dots(k) + ' ' + (k > 0 ? 'coup' + (k > 1 ? 's' : '') : 'redonne') : ''}</div><div class="hp-tot">${tots[pi].played ? `Brut <b>${tots[pi].gross}</b> · Net <b>${tots[pi].net}</b><br>${tots[pi].played} trou${tots[pi].played > 1 ? 's' : ''} joué${tots[pi].played > 1 ? 's' : ''}` : 'Aucun trou joué'}</div></${owner ? 'button' : 'div'}>`; }).join('')}</div><div class="tb-foot"><b>${teamPts[k]}</b> point${teamPts[k] > 1 ? 's' : ''} · <b>${p3.money[k]} $</b></div>${btn}</div>`; }).join('')}</div>
         ${holeChips.length ? `<div class="chips">${holeChips.join('')}</div>` : ''}
       </section>
 
 
       <div class="card-scroll"><table class="sc">
-        <thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${g.players.map((p, i) => `<th class="tc${teamOf(g, i)}" title="${esc(p.name)}">${esc(ini[i])}</th>`).join('')}<th>Statut</th><th>Calcul</th><th class="tc1">Bleu</th><th class="tc0">Rouge</th></tr></thead>
+        <thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${colOrder.map(i => { const p = g.players[i]; return `<th class="pc tc${teamOf(g, i)}" title="${esc(p.name)}">${esc(ini[i])}</th>`; }).join('')}<th>Statut</th><th>Calcul</th><th class="tc1">Bleu</th><th class="tc0">Rouge</th></tr></thead>
         <tbody>${Array.from({ length: 9 }, (_, i) => row(i + 1)).join('')}${sumRow('Aller', 1, 9)}${Array.from({ length: 9 }, (_, i) => row(i + 10)).join('')}${sumRow('Retour', 10, 18)}${sumRow('Total', 1, 18, true)}</tbody>
       </table></div>
       <div class="legend"><span>● coup reçu · petit chiffre = net</span><span>Calcul : ↓ plus bas net · ↑ plus haut net · R/B équipe qui reçoit · ×2 press · ×4 reroll · S skin · C cabane · $ normale 3 · = résultat net</span><span>Noms à la couleur de l'équipe : <b class="tc1">Bleus</b> · <b class="tc0">Rouges</b></span><span>${g.players.map((p, i) => `<b class="tc${teamOf(g, i)}">${esc(ini[i])}</b> ${esc(p.name)}`).join(' · ')}</span><span>Faites glisser la carte vers la gauche pour voir le calcul</span></div>
@@ -623,6 +640,8 @@
         render();
       });
       const pt = $('#partner'); if (pt) pt.onchange = () => { const j = +pt.value; d.teams = [[0, j], [1, 2, 3].filter(i => i !== j)]; refresh(); };
+      $('#stake').oninput = e => { d.stake = e.target.value; };
+      $('#lcv').oninput = e => { d.leadChangeValue = e.target.value; };
       v.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { d.mode = b.dataset.mode; v.querySelectorAll('[data-mode]').forEach(x => x.setAttribute('aria-pressed', x === b)); refresh(); });
       $('#create').onclick = async () => {
         const pv = draftPreview(d);
@@ -633,7 +652,7 @@
         ls.set('pelland.lastPlayers', d.players);
         const id = await Store.newCode();
         const g = { id, createdAt: Date.now(), ownerUid: Store.uid, course: pv.c, courseId: pv.c.id, mode: d.mode, responsable: d.responsable,
-          players: pv.ps, teams: draftTeams(d, pv.ps), teamMode: d.teamMode, currentHole: 1, scores: {}, events: {}, status: 'en cours' };
+          players: pv.ps, teams: draftTeams(d, pv.ps), teamMode: d.teamMode, stake: money(d.stake), leadChangeValue: money(d.leadChangeValue), currentHole: 1, scores: {}, events: {}, status: 'en cours' };
         try { await Store.saveGame(g); S.draft = null; openGame(id); const msg = `Partie créée. ${g.players.map(p => `${p.name} ${p.strokes} coup${Math.abs(p.strokes) > 1 ? 's' : ''}`).join(', ')}. Rouges : ${L.teamName(g, 0)}. Bleus : ${L.teamName(g, 1)}. Trou 1, normale ${L.holeInfo(g, 1, 0).par}.`; setHeard('« Créer la partie »'); setReply(msg); Voice.say(msg); }
         catch (e) { toast('Création impossible : ' + e.message); }
       };
@@ -798,13 +817,14 @@
     const st0 = L.skinTeam(g, h);
     let skin = st0 == null ? undefined : st0; // undefined = pas encore dit ; -1 = pas de skin ; 0/1 = équipe
     let skinPlayer = ((g.events || {})[h] || {}).skinPlayer; if (skinPlayer === undefined) skinPlayer = null;
+    const T = L.getTeams(g), order = [...T[1], ...T[0]]; // Bleus puis Rouges
     const draw = () => {
       const sheet = $('#sheet');
       // seuls les joueurs à la normale ou mieux (score brut) peuvent avoir la skin
-      const eligible = P.map((p, pi) => pi).filter(pi => vals[pi] != null && vals[pi] <= L.holeInfo(g, h, pi).par);
+      const eligible = order.filter(pi => vals[pi] != null && vals[pi] <= L.holeInfo(g, h, pi).par);
       if (skinPlayer != null && !eligible.includes(skinPlayer)) { skinPlayer = null; if (skin !== -1) skin = st0 == null ? undefined : st0; }
       sheet.innerHTML = `<h3>Trou ${h} · normale ${L.holeInfo(g, h, 0).par}</h3>
-        <div class="allscores">${P.map((p, pi) => {
+        <div class="allscores">${order.map(pi => { const p = P[pi];
           const par = L.holeInfo(g, h, pi).par, k = L.strokesOnHole(p.strokes, g.course.holes[h - 1].si);
           const lo = Math.max(1, par - 2), hi = lo + 5;
           const opts = []; for (let n = lo; n <= hi; n++) opts.push(n);
