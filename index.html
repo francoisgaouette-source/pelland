@@ -14,7 +14,24 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="styles.css?v=20261027zd">
+<script>
+/* Sur ordinateur : l'app s'affiche dans un cadre de la taille d'un iPhone, pour avoir exactement la même vue. */
+(function () {
+  if (window.top !== window || window.innerWidth < 700 || /[?&]plein=1/.test(location.search)) return;
+  window.PELLAND_FRAMED = true;
+  var q = location.search ? location.search + '&cadre=1' : '?cadre=1';
+  document.addEventListener('DOMContentLoaded', function () {
+    document.body.innerHTML = '<div class="phone-frame"><iframe src="' + location.pathname + q + location.hash + '" title="Pelland"></iframe></div>';
+    document.body.className = 'framed';
+  });
+})();
+</script>
+<style>
+body.framed { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #0e1813; }
+.phone-frame { width: 402px; height: min(874px, calc(100vh - 32px)); border-radius: 44px; padding: 12px; background: #000; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+.phone-frame iframe { width: 100%; height: 100%; border: 0; border-radius: 34px; background: #fff; display: block; }
+</style>
+<link rel="stylesheet" href="styles.css?v=20261027ze">
 </head>
 <body>
 <header class="bar">
@@ -47,8 +64,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js?v=20261027zd"></script>
-<script src="logic.js?v=20261027zd"></script>
-<script src="app.js?v=20261027zd"></script>
+<script src="firebase-config.js?v=20261027ze"></script>
+<script src="logic.js?v=20261027ze"></script>
+<script src="app.js?v=20261027ze"></script>
 </body>
 </html>

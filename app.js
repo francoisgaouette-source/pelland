@@ -1,6 +1,7 @@
 /* Pelland — application (interface, voix, base de données). */
 (function () {
   'use strict';
+  if (window.PELLAND_FRAMED) return; // l'app tourne dans le cadre iPhone (ordinateur)
   const L = window.PellandLogic;
   const $ = (s, el = document) => el.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -952,7 +953,7 @@
   }
 
   // Invitation : lien direct vers la partie, envoyé avec le menu Partager de l'iPhone
-  function inviteLink(g) { return location.origin + location.pathname + '?partie=' + encodeURIComponent(g.id); }
+  function inviteLink(g) { return location.origin + location.pathname + '?partie=' + encodeURIComponent(g.id); } // sans « cadre »
   async function invitePlayers(g) {
     const url = inviteLink(g);
     const others = g.players.filter((p, i) => i !== g.responsable).map(p => p.name.split(' ')[0]).join(', ');
