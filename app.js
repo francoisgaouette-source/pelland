@@ -1129,7 +1129,13 @@
       return `<tr><td class="tc${teamOf(g, pi)}">${esc(p.name)}</td><td>${s == null ? '—' : s}</td><td>${k > 0 ? BALL.repeat(k) : k < 0 ? '○'.repeat(-k) : '—'}</td><td><b>${s == null ? '—' : s - k}</b></td></tr>`; }).join('');
     const lines = [];
     lines.push(`<b>Statut :</b> ${e.reroll ? 'Reroll (points ×4)' : (e.presses || []).length ? 'Press (points ×2)' : 'Normal'}`);
-    const pts = L.describeHolePoints(g, h); if (pts) lines.push(`<b>Points :</b> ${esc(pts)}${mult > 1 ? ` Multipliés par ${mult}.` : ''}`);
+    const r = L.holePoints(g, h);
+    if (r) {
+      const v = 2 * r.mult, nm = a => a.map(i => esc(g.players[i].name)).join(' et '), tm = k => `<span class="tc${k}">les ${L.TEAMS[k]}</span>`;
+      lines.push(`<b>Point plus bas :</b> ${r.low.team != null ? `${nm(r.low.players)}, net ${r.low.net} : ${v} points pour ${tm(r.low.team)}.` : `égalité au plus bas net (${r.low.net}), pas de points.`}`);
+      lines.push(`<b>Point plus haut :</b> ${r.high.team != null ? `${nm(r.high.players)}, net ${r.high.net} : ${v} points pour ${tm(1 - r.high.team)}.` : `égalité au plus haut net (${r.high.net}), pas de points.`}`);
+      if (mult > 1) lines.push(`<b>Multiplicateur :</b> ${mult === 4 ? 'reroll, points ×4' : 'press, points ×2'} (déjà compté ci-dessus).`);
+    }
     const sk = L.describeSkin(g, h); if (sk) lines.push(`<b>Skin :</b> ${esc(sk)}`);
     const p3 = L.describePar3(g, h); if (p3) lines.push(`<b>Normale 3 :</b> ${esc(p3)}`);
     const hp = L.holeTotal(g, h); if (hp) lines.push(`<b>Résultat du trou :</b> <span class="tc0">Rouges ${hp[0]}</span> · <span class="tc1">Bleus ${hp[1]}</span>`);
