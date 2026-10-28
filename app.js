@@ -317,7 +317,7 @@
         <button class="tile" data-go="players"><span class="pin"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M15.5 2.5 9 17.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M9 17.2c-.4 1.2-1.6 2.2-3.4 2.4l-2.1.2c-.6.1-.9.7-.6 1.2.2.3.5.5.9.5h4.6c1.6 0 2.7-.9 3.1-2.2l.3-.9" fill="currentColor"/><circle cx="18.5" cy="19.5" r="1.8" fill="currentColor"/></svg></span><div><strong>Joueurs</strong><span>Ajouter ou retirer des joueurs avant la partie</span></div></button>
         <button class="tile primary" data-go="setup"><span class="pin">+</span><div><strong>Nouvelle partie</strong><span>Terrain, joueurs, index, tertres, handicap</span></div></button>
         <button class="tile" data-go="live"><span class="pin">⏵</span><div><strong>Parties en cours</strong><span>Les parties qui ont lieu en ce moment</span></div></button>
-        <button class="tile" data-go="history"><span class="pin">≡</span><div><strong>Parties jouées</strong><span>Toutes les parties enregistrées</span></div></button>
+        <button class="tile" data-go="history"><span class="pin">≡</span><div><strong>Parties jouées</strong><span>Les parties terminées</span></div></button>
       </div>
       ${Store.mode === 'firebase' && Store.email ? `<p class="note">Connecté : <b>${esc(ls.get('pelland.me', '') || '')}</b> · <button class="linkbtn" id="logout" type="button">Se déconnecter</button></p>` : ''}
       <p class="note">${Store.mode === 'firebase' ? 'Base partagée active : les autres joueurs suivent la partie en direct par le lien d’invitation ou par Parties en cours.' : 'Mode local : les parties restent sur ce téléphone.'}</p>
@@ -590,10 +590,10 @@
     const live = S.view === 'live';
     $('#barTitle').textContent = live ? 'Parties en cours' : 'Parties jouées';
     if (S.historyList == null) { Store.listGames().then(l => { S.historyList = l; if (S.view === 'history' || S.view === 'live') render(); }).catch(e => toast(e.message)); return '<p class="note">Chargement…</p>'; }
-    const list = live ? S.historyList.filter(g => g.status !== 'terminée') : S.historyList;
+    const list = S.historyList.filter(g => live ? g.status !== 'terminée' : g.status === 'terminée');
     if (!list.length) return live
       ? '<section class="card"><h2>Aucune partie en cours</h2><p class="note">Les parties apparaissent ici dès leur création, jusqu’à ce que le responsable les termine.</p></section>'
-      : '<section class="card"><h2>Aucune partie encore</h2><p class="note">Les parties apparaîtront ici dès leur création.</p></section>';
+      : '<section class="card"><h2>Aucune partie terminée</h2><p class="note">Une partie apparaît ici quand le responsable touche « Terminer et sauvegarder ».</p></section>';
     return `<div class="list">${list.map(g => {
       const d = new Date(g.createdAt);
       const played = Object.keys(g.scores || {}).filter(k => (g.scores[k] || []).some(v => v != null)).length;
