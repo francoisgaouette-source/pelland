@@ -401,7 +401,7 @@
       const reps = offreReps(o), past = Date.now() > o.deadline;
       return `<div class="offre"><div class="offre-h"><b>${esc(o.course)}</b><small>${past ? 'Réponses fermées' : 'Réponses avant le ' + esc(fmtDay(o.deadline))} · ${reps.length} réponse${reps.length > 1 ? 's' : ''}</small></div>
         ${o.dates.map(dt => { const yes = reps.filter(r => (r.dates || []).includes(dt)).map(r => r.name);
-          return `<div class="offre-d"><div><b>${esc(fmtDate(dt))}</b><span>${yes.length ? esc(yes.join(', ')) : 'Personne pour l’instant'}</span></div><span class="cnt ${yes.length >= 4 ? 'ok' : ''}">${yes.length}</span></div>${yes.length >= 3 ? `<div class="row offre-acts"><button class="btn small" data-oauto="${esc(o.id)}|${dt}" type="button">Quatuors automatiques</button><button class="btn ghost small" data-oquat="${esc(o.id)}|${dt}" type="button">Manuel</button></div>` : ''}`; }).join('')}
+          return `<div class="offre-d"><div><b>${esc(fmtDate(dt))}</b><span>${yes.length ? esc(yes.join(', ')) : 'Personne pour l’instant'}</span>${yes.length ? `<span class="grp">${esc(groupsText(yes.length))}</span>` : ''}</div><span class="cnt ${yes.length >= 4 ? 'ok' : ''}">${yes.length}</span></div>${yes.length >= 3 ? `<div class="row offre-acts"><button class="btn small" data-oauto="${esc(o.id)}|${dt}" type="button">Quatuors automatiques</button><button class="btn ghost small" data-oquat="${esc(o.id)}|${dt}" type="button">Manuel</button></div>` : ''}`; }).join('')}
         <div class="row"><button class="btn ghost small" data-osms="${esc(o.id)}" type="button">Renvoyer le texto</button><button class="btn ghost small" data-odel="${esc(o.id)}" type="button">${S.confirmDelO === o.id ? 'Confirmer' : 'Retirer'}</button></div></div>`; }).join('');
     const form = f ? `<div class="offre-form">
         <label>Terrain<select id="oCourse">${S.courses.map(c => `<option value="${esc(c.name)}" ${c.name === f.course ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
@@ -436,6 +436,13 @@
       ${o[key] ? `<p class="note">Réponse enregistrée${sel.length ? '' : ' : aucune date'}.</p>` : ''}</section>`;
   }
   // Tailles des groupes : le plus de 4 possible, des groupes de 3 au besoin (5 → 4 + 1 en attente)
+  // « 1 quatuor de 4 et 1 de 3 · 1 en attente »
+  function groupsText(n) {
+    const z = groupSizes(n), q4 = z.filter(x => x === 4).length, q3 = z.filter(x => x === 3).length, wait = n - z.reduce((a, b) => a + b, 0);
+    if (!z.length) return n ? `${n} disponible${n > 1 ? 's' : ''} : pas assez pour un groupe` : '';
+    const parts = []; if (q4) parts.push(`${q4} quatuor${q4 > 1 ? 's' : ''} de 4`); if (q3) parts.push(`${q3} quatuor${q3 > 1 ? 's' : ''} de 3`);
+    return parts.join(' et ') + (wait ? ` · ${wait} en attente` : '');
+  }
   function groupSizes(n) {
     for (let a = Math.floor(n / 4); a >= 0; a--) { const r = n - 4 * a; if (r % 3 === 0) return Array(a).fill(4).concat(Array(r / 3).fill(3)); }
     return n >= 4 ? [4] : n === 3 ? [3] : [];
@@ -474,7 +481,7 @@
     const pc = pairHistory(games, S.quatuors);
     let res = autoGroups(names, pc);
     const label = `${o.course.replace(/^Club de golf /i, '')} – ${fmtDate(dt)}`;
-    const draw = () => openSheet(`<h3>Quatuors automatiques</h3><p class="note">${esc(label)} · ${names.length} disponibles. Les groupes évitent de remettre ensemble ceux qui ont joué ensemble récemment.</p>
+    const draw = () => openSheet(`<h3>Quatuors automatiques</h3><p class="note">${esc(label)} · ${names.length} disponibles : <b>${esc(groupsText(names.length))}</b>. Les groupes évitent de remettre ensemble ceux qui ont joué ensemble récemment.</p>
       <div class="auto-groups">${res.groups.map((g, i) => `<div class="auto-g"><b>Groupe ${i + 1}${g.length === 3 ? ' (3 joueurs)' : ''}</b><span>${g.map(esc).join(', ')}</span></div>`).join('')}
       ${res.waiting.length ? `<div class="auto-g wait"><b>En attente</b><span>${res.waiting.map(esc).join(', ')}</span></div>` : ''}</div>
       <div class="row"><button class="btn" data-autosave type="button">Enregistrer ces quatuors</button><button class="btn ghost small" data-autoredo type="button">Mélanger de nouveau</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`, sh => {
@@ -551,7 +558,7 @@
           <button type="button" data-count="3" aria-pressed="${d.count === 3}"><b>3 joueurs</b><small>Le 9 points</small></button>
         </div>
         ${offreDates().length ? `<label>Choisir parmi ceux qui ont répondu<select id="offPick"><option value="">— Tous les joueurs —</option>${offreDates().map(x => `<option value="${x.key}" ${d.offre === x.key ? 'selected' : ''}>${esc(x.label)} (${x.names.length} dispo)</option>`).join('')}</select></label>
-        ${d.offre ? `<p class="note">Disponibles : ${esc((offreDates().find(x => x.key === d.offre) || { names: [] }).names.join(', ') || 'personne')}</p>` : ''}` : ''}
+        ${d.offre ? (() => { const nm = (offreDates().find(x => x.key === d.offre) || { names: [] }).names; return `<p class="note">Disponibles : ${esc(nm.join(', ') || 'personne')}${nm.length ? `<br><b>${esc(groupsText(nm.length))}</b>` : ''}</p>`; })() : ''}` : ''}
         ${(S.quatuors || []).length ? `<label>Quatuor<select id="quatPick"><option value="">— Choisir un quatuor (facultatif) —</option>${S.quatuors.map(x => `<option value="${esc(x.id)}">${esc(x.name || x.players.join(', '))}</option>`).join('')}</select></label>` : ''}
         ${d.players.map((p, i) => `
           <div class="prow">
