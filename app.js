@@ -310,7 +310,7 @@
         <button class="tile" data-go="live"><span class="pin">⏵</span><div><strong>Parties en cours</strong><span>Les parties qui ont lieu en ce moment</span></div></button>
         ${last ? `<button class="tile" data-open="${esc(last)}"><span class="pin">▶</span><div><strong>Reprendre la partie${lastDate ? ' du ' + esc(lastDate) : ''}</strong><span>${info && info.id === last ? `${esc(info.course.replace(/^Club de golf /i, ''))} · ${esc(info.players.join(', '))} · trou ${info.hole}` : 'Dernière partie ouverte sur ce téléphone'}</span></div></button>` : ''}
         <button class="tile" data-go="join"><span class="pin">#</span><div><strong>Rejoindre une partie</strong><span>Avec le code donné par le responsable</span></div></button>
-        <button class="tile" data-go="history"><span class="pin">≡</span><div><strong>Historique</strong><span>Toutes les parties enregistrées</span></div></button>
+        <button class="tile" data-go="history"><span class="pin">≡</span><div><strong>Parties jouées</strong><span>Toutes les parties enregistrées</span></div></button>
       </div>
       ${Store.mode === 'firebase' && Store.email ? `<p class="note">Connecté : <b>${esc(ls.get('pelland.me', '') || '')}</b> · <button class="linkbtn" id="logout" type="button">Se déconnecter</button></p>` : ''}
       <p class="note">${Store.mode === 'firebase' ? 'Base partagée active : les autres joueurs voient la partie en direct avec le code.' : 'Mode local : les parties restent sur ce téléphone.'}</p>
@@ -376,8 +376,8 @@
       <section class="card">
         <div class="step">Argent</div>
         <div class="row" style="flex-wrap:nowrap">
-          <label style="flex:1">La game commence à<span class="money-in"><input id="stake" type="text" inputmode="decimal" placeholder="0" value="${esc(fmtIn(d.stake))}"><i>$</i></span></label>
-          <label style="flex:1">$ quand la partie tourne<span class="money-in"><input id="lcv" type="text" inputmode="decimal" placeholder="0" value="${esc(fmtIn(d.leadChangeValue))}"><i>$</i></span></label>
+          <label style="flex:1">$ au début de la game<span class="money-in"><input id="stake" type="text" inputmode="decimal" placeholder="0" value="${esc(fmtIn(d.stake))}"><i>$</i></span></label>
+          <label style="flex:1">$ à chaque fois que la partie tourne<span class="money-in"><input id="lcv" type="text" inputmode="decimal" placeholder="0" value="${esc(fmtIn(d.leadChangeValue))}"><i>$</i></span></label>
         </div>
       </section>
       <section class="card">
@@ -523,12 +523,12 @@
 
     return `
       <section class="hole-card" aria-live="polite">
+        ${owner && g.status !== 'terminée' ? `<button class="btn invite-btn" data-invite type="button">Inviter les joueurs</button>` : ''}
         <div class="hole-top">
           <div class="hole-no">${h}</div>
           <div class="hole-meta">Normale <b>${hi.par}</b> · Handicap <b>${hi.si}</b>${meta.map(m => ` · <b>${m}</b>`).join('')}</div>
           <div class="hole-nav"><button data-nav="-1" aria-label="Trou précédent">‹</button><button data-nav="1" aria-label="Trou suivant">›</button></div>
         </div>
-        ${owner && g.status !== 'terminée' ? `<button class="btn invite-btn" data-invite type="button">Inviter les joueurs</button>` : ''}
         ${owner ? `<div class="row game-actions">${g.status === 'terminée'
           ? '<span class="note">Partie terminée et sauvegardée.</span><button class="btn ghost small" data-reopen type="button">Rouvrir</button>'
           : '<button class="btn small" data-finish type="button">Terminer et sauvegarder</button>'}
@@ -539,7 +539,7 @@
           ? `<div class="row game-actions"><button class="btn small" data-claim type="button">Oui, je deviens responsable</button><button class="btn ghost small" data-cancelclaim type="button">Annuler</button></div>`
           : `<div class="row game-actions"><button class="btn ghost small light" data-askclaim type="button">Devenir responsable de cette partie</button><span class="note light">pour entrer les scores, la terminer ou l'effacer</span></div>`) : ''}
         <div class="money-boxes">
-          <div class="mbox green"><span>La game commence à</span><b>${g.stake ? fmt$(g.stake) : '—'}</b></div>
+          <div class="mbox green"><span>$ au début de la game</span><b>${g.stake ? fmt$(g.stake) : '—'}</b></div>
           <div class="mbox green"><span>La partie a tourné</span><b>${L.leadChanges(g)}${g.leadChangeValue ? ` · ${fmt$(L.leadChanges(g) * g.leadChangeValue)}` : ''}</b></div>
         </div>
         <div class="team-blocks">${[1, 0].map(k => { const tm = L.getTeams(g)[k], teamPts = L.teamPoints(g).tot;
@@ -574,7 +574,7 @@
   let historyCache = null;
   function vHistory() {
     const live = S.view === 'live';
-    $('#barTitle').textContent = live ? 'Parties en cours' : 'Historique';
+    $('#barTitle').textContent = live ? 'Parties en cours' : 'Parties jouées';
     if (S.historyList == null) { Store.listGames().then(l => { S.historyList = l; if (S.view === 'history' || S.view === 'live') render(); }).catch(e => toast(e.message)); return '<p class="note">Chargement…</p>'; }
     const list = live ? S.historyList.filter(g => g.status !== 'terminée') : S.historyList;
     if (!list.length) return live
