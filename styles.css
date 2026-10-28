@@ -493,3 +493,4 @@ table.sc tr.has-sub > * { border-bottom: 0; }
 .card-view img { display: block; width: 100%; height: auto; }
 #cardStatus:empty { display: none; }
 .coups-calc { display: grid; gap: 2px; margin: 6px 0; } .coups-calc span { display: block; }
+.bottom-actions { justify-content: center; gap: 10px; }
