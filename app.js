@@ -362,7 +362,7 @@
       <div class="tiles">
         <button class="tile" data-go="courses"><span class="pin">⛳</span><div><strong>Terrains</strong><span>Ajouter ou corriger un terrain avant la partie</span></div></button>
         <button class="tile" data-go="players"><span class="pin"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M15.5 2.5 9 17.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M9 17.2c-.4 1.2-1.6 2.2-3.4 2.4l-2.1.2c-.6.1-.9.7-.6 1.2.2.3.5.5.9.5h4.6c1.6 0 2.7-.9 3.1-2.2l.3-.9" fill="currentColor"/><circle cx="18.5" cy="19.5" r="1.8" fill="currentColor"/></svg></span><div><strong>Joueurs</strong><span>Ajouter ou retirer des joueurs avant la partie</span></div></button>
-        <button class="tile" data-go="quatuors"><span class="pin" style="font-family:var(--display);font-weight:700">4</span><div><strong>Quatuors</strong><span>Les groupes de 4 qui jouent ensemble</span></div></button>
+        <button class="tile" data-go="quatuors"><span class="pin" style="font-family:var(--display);font-weight:700">4</span><div><strong>Parties à venir</strong><span>Dates offertes, disponibilités et groupes de 4</span></div></button>
         <button class="tile primary" data-go="setup"><span class="pin">+</span><div><strong>Nouvelle partie</strong><span>Terrain, joueurs, index, tertres, handicap</span></div></button>
         <button class="tile" data-go="live"><span class="pin">⏵</span><div><strong>Parties en cours</strong><span>Les parties qui ont lieu en ce moment</span></div></button>
         <button class="tile" data-go="history"><span class="pin">≡</span><div><strong>Parties jouées</strong><span>Les parties terminées</span></div></button>
@@ -374,7 +374,7 @@
 
   // ---------------- Quatuors ----------------
   function vQuatuors() {
-    $('#barTitle').textContent = 'Quatuors';
+    $('#barTitle').textContent = 'Parties à venir';
     const q = S.quatuors || [], nq = S.newQuat || (S.newQuat = { name: '', players: ['', '', '', ''] });
     const opts = i => { const taken = nq.players.filter((x, j) => j !== i && x).map(L.norm);
       return `<option value="">— Joueur ${i + 1} —</option>` + S.players.filter(p => !taken.includes(L.norm(p.name))).map(p => `<option value="${esc(p.name)}" ${p.name === nq.players[i] ? 'selected' : ''}>${esc(p.name)}</option>`).join(''); };
@@ -401,7 +401,7 @@
       const reps = offreReps(o), past = Date.now() > o.deadline;
       return `<div class="offre"><div class="offre-h"><b>${esc(o.course)}</b><small>${past ? 'Réponses fermées' : 'Réponses avant le ' + esc(fmtDay(o.deadline))} · ${reps.length} réponse${reps.length > 1 ? 's' : ''}</small></div>
         ${o.dates.map(dt => { const yes = reps.filter(r => (r.dates || []).includes(dt)).map(r => r.name);
-          return `<div class="offre-d"><div><b>${esc(fmtDate(dt))}</b><span>${yes.length ? esc(yes.join(', ')) : 'Personne pour l’instant'}</span></div><span class="cnt ${yes.length >= 4 ? 'ok' : ''}">${yes.length}</span>${yes.length >= 4 ? `<button class="btn small" data-oquat="${esc(o.id)}|${dt}" type="button">Quatuor</button>` : ''}</div>`; }).join('')}
+          return `<div class="offre-d"><div><b>${esc(fmtDate(dt))}</b><span>${yes.length ? esc(yes.join(', ')) : 'Personne pour l’instant'}</span></div><span class="cnt ${yes.length >= 4 ? 'ok' : ''}">${yes.length}</span></div>${yes.length >= 3 ? `<div class="row offre-acts"><button class="btn small" data-oauto="${esc(o.id)}|${dt}" type="button">Quatuors automatiques</button><button class="btn ghost small" data-oquat="${esc(o.id)}|${dt}" type="button">Manuel</button></div>` : ''}`; }).join('')}
         <div class="row"><button class="btn ghost small" data-osms="${esc(o.id)}" type="button">Renvoyer le texto</button><button class="btn ghost small" data-odel="${esc(o.id)}" type="button">${S.confirmDelO === o.id ? 'Confirmer' : 'Retirer'}</button></div></div>`; }).join('');
     const form = f ? `<div class="offre-form">
         <label>Terrain<select id="oCourse">${S.courses.map(c => `<option value="${esc(c.name)}" ${c.name === f.course ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
@@ -434,6 +434,60 @@
       <div class="dispo">${o.dates.map(dt => `<button type="button" class="dispo-d" data-dispo="${dt}" aria-pressed="${sel.includes(dt)}" ${past ? 'disabled' : ''}><b>${sel.includes(dt) ? '✓' : ''}</b><span>${esc(fmtDate(dt))}</span></button>`).join('')}</div>
       ${past ? '' : `<button class="btn" id="dispoSave" type="button">Enregistrer mes disponibilités</button>`}
       ${o[key] ? `<p class="note">Réponse enregistrée${sel.length ? '' : ' : aucune date'}.</p>` : ''}</section>`;
+  }
+  // Tailles des groupes : le plus de 4 possible, des groupes de 3 au besoin (5 → 4 + 1 en attente)
+  function groupSizes(n) {
+    for (let a = Math.floor(n / 4); a >= 0; a--) { const r = n - 4 * a; if (r % 3 === 0) return Array(a).fill(4).concat(Array(r / 3).fill(3)); }
+    return n >= 4 ? [4] : n === 3 ? [3] : [];
+  }
+  // Varier les groupes : coût = nombre de fois (récentes surtout) où deux joueurs ont déjà été ensemble
+  function pairHistory(games, quats) {
+    const m = {}, add = (names, w) => { const k = names.map(L.norm); for (let i = 0; i < k.length; i++) for (let j = i + 1; j < k.length; j++) { const key = [k[i], k[j]].sort().join('|'); m[key] = (m[key] || 0) + w; } };
+    (games || []).slice().sort((a, b) => b.createdAt - a.createdAt).slice(0, 30).forEach((g, i) => add(g.players.map(p => p.name), 1 / (1 + i * 0.15)));
+    (quats || []).forEach(q => add(q.players, 0.5));
+    return (a, b) => m[[L.norm(a), L.norm(b)].sort().join('|')] || 0;
+  }
+  function autoGroups(names, pc) {
+    const sizes = groupSizes(names.length), placed = sizes.reduce((a, b) => a + b, 0);
+    const cost = gs => gs.reduce((t, g) => { let c = 0; for (let i = 0; i < g.length; i++) for (let j = i + 1; j < g.length; j++) c += pc(g[i], g[j]); return t + c; }, 0);
+    let best = null, bestC = Infinity;
+    for (let r = 0; r < 60; r++) {
+      const sh = names.slice().sort(() => Math.random() - 0.5);
+      // les premiers à avoir répondu sont placés ; les autres en attente
+      const pool = names.slice(0, placed).sort(() => Math.random() - 0.5);
+      let gs = [], k = 0; sizes.forEach(z => { gs.push(pool.slice(k, k + z)); k += z; });
+      let c = cost(gs), improved = true;
+      while (improved) { improved = false;
+        for (let a = 0; a < gs.length; a++) for (let b = a + 1; b < gs.length; b++) for (let i = 0; i < gs[a].length; i++) for (let j = 0; j < gs[b].length; j++) {
+          [gs[a][i], gs[b][j]] = [gs[b][j], gs[a][i]]; const c2 = cost(gs);
+          if (c2 < c - 1e-9) { c = c2; improved = true; } else [gs[a][i], gs[b][j]] = [gs[b][j], gs[a][i]];
+        } }
+      if (c < bestC) { bestC = c; best = gs.map(g => g.slice()); }
+      void sh;
+    }
+    return { groups: best || [], waiting: names.slice(placed) };
+  }
+  async function autoQuatuorsSheet(o, dt) {
+    const reps = offreReps(o).filter(r => (r.dates || []).includes(dt)).sort((a, b) => (a.at || 0) - (b.at || 0));
+    const names = reps.map(r => r.name);
+    let games = []; try { games = await Store.listGames(); } catch (e) { }
+    const pc = pairHistory(games, S.quatuors);
+    let res = autoGroups(names, pc);
+    const label = `${o.course.replace(/^Club de golf /i, '')} – ${fmtDate(dt)}`;
+    const draw = () => openSheet(`<h3>Quatuors automatiques</h3><p class="note">${esc(label)} · ${names.length} disponibles. Les groupes évitent de remettre ensemble ceux qui ont joué ensemble récemment.</p>
+      <div class="auto-groups">${res.groups.map((g, i) => `<div class="auto-g"><b>Groupe ${i + 1}${g.length === 3 ? ' (3 joueurs)' : ''}</b><span>${g.map(esc).join(', ')}</span></div>`).join('')}
+      ${res.waiting.length ? `<div class="auto-g wait"><b>En attente</b><span>${res.waiting.map(esc).join(', ')}</span></div>` : ''}</div>
+      <div class="row"><button class="btn" data-autosave type="button">Enregistrer ces quatuors</button><button class="btn ghost small" data-autoredo type="button">Mélanger de nouveau</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`, sh => {
+        sh.querySelector('[data-close]').onclick = closeSheet;
+        sh.querySelector('[data-autoredo]').onclick = () => { res = autoGroups(names, pc); draw(); };
+        sh.querySelector('[data-autosave]').onclick = async () => {
+          const add = res.groups.map((g, i) => ({ id: 'q' + Date.now().toString(36) + i, name: `${label}${res.groups.length > 1 ? ' – groupe ' + (i + 1) : ''}`, players: g.slice(), date: dt }));
+          const list = (S.quatuors || []).concat(add);
+          try { await Store.saveQuatuors(list); S.quatuors = list; closeSheet(); toast(`${add.length} quatuor${add.length > 1 ? 's' : ''} enregistré${add.length > 1 ? 's' : ''}.`); render(); }
+          catch (e) { toast('Enregistrement impossible : ' + e.message); }
+        };
+      });
+    draw();
   }
   function draftFromQuatuor(x) {
     const d = newDraft(), me = L.norm(ls.get('pelland.me', '') || '');
@@ -914,6 +968,7 @@
         if (S.confirmDelO !== b.dataset.odel) { S.confirmDelO = b.dataset.odel; return render(); }
         try { await Store.deleteOffre(b.dataset.odel); S.offres = S.offres.filter(o => o.id !== b.dataset.odel); S.confirmDelO = null; render(); } catch (e) { toast('Retrait impossible : ' + e.message); }
       });
+      v.querySelectorAll('[data-oauto]').forEach(b => b.onclick = () => { const [id, dt] = b.dataset.oauto.split('|'); autoQuatuorsSheet(S.offres.find(x => x.id === id), +dt); });
       v.querySelectorAll('[data-oquat]').forEach(b => b.onclick = () => {
         const [id, dt] = b.dataset.oquat.split('|'); const o = S.offres.find(x => x.id === id);
         const yes = offreReps(o).filter(r => (r.dates || []).includes(+dt)).map(r => r.name).filter(n => S.players.some(p => L.norm(p.name) === L.norm(n)));

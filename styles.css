@@ -566,3 +566,7 @@ table.sc tr.calc-row td:last-child::after { content: ' ›'; color: var(--muted)
 .dispo-d { display: grid; grid-template-columns: 32px 1fr; align-items: center; gap: 10px; text-align: left; min-height: 54px; padding: 8px 12px; border: 2px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--ink); font-size: 17px; }
 .dispo-d b { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; }
 .dispo-d[aria-pressed=true] { border-color: #2fb36b; } .dispo-d[aria-pressed=true] b { background: #2fb36b; border-color: #2fb36b; color: #fff; }
+.offre-acts { margin: -2px 0 6px; gap: 8px; }
+.auto-groups { display: grid; gap: 8px; }
+.auto-g { border: 2px solid #2fb36b; border-radius: 10px; padding: 8px 12px; display: grid; gap: 2px; }
+.auto-g span { font-size: 16px; } .auto-g.wait { border-color: var(--line); color: var(--muted); }
