@@ -21,16 +21,19 @@
       if (cfg && cfg.apiKey && typeof firebase !== 'undefined') {
         try {
           firebase.initializeApp(cfg);
-          const cred = await firebase.auth().signInAnonymously();
-          this.uid = cred.user.uid;
+          this.cfg = cfg;
           this.db = firebase.firestore();
+          // Connexion des membres : nom + numéro de téléphone (compte Firebase « courriel / mot de passe »)
+          const user = await new Promise(res => { const off = firebase.auth().onAuthStateChanged(u => { off(); res(u); }); });
+          if (user && !user.isAnonymous) { this.uid = user.uid; this.email = user.email; }
+          else { if (user && user.isAnonymous) { try { await firebase.auth().signOut(); } catch (e) { } } this.needLogin = true; }
           try { await this.db.enablePersistence({ synchronizeTabs: true }); } catch (e) { /* déjà active ou non supportée */ }
           this.mode = 'firebase';
         } catch (e) {
           console.error(e);
           const c = (e && e.code) || '';
           this.error = c === 'auth/admin-restricted-operation' || c === 'auth/operation-not-allowed'
-            ? 'La connexion « Anonymous » n\'est pas activée dans Firebase (Authentication → Sign-in method).'
+            ? 'La connexion « Email/Password » n\'est pas activée dans Firebase (Authentication → Sign-in method).'
             : c === 'auth/unauthorized-domain' || /domain/i.test(e.message || '')
             ? 'Le domaine francoisgaouette-source.github.io n\'est pas dans Authentication → Settings → Authorized domains.'
             : /referer|referrer|API key|api-key|blocked/i.test((e && e.message) || '')
@@ -43,7 +46,40 @@
         this.uid = ls.get('pelland.uid', null) || ('local-' + Math.random().toString(36).slice(2, 10));
         ls.set('pelland.uid', this.uid);
       }
+      if (!this.needLogin) await this.ensureSeed();
+    },
+    // Connexion avec le nom (choisi dans la liste) et le numéro de téléphone
+    async login(player, phone) {
+      const digits = String(phone || '').replace(/\D/g, '');
+      if (digits.length < 7) throw new Error('Entrez votre numéro de téléphone (10 chiffres).');
+      const auth = firebase.auth();
+      if (player.authEmail) {
+        try { const c = await auth.signInWithEmailAndPassword(player.authEmail, digits); this.uid = c.user.uid; this.email = c.user.email; }
+        catch (e) { throw new Error('Numéro de téléphone incorrect pour ' + player.name + '.'); }
+      } else {
+        const all = await this.listPlayers();
+        if (all.some(x => x.authEmail)) throw new Error('Le téléphone de ' + player.name + ' n\'est pas encore enregistré. Demandez à un membre de l\'ajouter dans Joueurs.');
+        // Premier membre : son compte est créé avec ce numéro
+        const email = player.id.replace(/[^a-z0-9-]/gi, '') + '-' + Date.now().toString(36) + '@pelland.golf';
+        const c = await auth.createUserWithEmailAndPassword(email, digits);
+        this.uid = c.user.uid; this.email = email;
+        await this.db.collection('players').doc(player.id).set({ authEmail: email, phoneHint: digits.slice(-2) }, { merge: true });
+      }
+      this.needLogin = false;
+      ls.set('pelland.me', player.name);
       await this.ensureSeed();
+    },
+    async logout() { try { await firebase.auth().signOut(); } catch (e) { } ls.set('pelland.me', null); location.reload(); },
+    // Ajoute ou change le téléphone d'un joueur (crée son compte sans déconnecter le membre actuel)
+    async setPhone(player, phone) {
+      const digits = String(phone || '').replace(/\D/g, '');
+      if (digits.length < 7) throw new Error('Numéro de téléphone invalide (10 chiffres).');
+      if (this.mode !== 'firebase') { const list = ls.get('pelland.players', []); const x = list.find(q => q.id === player.id); if (x) { x.phoneHint = digits.slice(-2); x.authEmail = 'local'; } ls.set('pelland.players', list); return; }
+      const sec = firebase.apps.find(a => a.name === 'invite') || firebase.initializeApp(this.cfg, 'invite');
+      const email = player.id.replace(/[^a-z0-9-]/gi, '') + '-' + Date.now().toString(36) + '@pelland.golf';
+      await sec.auth().createUserWithEmailAndPassword(email, digits);
+      try { await sec.auth().signOut(); } catch (e) { }
+      await this.db.collection('players').doc(player.id).set({ authEmail: email, phoneHint: digits.slice(-2) }, { merge: true });
     },
     async ensureSeed() {
       const list = await this.listCourses();
@@ -249,12 +285,12 @@
 
   function render() {
     const v = $('#view');
-    $('#back').hidden = S.view === 'home';
+    $('#back').hidden = S.view === 'home' || S.view === 'login';
     $('#dbBadge').textContent = Store.mode === 'firebase' ? 'Partagé' : 'Local';
     const showDock = false; // plus d'interface vocale
     document.body.classList.toggle('view-game', S.view === 'game');
     $('#dock').hidden = !showDock; document.body.classList.toggle('no-dock', !showDock);
-    const R = { home: vHome, setup: vSetup, game: vGame, join: vJoin, history: vHistory, courses: vCourses, course: vCourse, players: vPlayers }[S.view];
+    const R = { home: vHome, setup: vSetup, game: vGame, join: vJoin, history: vHistory, courses: vCourses, course: vCourse, players: vPlayers, login: vLogin }[S.view];
     v.innerHTML = R();
     bind[S.view] && bind[S.view](v);
   }
@@ -275,6 +311,7 @@
         <button class="tile" data-go="join"><span class="pin">#</span><div><strong>Rejoindre une partie</strong><span>Avec le code donné par le responsable</span></div></button>
         <button class="tile" data-go="history"><span class="pin">≡</span><div><strong>Historique</strong><span>Toutes les parties enregistrées</span></div></button>
       </div>
+      ${Store.mode === 'firebase' && Store.email ? `<p class="note">Connecté : <b>${esc(ls.get('pelland.me', '') || '')}</b> · <button class="linkbtn" id="logout" type="button">Se déconnecter</button></p>` : ''}
       <p class="note">${Store.mode === 'firebase' ? 'Base partagée active : les autres joueurs voient la partie en direct avec le code.' : 'Mode local : les parties restent sur ce téléphone.'}</p>
       ${Store.mode === 'local' && Store.error ? `<div class="warn"><b>Pourquoi le mode local :</b> ${esc(Store.error)}</div>` : ''}`;
   }
@@ -322,7 +359,7 @@
         <div class="step">2 à 5 · Joueurs, responsable, index, tertre</div>
         ${d.players.map((p, i) => `
           <div class="prow">
-            <label>Joueur ${i + 1}<input id="pn${i}" type="text" list="playerList${i}" value="${esc(p.name)}" placeholder="Prénom et nom" autocapitalize="words"></label>
+            <label>Joueur ${i + 1}${playerPicker(d, i)}</label>
             <label>Index<input id="pi${i}" type="text" inputmode="decimal" value="${esc(p.index)}" placeholder="" aria-label="Index de ${esc(p.name || 'joueur ' + (i + 1))}"></label>
             <label>Tertre<select id="pt${i}">${teeOpts(p.tee)}</select></label>
             <label class="resp"><input type="radio" name="resp" value="${i}" ${d.responsable === i ? 'checked' : ''}> Responsable de la partie</label>
@@ -358,6 +395,17 @@
       </section>`;
   }
   // Noms de la bibliothèque pas encore choisis dans les autres cases
+  // Menu déroulant des joueurs de la bibliothèque (sans ceux déjà choisis) + « Autre… » pour taper un nom
+  function playerPicker(d, i) {
+    const p = d.players[i];
+    const inLib = S.players.some(x => L.norm(x.name) === L.norm(p.name || ''));
+    const custom = !S.players.length || p.custom || (p.name && !inLib);
+    const taken = d.players.map((q, j) => j !== i ? L.norm(q.name || '') : '').filter(Boolean);
+    const opts = S.players.filter(x => !taken.includes(L.norm(x.name)));
+    const sel = S.players.length ? `<select id="ps${i}"><option value="">— Choisir —</option>${opts.map(x => `<option value="${esc(x.name)}" ${!custom && L.norm(x.name) === L.norm(p.name || '') ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}<option value="__other" ${custom ? 'selected' : ''}>Autre (taper le nom)…</option></select>` : '';
+    const inp = custom ? `<input id="pn${i}" type="text" value="${esc(p.name)}" placeholder="Prénom et nom" autocapitalize="words" ${S.players.length ? 'style="margin-top:6px"' : ''}>` : '';
+    return sel + inp;
+  }
   function listOptions(d, i) {
     const taken = d.players.map((p, j) => j !== i ? L.norm(p.name || '') : '').filter(Boolean);
     return S.players.filter(p => !taken.includes(L.norm(p.name))).map(p => `<option value="${esc(p.name)}"></option>`).join('');
@@ -456,7 +504,7 @@
       const hp = L.holeTotal(g, hole);
       if (hp) { cum[0] += hp[0]; cum[1] += hp[1]; }
       const tot = hp ? leadHtml(cum) : '';
-      return `<tr class="${hole === h ? 'cur' : ''}"><th class="h"><button class="cell" data-hole="${hole}" style="font-size:19px">${hole}</button></th><td class="m">${ih.par}</td><td class="m">${ih.si}</td>${cells}<td class="stat"><div class="ev">${st.join('')}</div></td><td class="calc">${esc(calc.replace(/^ · /, ''))}</td><td class="tp1">${hp ? hp[1] : ''}</td><td class="tp0">${hp ? hp[0] : ''}</td></tr>`;
+      return `<tr class="${hole === h ? 'cur' : ''}"><th class="h"><button class="cell" data-hole="${hole}" style="font-size:19px">${hole}</button></th><td class="m">${ih.par}</td><td class="m">${ih.si}</td>${cells}<td class="stat"><div class="ev">${st.join('')}</div></td><td class="calc">${esc(calc.replace(/^ · /, ''))}</td><td class="tp0">${hp ? hp[0] : ''}</td><td class="tp1">${hp ? hp[1] : ''}</td></tr>`;
     };
     const sumRow = (label, from, to, final) => {
       const cells = colOrder.map(pi => { const p = g.players[pi];
@@ -464,7 +512,7 @@
         return `<td>${any ? s : ''}</td>`;
       }).join('');
       let par = 0, tb = [0, 0]; for (let x = from; x <= to; x++) { par += L.holeInfo(g, x, 0).par; const hp = L.holeTotal(g, x); if (hp) { tb[0] += hp[0]; tb[1] += hp[1]; } }
-      return `<tr class="sum"><td colspan="2">${label}</td><td>${par}</td>${cells}<td></td><td></td><td class="tp1">${tb[1]}</td><td class="tp0">${tb[0]}</td></tr>`;
+      return `<tr class="sum"><td colspan="2">${label}</td><td>${par}</td>${cells}<td></td><td></td><td class="tp0">${tb[0]}</td><td class="tp1">${tb[1]}</td></tr>`;
     };
     const cum = [0, 0];
     const ini = L.initials(g.players);
@@ -477,6 +525,7 @@
           <div class="hole-meta">Normale <b>${hi.par}</b> · Handicap <b>${hi.si}</b>${meta.map(m => ` · <b>${m}</b>`).join('')}</div>
           <div class="hole-nav"><button data-nav="-1" aria-label="Trou précédent">‹</button><button data-nav="1" aria-label="Trou suivant">›</button></div>
         </div>
+        ${owner && g.status !== 'terminée' ? `<button class="btn invite-btn" data-invite type="button">Inviter les joueurs</button>` : ''}
         <div class="money-boxes">
           <div class="mbox green"><span>La game vaut au minimum</span><b>${g.stake ? fmt$(g.stake) : '—'}</b></div>
           <div class="mbox green"><span>La partie a tourné</span><b>${L.leadChanges(g)}${g.leadChangeValue ? ` · ${fmt$(L.leadChanges(g) * g.leadChangeValue)}` : ''}</b></div>
@@ -496,7 +545,7 @@
 
 
       <div class="card-scroll"><table class="sc">
-        <thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${colOrder.map(i => { const p = g.players[i]; return `<th class="pc tc${teamOf(g, i)}" title="${esc(p.name)}">${esc(ini[i])}</th>`; }).join('')}<th>Statut</th><th>Calcul</th><th class="tc1">Bleu</th><th class="tc0">Rouge</th></tr></thead>
+        <thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${colOrder.map(i => { const p = g.players[i]; return `<th class="pc tc${teamOf(g, i)}" title="${esc(p.name)}">${esc(ini[i])}</th>`; }).join('')}<th>Statut</th><th>Calcul</th><th class="tc0">Rouge</th><th class="tc1">Bleu</th></tr></thead>
         <tbody>${Array.from({ length: 9 }, (_, i) => row(i + 1)).join('')}${sumRow('Aller', 1, 9)}${Array.from({ length: 9 }, (_, i) => row(i + 10)).join('')}${sumRow('Retour', 10, 18)}${sumRow('Total', 1, 18, true)}</tbody>
       </table></div>
       <div class="legend"><span>★ responsable de la partie (il entre les scores)</span><span>${BALL} coup reçu · petit chiffre = net</span><span>Calcul : ↓ plus bas net · ↑ plus haut net · R/B équipe qui reçoit · ×2 press · ×4 reroll · S skin · C cabane · $ normale 3 · = résultat net</span><span>Noms à la couleur de l'équipe : <b class="tc1">Bleus</b> · <b class="tc0">Rouges</b></span><span>${g.players.map((p, i) => `<b class="tc${teamOf(g, i)}">${esc(ini[i])}</b> ${esc(p.name)}`).join(' · ')}</span><span>Faites glisser la carte vers la gauche pour voir le calcul</span></div>
@@ -538,15 +587,28 @@
   }
 
   // ---------------- Terrains ----------------
+  function vLogin() {
+    $('#barTitle').textContent = 'Pelland';
+    $('#back').hidden = true;
+    const me = ls.get('pelland.me', '');
+    return `<div class="hero"><h1>La game à Pelland</h1><p>Réservé aux joueurs du groupe.</p></div>
+      <section class="card"><h2>Connexion</h2>
+        <label>Votre nom<select id="loginName"><option value="">— Choisir —</option>${S.players.map(p => `<option value="${esc(p.id)}" ${p.name === me ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
+        <label>Votre numéro de téléphone<input id="loginPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="450 555-1234"></label>
+        <button class="btn" id="loginBtn" type="button">Entrer</button>
+        <p class="note" id="loginMsg">Votre numéro sert de mot de passe. Il n'est visible par personne.</p>
+      </section>`;
+  }
   function vPlayers() {
     $('#barTitle').textContent = 'Joueurs';
     return `<section class="card"><h2>Ajouter un joueur</h2>
-        <div class="row" style="flex-wrap:nowrap"><input id="newPlayer" type="text" placeholder="Prénom et nom" autocapitalize="words" style="flex:1;min-width:0"><button class="btn small" id="addPlayer" type="button">Ajouter</button></div>
+        <input id="newPlayer" type="text" placeholder="Prénom et nom" autocapitalize="words">
+        <div class="row" style="flex-wrap:nowrap"><input id="newPhone" type="tel" inputmode="tel" placeholder="Téléphone (sert de mot de passe)" style="flex:1;min-width:0"><button class="btn small" id="addPlayer" type="button">Ajouter</button></div>
         <p class="note">Les joueurs sont proposés en remplissant une nouvelle partie, et reconnus à la voix par leur prénom ou leur nom.</p></section>
       ${(() => { const dups = duplicateMap(S.players); const nd = Object.keys(dups).length; return nd ? `<div class="warn">${nd} joueurs semblent en double. Vérifiez les noms marqués « Doublon ? » et retirez celui de trop.</div>` : ''; })()}
       <div class="list">${S.players.length ? (() => { const dups = duplicateMap(S.players); return S.players.map(p => `<div class="item pl-row ${dups[p.id] ? 'dup' : ''}"><b>${esc(p.name)}${dups[p.id] ? ` <span class="dup-flag" title="Ressemble à ${esc(dups[p.id].join(', '))}">Doublon ?</span>` : ''}</b>${S.confirmDel === p.id
         ? `<span class="row"><button class="btn small" data-delp="${esc(p.id)}" type="button" style="background:var(--red)">Confirmer</button><button class="btn ghost small" data-canceldel type="button">Annuler</button></span>`
-        : `<button class="btn ghost small" data-askdel="${esc(p.id)}" type="button">Retirer</button>`}</div>`).join(''); })() : '<p class="note">Aucun joueur pour l\'instant.</p>'}</div>`;
+        : `<span class="row" style="flex-wrap:nowrap;flex:none"><button class="btn ghost small" data-phone="${esc(p.id)}" type="button">${p.authEmail ? '☎ ••' + esc(p.phoneHint || '') : '+ Téléphone'}</button><button class="btn ghost small" data-askdel="${esc(p.id)}" type="button">Retirer</button></span>`}</div>`).join(''); })() : '<p class="note">Aucun joueur pour l\'instant.</p>'}</div>`;
   }
   function vCourses() {
     $('#barTitle').textContent = 'Terrains';
@@ -583,6 +645,19 @@
   // Interactions
   // =====================================================================
   const bind = {
+    login(v) {
+      const go2 = async () => {
+        const id = $('#loginName').value, ph = $('#loginPhone').value;
+        const pl = S.players.find(p => p.id === id);
+        const msg = $('#loginMsg');
+        if (!pl) { msg.textContent = 'Choisissez votre nom.'; return; }
+        $('#loginBtn').disabled = true; msg.textContent = 'Connexion…';
+        try { await Store.login(pl, ph); location.href = location.pathname + location.search; }
+        catch (e) { msg.textContent = e.message; $('#loginBtn').disabled = false; }
+      };
+      $('#loginBtn').onclick = go2;
+      $('#loginPhone').onkeydown = e => { if (e.key === 'Enter') go2(); };
+    },
     players(v) {
       const add = async () => {
         const n = $('#newPlayer').value.trim(); if (!n) return;
@@ -590,18 +665,32 @@
         const near = duplicateMap(S.players.concat([{ id: '__new', name: n }]))['__new'];
         if (near && S.confirmAdd !== n) { S.confirmAdd = n; return toast(`Ressemble à ${near.join(', ')}. Touchez Ajouter de nouveau pour confirmer.`); }
         S.confirmAdd = null;
-        try { await Store.savePlayer(n); S.players = await Store.listPlayers(); toast(`${n} ajouté.`); render(); setTimeout(() => $('#newPlayer') && $('#newPlayer').focus(), 50); }
+        try { const np = await Store.savePlayer(n); const ph = $('#newPhone').value.trim(); if (ph) await Store.setPhone(np, ph); S.players = await Store.listPlayers(); toast(`${n} ajouté${ph ? ' avec son téléphone' : ''}.`); render(); setTimeout(() => $('#newPlayer') && $('#newPlayer').focus(), 50); }
         catch (e) { toast('Ajout impossible : ' + e.message); }
       };
       $('#addPlayer').onclick = add;
       $('#newPlayer').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); add(); } };
       v.querySelectorAll('[data-askdel]').forEach(b => b.onclick = () => { S.confirmDel = b.dataset.askdel; render(); });
+      v.querySelectorAll('[data-phone]').forEach(b => b.onclick = () => {
+        const pl = S.players.find(x => x.id === b.dataset.phone);
+        openSheet(`<h3>Téléphone de ${esc(pl.name)}</h3>
+          <p class="note">Ce numéro sert de mot de passe pour se connecter. Il n'est pas affiché dans l'app.${pl.authEmail ? ' Un nouveau numéro remplace l\'ancien.' : ''}</p>
+          <input id="phIn" type="tel" inputmode="tel" placeholder="450 555-1234">
+          <div class="row"><button class="btn small" id="phSave" type="button">Enregistrer</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`, sh => {
+          sh.querySelector('[data-close]').onclick = closeSheet;
+          sh.querySelector('#phSave').onclick = async () => {
+            try { await Store.setPhone(pl, sh.querySelector('#phIn').value); closeSheet(); S.players = await Store.listPlayers(); toast('Téléphone enregistré.'); render(); }
+            catch (e) { toast(e.message.includes('auth/') ? 'Impossible : vérifiez que Email/Password est activé dans Firebase.' : e.message); }
+          };
+          setTimeout(() => sh.querySelector('#phIn').focus(), 50);
+        });
+      });
       v.querySelectorAll('[data-canceldel]').forEach(b => b.onclick = () => { S.confirmDel = null; render(); });
       v.querySelectorAll('[data-delp]').forEach(b => b.onclick = async () => {
         try { await Store.deletePlayer(b.dataset.delp); S.players = await Store.listPlayers(); S.confirmDel = null; render(); } catch (e) { toast('Retrait impossible : ' + e.message); }
       });
     },
-    home(v) { commonNav(v); },
+    home(v) { commonNav(v); const lo = $('#logout'); if (lo) lo.onclick = () => Store.logout(); },
     join(v) {
       $('#joinBtn').onclick = () => { const code = $('#code').value.trim().toUpperCase(); if (code) openGame(code); };
       $('#code').onkeydown = e => { if (e.key === 'Enter') $('#joinBtn').click(); };
@@ -653,6 +742,15 @@
       };
       $('#course').onchange = e => { d.courseId = e.target.value; render(); };
       d.players.forEach((p, i) => {
+        const ps = $('#ps' + i);
+        if (ps) ps.onchange = e => {
+          const v = e.target.value;
+          if (v === '__other') { p.custom = true; p.name = ''; }
+          else { p.custom = false; p.name = v; }
+          render();
+          if (v === '__other') setTimeout(() => $('#pn' + i) && $('#pn' + i).focus(), 50);
+        };
+        if (!$('#pn' + i)) { $('#pi' + i).oninput = e => { p.index = e.target.value; refresh(); }; $('#pt' + i).onchange = e => { p.tee = e.target.value; refresh(); }; return; }
         $('#pn' + i).oninput = e => { p.name = e.target.value; d.players.forEach((_, j) => { const dl = $('#playerList' + j); if (dl && j !== i) dl.innerHTML = listOptions(d, j); }); refresh(); };
         $('#pn' + i).onchange = e => {
           const n = L.norm(e.target.value);
@@ -698,6 +796,7 @@
       });
       v.querySelectorAll('[data-cell]').forEach(b => b.onclick = () => { const [h] = b.dataset.cell.split(':').map(Number); allScoresSheet(h); });
       v.querySelectorAll('[data-allscores]').forEach(b => b.onclick = () => allScoresSheet(+b.dataset.allscores));
+      const inv = v.querySelector('[data-invite]'); if (inv) inv.onclick = () => invitePlayers(S.game);
       const fin = v.querySelector('[data-finish]'); if (fin) fin.onclick = async () => {
         const ng = JSON.parse(JSON.stringify(S.game)); ng.status = 'terminée'; ng.finishedAt = Date.now();
         try { await Store.saveGame(ng); S.game = ng; toast('Partie terminée et sauvegardée dans l\'historique.'); ls.set('pelland.lastGame', null); go('home'); } catch (e) { toast('Sauvegarde impossible : ' + e.message); }
@@ -721,6 +820,26 @@
     v.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openGame(b.dataset.open));
   }
 
+  // Invitation : lien direct vers la partie, envoyé avec le menu Partager de l'iPhone
+  function inviteLink(g) { return location.origin + location.pathname + '?partie=' + encodeURIComponent(g.id); }
+  async function invitePlayers(g) {
+    const url = inviteLink(g);
+    const others = g.players.filter((p, i) => i !== g.responsable).map(p => p.name.split(' ')[0]).join(', ');
+    const text = `Salut ${others} ! Suis la game à Pelland en direct (${g.course.name.replace(/^Club de golf /i, '')}) : `;
+    if (navigator.share) {
+      try { await navigator.share({ title: 'La game à Pelland', text, url }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    openSheet(`<h3>Inviter les joueurs</h3>
+      <p class="note">Envoyez ce lien aux autres joueurs. Il ouvre directement la partie sur leur iPhone.</p>
+      <input id="invUrl" type="text" readonly value="${esc(url)}">
+      <div class="row"><button class="btn small" id="invCopy" type="button">Copier le lien</button>
+      <a class="btn ghost small" style="display:grid;place-items:center;text-decoration:none" href="sms:&body=${encodeURIComponent(text + url)}">Texto</a>
+      <button class="btn ghost small" data-close type="button">Fermer</button></div>
+      <p class="note">Code de la partie : <b class="num" style="font-size:20px;letter-spacing:.15em">${esc(g.id)}</b></p>`, sh => {
+      sh.querySelector('#invCopy').onclick = async () => { try { await navigator.clipboard.writeText(url); toast('Lien copié.'); } catch (e) { const i = sh.querySelector('#invUrl'); i.select(); toast('Lien sélectionné : copiez-le.'); } };
+      sh.querySelector('[data-close]').onclick = closeSheet;
+    });
+  }
   async function removeGame(id) {
     await Store.deleteGame(id);
     if (ls.get('pelland.lastGame', null) === id) { ls.set('pelland.lastGame', null); ls.set('pelland.lastGameInfo', null); }
@@ -960,6 +1079,10 @@
   (async function start() {
     $('#view').innerHTML = '<p class="note">Démarrage…</p>';
     await Store.init();
+    if (Store.needLogin) {
+      try { S.players = await Store.listPlayers(); } catch (e) { S.players = []; }
+      S.view = 'login'; render(); return;
+    }
     try { S.courses = await Store.listCourses(); } catch (e) { S.courses = [L.PINEGROVE]; }
     try { S.players = await Store.listPlayers(); } catch (e) { S.players = []; }
     const params = new URLSearchParams(location.search);
