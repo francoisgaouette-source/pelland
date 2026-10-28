@@ -764,15 +764,16 @@
       v.querySelectorAll('[data-phone]').forEach(b => b.onclick = () => {
         const pl = S.players.find(x => x.id === b.dataset.phone);
         openSheet(`<h3>Téléphone de ${esc(pl.name)}</h3>
-          <p class="note">Ce numéro sert de mot de passe pour se connecter. Il est visible seulement par les joueurs connectés.${pl.authEmail ? ' Un nouveau numéro remplace l\'ancien.' : ''}</p>
-          <input id="phIn" type="tel" inputmode="tel" placeholder="450 555-1234" value="${esc(pl.phone ? fmtPhone(pl.phone) : '')}">
+          <p class="note">${pl.phone ? `Numéro actuel : <b style="font-size:20px">${esc(fmtPhone(pl.phone))}</b>` : pl.authEmail ? `Numéro actuel : se termine par <b>${esc(pl.phoneHint || '')}</b>. Le numéro complet s’affichera après la prochaine connexion de ${esc(pl.name)}.` : 'Aucun numéro pour l’instant.'}</p>
+          <label>${pl.authEmail ? 'Nouveau numéro' : 'Numéro'}<input id="phIn" type="tel" inputmode="tel" placeholder="450 555-1234" value="${esc(pl.phone ? fmtPhone(pl.phone) : '')}"></label>
+          <p class="note">Ce numéro sert de mot de passe pour se connecter. Il est visible seulement par les joueurs connectés.</p>
           <div class="row"><button class="btn small" id="phSave" type="button">Enregistrer</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`, sh => {
           sh.querySelector('[data-close]').onclick = closeSheet;
           sh.querySelector('#phSave').onclick = async () => {
             try { await Store.setPhone(pl, sh.querySelector('#phIn').value); closeSheet(); S.players = await Store.listPlayers(); toast('Téléphone enregistré.'); render(); }
             catch (e) { toast(e.message.includes('auth/') ? 'Impossible : vérifiez que Email/Password est activé dans Firebase.' : e.message); }
           };
-          setTimeout(() => sh.querySelector('#phIn').focus(), 50);
+          setTimeout(() => { const i = sh.querySelector('#phIn'); i.focus(); i.select(); }, 50);
         });
       });
       v.querySelectorAll('[data-canceldel]').forEach(b => b.onclick = () => { S.confirmDel = null; render(); });
