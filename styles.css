@@ -502,3 +502,4 @@ table.sc tr.has-sub > * { border-bottom: 0; }
 .tb-grid .hp .hp-tot { font-size: 14px; line-height: 1.35; white-space: normal; opacity: .95; }
 .tb-grid .hp .hp-tot b { font-size: 18px; }
 .tb-grid .hp .nm { font-size: 17px; font-weight: 600; }
+table.sc tr.calc-row td:first-child { padding: 0; }

@@ -521,7 +521,7 @@
       if (hp) { cum[0] += hp[0]; cum[1] += hp[1]; }
       const tot = hp ? leadHtml(cum) : '';
       const calcTxt = esc(calc.replace(/^ · /, '').trim());
-      const sub = (status || calcTxt) ? `<tr class="calc-row ${hole === h ? 'cur' : ''}"><td colspan="9">${status ? `<i class="${status === 'Normal' ? '' : 'p'}">${status}</i> ` : ''}${calcTxt}</td></tr>` : '';
+      const sub = (status || calcTxt) ? `<tr class="calc-row ${hole === h ? 'cur' : ''}"><td colspan="3"></td><td colspan="6">${status ? `<i class="${status === 'Normal' ? '' : 'p'}">${status}</i> ` : ''}${calcTxt}</td></tr>` : '';
       return `<tr class="${hole === h ? 'cur' : ''} ${sub ? 'has-sub' : ''}"><th class="h"><button class="cell" data-hole="${hole}" style="font-size:19px">${hole}</button></th><td class="m">${ih.par}</td><td class="m">${ih.si}</td>${cells}<td class="stat col-wide"><div class="ev">${st.join('')}</div></td><td class="calc col-wide">${calcTxt}</td><td class="tp0">${hp ? hp[0] : ''}</td><td class="tp1">${hp ? hp[1] : ''}</td></tr>${sub}`;
     };
     const sumRow = (label, from, to, final) => {
