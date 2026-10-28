@@ -494,3 +494,11 @@ table.sc tr.has-sub > * { border-bottom: 0; }
 #cardStatus:empty { display: none; }
 .coups-calc { display: grid; gap: 2px; margin: 6px 0; } .coups-calc span { display: block; }
 .bottom-actions { justify-content: center; gap: 10px; }
+/* Texte plus gros sous le nom des joueurs (carte du trou) */
+.tb-grid .hp .hp-idx { font-size: 15px; opacity: .85; margin-top: 3px; }
+.tb-grid .hp .hp-strk { font-size: 15px; line-height: 1.35; opacity: .95; }
+.tb-grid .hp .hp-strk .ydot { font-size: 13px; }
+.tb-grid .hp .dots { font-size: 16px; min-height: 20px; }
+.tb-grid .hp .hp-tot { font-size: 14px; line-height: 1.35; white-space: normal; opacity: .95; }
+.tb-grid .hp .hp-tot b { font-size: 18px; }
+.tb-grid .hp .nm { font-size: 17px; font-weight: 600; }
