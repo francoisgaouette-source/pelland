@@ -18,6 +18,10 @@ service cloud.firestore {
     match /phones/{playerId} {
       allow read, write: if membre();
     }
+    // présences aux parties : chaque membre confirme la sienne
+    match /presence/{gameId} {
+      allow read, write: if membre();
+    }
     match /courses/{courseId} {
       allow read, create, update: if membre();
       allow delete: if false;

@@ -153,6 +153,24 @@
       if (this.mode === 'firebase') { await this.db.collection('players').doc(id).delete(); try { await this.db.collection('phones').doc(id).delete(); } catch (e) { } return; }
       ls.set('pelland.players', ls.get('pelland.players', []).filter(x => x.id !== id));
     },
+    // Présences : presence/{partie} = { cléJoueur: { ok: true|false, at } } ; chaque membre écrit sa propre réponse
+    watchPresence(id, cb) {
+      if (this.mode === 'firebase') return this.db.collection('presence').doc(id).onSnapshot(d => cb(d.exists ? d.data() : {}), () => cb(null));
+      const read = () => cb(ls.get('pelland.presence', {})[id] || {}); read();
+      const on = e => { if (e.key === 'pelland.presence') read(); }; window.addEventListener('storage', on);
+      this._presSubs = (this._presSubs || []).concat([[id, read]]);
+      return () => { window.removeEventListener('storage', on); this._presSubs = (this._presSubs || []).filter(x => x[1] !== read); };
+    },
+    async setPresence(id, key, ok) {
+      const v = { ok, at: Date.now() };
+      if (this.mode === 'firebase') { await this.db.collection('presence').doc(id).set({ [key]: v }, { merge: true }); return; }
+      const all = ls.get('pelland.presence', {}); all[id] = { ...(all[id] || {}), [key]: v }; ls.set('pelland.presence', all);
+      (this._presSubs || []).forEach(([gid, f]) => { if (gid === id) f(); });
+    },
+    async listPresence() {
+      if (this.mode === 'firebase') { try { const sn = await this.db.collection('presence').get(); const m = {}; sn.docs.forEach(d => { m[d.id] = d.data(); }); return m; } catch (e) { return {}; } }
+      return ls.get('pelland.presence', {});
+    },
     async deleteGame(id) {
       if (this.mode === 'firebase') { await this.db.collection('games').doc(id).delete(); return; }
       const all = ls.get('pelland.games', {}); delete all[id]; ls.set('pelland.games', all);
@@ -283,6 +301,7 @@
 
   function go(view, opts = {}) {
     if (S.unwatch && view !== 'game') { S.unwatch(); S.unwatch = null; S.game = null; }
+    if (S.unwatchPres && view !== 'game') { S.unwatchPres(); S.unwatchPres = null; }
     if (view !== 'game' && view !== 'setup' && Voice.wake) Voice.setWake(false);
     S.view = view; Object.assign(S, opts);
     if (view === 'course' && 'editCourse' in opts) { S.cardImgs = []; S.cardStatus = ''; }
@@ -540,6 +559,7 @@
     function leadHtml(t) { return t[0] === t[1] ? '<span>Égal</span>' : t[0] > t[1] ? `<span class="tc0">R ${t[0]}</span>` : `<span class="tc1">B ${t[1]}</span>`; }
 
     return `
+      ${presenceHtml(g)}
       <section class="hole-card" aria-live="polite">
         <div class="hole-top">
           <div class="hole-no">${h}</div>
@@ -593,7 +613,7 @@
   function vHistory() {
     const live = S.view === 'live';
     $('#barTitle').textContent = live ? 'Parties en cours' : 'Parties jouées';
-    if (S.historyList == null) { Store.listGames().then(l => { S.historyList = l; if (S.view === 'history' || S.view === 'live') render(); }).catch(e => toast(e.message)); return '<p class="note">Chargement…</p>'; }
+    if (S.historyList == null) { Store.listPresence().then(m => { S.presAll = m; }); Store.listGames().then(l => { S.historyList = l; if (S.view === 'history' || S.view === 'live') render(); }).catch(e => toast(e.message)); return '<p class="note">Chargement…</p>'; }
     const list = S.historyList.filter(g => live ? g.status !== 'terminée' : g.status === 'terminée');
     if (!list.length) return live
       ? '<section class="card"><h2>Aucune partie en cours</h2><p class="note">Les parties apparaissent ici dès leur création, jusqu’à ce que le responsable les termine.</p></section>'
@@ -606,7 +626,7 @@
       const mine = Store.mode !== 'firebase' || !!Store.email;
       const done = g.status === 'terminée';
       return `<div class="item hist ${done ? 'done' : ''}"><button class="hist-open" data-open="${esc(g.id)}" type="button"><b>${d.toLocaleDateString('fr-CA', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })} · ${esc(g.course.name.replace(/^Club de golf /i, ''))}</b>
-        <span><span class="hist-st">${done ? 'Terminée' : 'En cours'}</span> ${g.players.map(p => esc(p.name)).join(', ')} · ${played}/18 trous · ${res}</span></button>
+        <span><span class="hist-st">${done ? 'Terminée' : 'En cours'}</span>${!done && S.presAll && S.presAll[g.id] ? ` ✓ ${Object.values(S.presAll[g.id]).filter(x => x && x.ok).length}/4 ·` : ''} ${g.players.map(p => esc(p.name)).join(', ')} · ${played}/18 trous · ${res}</span></button>
         ${mine ? (S.confirmDelGame === g.id
           ? `<span class="row"><button class="btn small" data-delgame="${esc(g.id)}" type="button" style="background:var(--red)">Effacer</button><button class="btn ghost small" data-canceldelgame type="button">Annuler</button></span>`
           : `<button class="btn ghost small" data-askdelgame="${esc(g.id)}" type="button">Effacer</button>`) : ''}</div>`;
@@ -914,7 +934,7 @@
         const id = await Store.newCode();
         const g = { id, createdAt: Date.now(), ownerUid: Store.uid, course: pv.c, courseId: pv.c.id, mode: d.mode, responsable: d.responsable,
           players: pv.ps, teams: draftTeams(d, pv.ps), teamMode: d.teamMode, stake: money(d.stake), leadChangeValue: money(d.leadChangeValue), perPoint: String(d.perPoint || '').trim() === '' ? 1 : money(d.perPoint), currentHole: 1, scores: {}, events: {}, status: 'en cours' };
-        try { await Store.saveGame(g); S.draft = null; openGame(id); toast('Partie créée.'); confirmText(g); }
+        try { await Store.saveGame(g); S.draft = null; openGame(id); toast('Partie créée.'); }
         catch (e) { toast('Création impossible : ' + e.message); }
       };
     },
@@ -951,6 +971,14 @@
       v.querySelectorAll('[data-reroll-team]').forEach(b => b.onclick = () => commit([{ type: 'reroll', hole: hh, on: b.dataset.rerollTeam === '1' }]));
       v.querySelectorAll('[data-detail]').forEach(r => r.onclick = () => holeDetail(+r.dataset.detail));
       const sm = v.querySelector('[data-sms]'); if (sm) sm.onclick = () => textPlayers(S.game);
+      const cs = v.querySelector('[data-confirmsms]'); if (cs) cs.onclick = () => confirmText(S.game);
+      v.querySelectorAll('[data-pres]').forEach(b => b.onclick = async () => {
+        const g = S.game, mi = myIndex(g); if (mi < 0) return;
+        const k = presKey(g.players[mi].name), ok = b.dataset.pres === '1';
+        S.presence = { ...(S.presence || {}), [k]: { ok, at: Date.now() } }; render();
+        try { await Store.setPresence(g.id, k, ok); toast(b.dataset.pres === '1' ? 'Présence confirmée.' : 'Absence notée.'); }
+        catch (e) { S.presenceBlocked = true; render(); }
+      });
       v.querySelectorAll('[data-hole]').forEach(b => b.onclick = () => { const h = +b.dataset.hole; if (isOwner()) holeSheet(h); else { S.game.currentHole = h; render(); } });
     }
   };
@@ -988,7 +1016,9 @@
   function openGame(id) {
     if (S.unwatch) S.unwatch();
     S.undo = [];
-    S.view = 'game'; S.game = null; render();
+    S.view = 'game'; S.game = null; S.presence = {}; render();
+    if (S.unwatchPres) S.unwatchPres();
+    S.unwatchPres = Store.watchPresence(id, p => { S.presenceBlocked = p === null; S.presence = p || {}; if (S.view === 'game' && S.game) render(); });
     let first = true;
     S.unwatch = Store.watchGame(id, g => {
       const keepHole = S.game && !isOwner() ? S.game.currentHole : null;
@@ -1145,12 +1175,36 @@
   // Texto d'invitation quand on ajoute un joueur avec son téléphone
   function inviteText(name, phone, id) {
     const d = String(phone || '').replace(/\D/g, ''); if (d.length < 10) return;
+    openSheet(`<h3>Inviter ${esc(name)}</h3><p class="note">Un texto d’invitation est prêt pour le ${esc(fmtPhone(d))}.</p>
+      <div class="row"><button class="btn sms-btn" data-go-sms type="button">Envoyer le texto</button><button class="btn ghost small" data-close type="button">Plus tard</button></div>`, sh => {
+      sh.querySelector('[data-close]').onclick = closeSheet;
+      sh.querySelector('[data-go-sms]').onclick = () => { closeSheet(); inviteSms(name, d, id); };
+    });
+  }
+  function inviteSms(name, d, id) {
     const url = location.origin + location.pathname + (id ? '?joueur=' + encodeURIComponent(id) : '');
     const body = `Salut ${name.split(' ')[0]} ! Tu as été invité à te joindre à la game à Pelland. Ouvre l’app : ${url} — ton nom est déjà choisi, entre seulement ton numéro de téléphone (${fmtPhone(d)}) pour te connecter. Sur iPhone : bouton Partager, puis « Sur l’écran d’accueil ».`;
     const ios = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
     const href = ios ? `sms:/open?addresses=${d}&body=${encodeURIComponent(body)}` : `sms:${d}?body=${encodeURIComponent(body)}`;
     window.__lastSms = href;
     (window.top || window).location.href = href;
+  }
+  // ---------------- Présences ----------------
+  const presKey = name => L.norm(name).replace(/[^a-z0-9]+/g, '-');
+  function myIndex(g) { const me = L.norm(ls.get('pelland.me', '') || ''); return g.players.findIndex(p => L.norm(p.name) === me); }
+  function presenceHtml(g) {
+    const pr = S.presence || {}, started = Object.values(g.scores || {}).some(r => (r || []).some(v => v != null));
+    if (started || g.status === 'terminée') return '';
+    const mi = myIndex(g), mine = mi >= 0 ? pr[presKey(g.players[mi].name)] : null;
+    const order = [...L.getTeams(g)[1], ...L.getTeams(g)[0]];
+    const n = order.filter(i => (pr[presKey(g.players[i].name)] || {}).ok === true).length;
+    return `<section class="card presence"><h2>Présences <small>${n}/4 confirmés</small></h2>
+      <div class="pres-list">${order.map(i => { const x = pr[presKey(g.players[i].name)];
+        const st = !x ? ['?', 'En attente', 'wait'] : x.ok ? ['✓', 'Présent', 'yes'] : ['✗', 'Absent', 'no'];
+        return `<div class="pres ${st[2]}"><b>${st[0]}</b><span class="tc${teamOf(g, i)}">${esc(g.players[i].name)}</span><small>${st[1]}</small></div>`; }).join('')}</div>
+      ${mi >= 0 ? `<div class="row pres-btns"><button class="btn ${mine && mine.ok ? '' : 'ghost'}" data-pres="1" type="button">Je serai là ✓</button><button class="btn ghost ${mine && mine.ok === false ? 'on-no' : ''}" data-pres="0" type="button">Je ne pourrai pas</button></div>` : ''}
+      ${isOwner() ? `<button class="btn sms-btn" data-confirmsms type="button" style="margin-top:10px">Texto aux joueurs pour confirmer</button>` : ''}
+      ${S.presenceBlocked ? '<div class="warn">Les présences ne peuvent pas être enregistrées : la règle « presence » n’est pas publiée dans Firebase.</div>' : ''}</section>`;
   }
   // À la création d'une partie : texto aux joueurs pour confirmer leur présence
   function confirmText(g) {
@@ -1160,7 +1214,7 @@
     const body = [`Tu es inscrit à la game à Pelland – ${g.course.name.replace(/^Club de golf /i, '')}, ${date}.`,
       `Bleus : ${T[1].map(i => g.players[i].name).join(', ')}`, `Rouges : ${T[0].map(i => g.players[i].name).join(', ')}`,
       g.stake ? `La game commence à ${fmt$(money(g.stake))}.` : '',
-      'Confirme ta présence en répondant OUI.', `Suivre la partie : ${inviteLink(g)}`].filter(Boolean).join('\n');
+      `Confirme ta présence : ouvre ${inviteLink(g)} et touche « Je serai là ».`].filter(Boolean).join('\n');
     if (missing.length) toast(`Pas de numéro pour ${missing.join(', ')}.`);
     openSms(nums, body);
   }

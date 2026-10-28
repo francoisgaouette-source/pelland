@@ -540,3 +540,13 @@ table.sc tr.calc-row td:last-child::after { content: ' ›'; color: var(--muted)
 .lb-detail { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .lb-detail i { font-style: normal; }
 .sms-btn { background: #2f7cf6; color: #fff; width: 100%; max-width: 640px; }
+/* Présences */
+.presence h2 { display: flex; justify-content: space-between; align-items: baseline; }
+.presence h2 small { font-size: 15px; color: var(--muted); font-weight: 600; }
+.pres-list { display: grid; gap: 6px; }
+.pres { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 8px; font-size: 17px; }
+.pres b { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; background: var(--line); color: var(--muted); }
+.pres.yes b { background: #2fb36b; color: #fff; } .pres.no b { background: var(--red); color: #fff; }
+.pres small { color: var(--muted); font-size: 14px; }
+.pres-btns { margin-top: 10px; gap: 8px; } .pres-btns .btn { flex: 1; }
+.pres-btns .on-no { border-color: var(--red); color: var(--red); }
