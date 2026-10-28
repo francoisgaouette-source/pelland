@@ -462,9 +462,9 @@ table.sc tr.calc-row td { height: auto; padding: 2px 8px 6px; text-align: left; 
 table.sc tr.calc-row i { font-style: normal; font-weight: 600; font-size: 11px; padding: 1px 6px; border-radius: 99px; border: 1px solid var(--line); margin-right: 4px; color: var(--ink); }
 table.sc tr.calc-row i.p { background: var(--flag); border-color: var(--flag); color: #1b1b1b; }
 table.sc tr.has-sub > * { border-bottom: 0; }
-@media (min-width: 561px) { table.sc tr.calc-row { display: none; } .narrow-only { display: none; } table.sc tr.has-sub > * { border-bottom: 1px solid var(--line); } }
-@media (max-width: 560px) {
-  .card-scroll { width: 100%; overflow-x: hidden; }
+/* même carte compacte sur iPhone et sur ordinateur */
+@media all {
+  .card-scroll { width: 100%; max-width: 640px; overflow-x: hidden; }
   table.sc { width: 100%; min-width: 0; table-layout: fixed; }
   table.sc .col-wide { display: none; }
   table.sc th, table.sc td { padding-left: 1px; padding-right: 1px; }
