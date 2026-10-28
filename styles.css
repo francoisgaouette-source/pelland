@@ -530,3 +530,4 @@ table.sc tr.calc-row td:last-child::after { content: ' ›'; color: var(--muted)
 .tb-grid .hp .hp-strk { grid-column: 1 / -1; }
 .tb-grid .hp .hp-tot { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
 .tb-grid .hp .hp-n { opacity: .8; }
+.money-boxes .mbox { align-items: stretch; } .money-boxes .mbox b { align-self: center; text-align: center; margin: auto 0; }
