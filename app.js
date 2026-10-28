@@ -767,7 +767,7 @@
         const near = duplicateMap(S.players.concat([{ id: '__new', name: n }]))['__new'];
         if (near && S.confirmAdd !== n) { S.confirmAdd = n; return toast(`Ressemble à ${near.join(', ')}. Touchez Ajouter de nouveau pour confirmer.`); }
         S.confirmAdd = null;
-        try { const np = await Store.savePlayer(n); const ph = $('#newPhone').value.trim(); if (ph) await Store.setPhone(np, ph); S.players = await Store.listPlayers(); toast(`${n} ajouté${ph ? ' avec son téléphone' : ''}.`); render(); setTimeout(() => $('#newPlayer') && $('#newPlayer').focus(), 50); }
+        try { const np = await Store.savePlayer(n); const ph = $('#newPhone').value.trim(); if (ph) await Store.setPhone(np, ph); S.players = await Store.listPlayers(); toast(`${n} ajouté${ph ? ' avec son téléphone' : ''}.`); render(); if (ph) inviteText(n, ph); else setTimeout(() => $('#newPlayer') && $('#newPlayer').focus(), 50); }
         catch (e) { toast('Ajout impossible : ' + e.message); }
       };
       $('#addPlayer').onclick = add;
@@ -783,7 +783,7 @@
           <div class="row"><button class="btn small" id="phSave" type="button">Enregistrer</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`, sh => {
           sh.querySelector('[data-close]').onclick = closeSheet;
           sh.querySelector('#phSave').onclick = async () => {
-            try { await Store.setPhone(pl, sh.querySelector('#phIn').value); closeSheet(); S.players = await Store.listPlayers(); toast('Téléphone enregistré.'); render(); }
+            try { const first = !pl.authEmail, ph = sh.querySelector('#phIn').value; await Store.setPhone(pl, ph); closeSheet(); S.players = await Store.listPlayers(); toast('Téléphone enregistré.'); render(); if (first) inviteText(pl.name, ph); }
             catch (e) { toast(e.message.includes('auth/') ? 'Impossible : vérifiez que Email/Password est activé dans Firebase.' : e.message); }
           };
           setTimeout(() => { const i = sh.querySelector('#phIn'); i.focus(); i.select(); }, 50);
@@ -1141,6 +1141,16 @@
     lines.push(`Bleus : ${T[1].map(i => g.players[i].name).join(', ')}`, `Rouges : ${T[0].map(i => g.players[i].name).join(', ')}`);
     lines.push(inviteLink(g));
     return lines.join('\n');
+  }
+  // Texto d'invitation quand on ajoute un joueur avec son téléphone
+  function inviteText(name, phone) {
+    const d = String(phone || '').replace(/\D/g, ''); if (d.length < 10) return;
+    const url = location.origin + location.pathname;
+    const body = `Salut ${name.split(' ')[0]} ! Tu as été invité à te joindre à la game à Pelland. Ouvre l’app : ${url} — connecte-toi avec ton nom et ton numéro de téléphone (${fmtPhone(d)}). Sur iPhone : bouton Partager, puis « Sur l’écran d’accueil ».`;
+    const ios = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
+    const href = ios ? `sms:/open?addresses=${d}&body=${encodeURIComponent(body)}` : `sms:${d}?body=${encodeURIComponent(body)}`;
+    window.__lastSms = href;
+    (window.top || window).location.href = href;
   }
   function textPlayers(g) {
     const me = L.norm(ls.get('pelland.me', '') || '');
