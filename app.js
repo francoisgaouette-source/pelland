@@ -1037,7 +1037,7 @@
       v.querySelectorAll('[data-askdelgame]').forEach(b => b.onclick = () => { S.confirmDelGame = b.dataset.askdelgame; render(); });
       v.querySelectorAll('[data-canceldelgame]').forEach(b => b.onclick = () => { S.confirmDelGame = null; render(); });
       v.querySelectorAll('[data-delgame]').forEach(b => b.onclick = async () => {
-        try { await removeGame(b.dataset.delgame, S.historyList.find(x => x.id === b.dataset.delgame)); S.historyList = S.historyList.filter(x => x.id !== b.dataset.delgame); S.confirmDelGame = null; toast('Partie effacée.'); render(); }
+        try { await removeGame(b.dataset.delgame, S.historyList.find(x => x.id === b.dataset.delgame)); S.historyList = S.historyList.filter(x => x.id !== b.dataset.delgame); S.confirmDelGame = null; render(); }
         catch (e) { toast('Effacement impossible : ' + e.message); }
       });
     },
@@ -1177,7 +1177,7 @@
       const can = v.querySelector('[data-canceldelgame]'); if (can) can.onclick = () => { S.confirmDelGame = null; render(); };
       const del = v.querySelector('[data-delthis]'); if (del) del.onclick = async () => {
         const id = S.game.id;
-        try { if (S.unwatch) { S.unwatch(); S.unwatch = null; } await removeGame(id); S.confirmDelGame = null; toast('Partie effacée.'); go('home'); } catch (e) { toast('Effacement impossible : ' + e.message); }
+        try { if (S.unwatch) { S.unwatch(); S.unwatch = null; } await removeGame(id); S.confirmDelGame = null; go('home'); } catch (e) { toast('Effacement impossible : ' + e.message); }
       };
       const hh = S.game.currentHole || 1;
       v.querySelectorAll('[data-press-team]').forEach(b => b.onclick = () => commit([{ type: 'press', hole: hh, team: +b.dataset.pressTeam, player: null }]));
