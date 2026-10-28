@@ -378,8 +378,7 @@
     const q = S.quatuors || [], nq = S.newQuat || (S.newQuat = { name: '', players: ['', '', '', ''] });
     const opts = i => { const taken = nq.players.filter((x, j) => j !== i && x).map(L.norm);
       return `<option value="">— Joueur ${i + 1} —</option>` + S.players.filter(p => !taken.includes(L.norm(p.name))).map(p => `<option value="${esc(p.name)}" ${p.name === nq.players[i] ? 'selected' : ''}>${esc(p.name)}</option>`).join(''); };
-    return `${offresHtml()}<section class="card"><h2>Nouveau quatuor</h2>
-        <label>Nom du quatuor (facultatif)<input id="qname" type="text" value="${esc(nq.name)}" placeholder="ex. Les habitués du mardi"></label>
+    return `${offresHtml()}<section class="card">
         <div class="quat-picks">${[0, 1, 2, 3].map(i => `<select data-qp="${i}">${opts(i)}</select>`).join('')}</div>
         <button class="btn" id="qsave" type="button">Enregistrer le quatuor</button>
         ${S.players.length < 4 ? '<p class="note">Ajoutez d’abord au moins 4 joueurs dans <b>Joueurs</b>.</p>' : ''}
@@ -981,13 +980,11 @@
         const [id, dt] = b.dataset.oquat.split('|'); const o = S.offres.find(x => x.id === id);
         const yes = offreReps(o).filter(r => (r.dates || []).includes(+dt)).map(r => r.name).filter(n => S.players.some(p => L.norm(p.name) === L.norm(n)));
         S.newQuat = { name: `${o.course.replace(/^Club de golf /i, '')} – ${fmtDate(+dt)}`, players: [0, 1, 2, 3].map(i => (S.players.find(p => L.norm(p.name) === L.norm(yes[i] || '')) || {}).name || '') };
-        render(); setTimeout(() => { const q = $('#qname'); if (q) q.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 50);
+        render(); setTimeout(() => { const q = $('.quat-picks'); if (q) q.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 50);
       });
       const nq = S.newQuat;
-      $('#qname').oninput = e => { nq.name = e.target.value; };
-      v.querySelectorAll('[data-qp]').forEach(sl => sl.onchange = e => { nq.players[+sl.dataset.qp] = e.target.value; nq.name = $('#qname').value; render(); });
+      v.querySelectorAll('[data-qp]').forEach(sl => sl.onchange = e => { nq.players[+sl.dataset.qp] = e.target.value; render(); });
       $('#qsave').onclick = async () => {
-        nq.name = $('#qname').value.trim();
         if (nq.players.some(x => !x)) return toast('Choisissez les 4 joueurs.');
         const list = (S.quatuors || []).concat([{ id: 'q' + Date.now().toString(36), name: nq.name, players: nq.players.slice() }]);
         try { await Store.saveQuatuors(list); S.quatuors = list; S.newQuat = null; render(); } catch (e) { toast('Enregistrement impossible : ' + e.message); }
