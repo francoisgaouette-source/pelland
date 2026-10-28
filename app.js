@@ -540,7 +540,7 @@
         <div class="step">2 à 5 · Joueurs, responsable, index, tertre</div>
         <div class="seg">
           <button type="button" data-count="4" aria-pressed="${(d.count || 4) === 4}"><b>4 joueurs</b><small>La game à Pelland</small></button>
-          <button type="button" data-count="3" aria-pressed="${d.count === 3}"><b>3 joueurs</b><small>Le 9 points : 5-3-1 par trou</small></button>
+          <button type="button" data-count="3" aria-pressed="${d.count === 3}"><b>3 joueurs</b><small>Le 9 points</small></button>
         </div>
         ${(S.quatuors || []).length ? `<label>Quatuor<select id="quatPick"><option value="">— Choisir un quatuor (facultatif) —</option>${S.quatuors.map(x => `<option value="${esc(x.id)}">${esc(x.name || x.players.join(', '))}</option>`).join('')}</select></label>` : ''}
         ${d.players.map((p, i) => `
