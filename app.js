@@ -559,7 +559,7 @@
           else if (!owner && pt === k) btn = `<span class="tb-btn t${k} on">Pressé</span>`;
           else if (!owner && pt != null && ev.reroll) btn = `<span class="tb-btn t${k} on">Reroll</span>`;
           const ph = tm.map(pi => { const p = g.players[pi]; const k = L.strokesOnHole(p.strokes, hi.si); const s = L.getScore(g, h, pi); return `<${owner ? `button type="button" data-allscores="${h}"` : 'div'} class="hp"><div class="nm tc${teamOf(g, pi)}">${esc(p.name)}${g.responsable === pi ? ' ★' : ''}</div><div class="hp-idx">Index ${String(p.index).replace('.', ',')}</div><div class="hp-strk">${strokeHoles(g, p)}</div><div class="dots">${k ? dots(k) + (k < 0 ? ' redonne' : '') : ''}</div><div class="hp-tot">${tots[pi].played ? `<span>Brut <b>${tots[pi].gross}</b> · Net <b>${tots[pi].net}</b></span><span class="hp-n">${tots[pi].played} trou${tots[pi].played > 1 ? 's' : ''}</span>` : 'Aucun trou joué'}</div></${owner ? 'button' : 'div'}>`; });
-          return `<div class="team-block t${k}"><div class="tb-name">${L.TEAMS[k]}</div><div class="tb-grid">${ph[0]}<div class="tbox"><span>Points</span><b>${teamPts[k]}</b></div>${ph[1]}<div class="tbox"><span>Gain</span><b>${fmt$(p3.money[k])}</b></div></div>${btn}</div>`; }).join('')}</div>
+          return `<div class="team-block t${k}"><div class="tb-name">${L.TEAMS[k]}</div><div class="tb-grid two">${ph[0]}${ph[1]}</div>${btn}</div>`; }).join('')}</div>
         ${holeChips.length ? `<div class="chips">${holeChips.join('')}</div>` : ''}
       </section>
 

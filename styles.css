@@ -531,3 +531,4 @@ table.sc tr.calc-row td:last-child::after { content: ' ›'; color: var(--muted)
 .tb-grid .hp .hp-tot { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
 .tb-grid .hp .hp-n { opacity: .8; }
 .money-boxes .mbox { align-items: stretch; } .money-boxes .mbox b { align-self: center; text-align: center; margin: auto 0; }
+.tb-grid.two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
