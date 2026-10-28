@@ -1159,6 +1159,7 @@
       // seuls les joueurs à la normale ou mieux (score brut) peuvent avoir la skin
       const eligible = order.filter(pi => vals[pi] != null && vals[pi] <= L.holeInfo(g, h, pi).par);
       if (skinPlayer != null && !eligible.includes(skinPlayer)) { skinPlayer = null; if (skin !== -1) skin = st0 == null ? undefined : st0; }
+      const needSkin = vals.some(v => v != null) && skin === undefined;
       sheet.innerHTML = `<h3>Trou ${h} · normale ${L.holeInfo(g, h, 0).par}</h3>
         <div class="allscores">${order.map(pi => { const p = P[pi];
           const par = L.holeInfo(g, h, pi).par, k = L.strokesOnHole(p.strokes, g.course.holes[h - 1].si);
@@ -1170,7 +1171,8 @@
         }).join('')}</div>
         <div class="toggles"><div class="tg"><span>Skin à… (joueurs qui ont fait la normale)</span>${eligible.length ? eligible.map(pi => `<button type="button" class="pill team-pill t${teamOf(g, pi)}" data-skinp="${pi}" aria-pressed="${skinPlayer === pi}">${esc(P[pi].name)}</button>`).join('') : `<span class="note" style="width:auto">${vals.every(v => v == null) ? 'Entrez les scores d\'abord.' : 'Personne n\'a fait la normale.'}</span>`}<button type="button" class="pill" data-skinp="-1" aria-pressed="${skin === -1}">Pas de skin</button></div>
         <p class="note">${skin === 0 || skin === 1 ? `Skin pour les ${L.TEAMS[skin]}.` : skin === -1 ? 'Pas de skin.' : 'Skin pas encore indiquée.'}</p></div>
-        <div class="sheet-foot"><button type="button" class="btn ghost small" data-close>Annuler</button><button type="button" class="btn" data-save>Enregistrer</button></div>`;
+        ${needSkin ? '<p class="warn" style="margin:0">Choisissez la skin (un joueur) ou « Pas de skin » avant d’enregistrer.</p>' : ''}
+        <div class="sheet-foot"><button type="button" class="btn ghost small" data-close>Annuler</button><button type="button" class="btn" data-save ${needSkin ? 'disabled' : ''}>Enregistrer</button></div>`;
       sheet.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { const pi = +b.dataset.p, n = +b.dataset.n; vals[pi] = vals[pi] === n ? null : n; draw(); });
       sheet.querySelectorAll('[data-plus]').forEach(b => b.onclick = () => { const pi = +b.dataset.p; vals[pi] = (vals[pi] || Math.max(1, L.holeInfo(g, h, pi).par - 2) + 5) + 1; draw(); });
       sheet.querySelectorAll('[data-skinp]').forEach(b => b.onclick = () => {
@@ -1180,6 +1182,7 @@
       });
       sheet.querySelector('[data-close]').onclick = closeSheet;
       sheet.querySelector('[data-save]').onclick = () => {
+        if (needSkin) return toast('Choisissez la skin ou « Pas de skin ».');
         const scores = {}; vals.forEach((v, pi) => { if (v != null && v !== L.getScore(g, h, pi)) scores[pi] = v; });
         const acts = [];
         if (Object.keys(scores).length) acts.push({ type: 'scores', hole: h, scores });
