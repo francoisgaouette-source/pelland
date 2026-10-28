@@ -522,3 +522,11 @@ table.sc tr.calc-row td:last-child::after { content: ' ›'; color: var(--muted)
 .leader-box.t0 small { color: var(--team0); } .leader-box.t1 small { color: var(--team1); }
 .leader-box > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .leader-box.even small { font-size: 16px; color: var(--muted); }
+/* Case du joueur : le contenu occupe toute la largeur */
+.tb-grid .hp { display: grid; grid-template-columns: 1fr auto; column-gap: 8px; row-gap: 2px; align-content: space-between; }
+.tb-grid .hp .nm { grid-column: 1 / -1; }
+.tb-grid .hp .hp-idx { grid-column: 1; grid-row: 2; margin-top: 0; }
+.tb-grid .hp .dots { grid-column: 2; grid-row: 2; justify-self: end; min-height: 0; }
+.tb-grid .hp .hp-strk { grid-column: 1 / -1; }
+.tb-grid .hp .hp-tot { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.tb-grid .hp .hp-n { opacity: .8; }
