@@ -83,10 +83,10 @@
       await sec.auth().createUserWithEmailAndPassword(email, digits);
       try { await sec.auth().signOut(); } catch (e) { }
       await this.db.collection('players').doc(player.id).set({ authEmail: email, phoneHint: digits.slice(-2) }, { merge: true });
-      await this.savePhone(player.id, digits);
+      await this.savePhone(player.id, digits, true);
     },
     // Numéro complet : gardé à part, lisible seulement par les membres connectés
-    async savePhone(id, digits) { try { await this.db.collection('phones').doc(id).set({ phone: digits }); } catch (e) { console.warn('phones', e.message); } },
+    async savePhone(id, digits, strict) { try { await this.db.collection('phones').doc(id).set({ phone: digits }); this.phonesBlocked = false; } catch (e) { console.warn('phones', e.message); this.phonesBlocked = true; if (strict) throw new Error('Numéro non conservé : publiez la règle « phones » dans Firebase (Firestore → Règles).'); } },
     async ensureSeed() {
       const list = await this.listCourses();
       if (!list.find(c => c.id === L.PINEGROVE.id)) await this.saveCourse(L.PINEGROVE);
@@ -139,7 +139,7 @@
       if (this.mode === 'firebase') {
         const snap = await this.db.collection('players').get();
         const list = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-        if (this.email) { try { const ph = await this.db.collection('phones').get(); const m = {}; ph.docs.forEach(d => { m[d.id] = d.data().phone; }); list.forEach(p => { if (m[p.id]) p.phone = m[p.id]; }); } catch (e) { } }
+        if (this.email) { try { const ph = await this.db.collection('phones').get(); const m = {}; ph.docs.forEach(d => { m[d.id] = d.data().phone; }); list.forEach(p => { if (m[p.id]) p.phone = m[p.id]; }); this.phonesBlocked = false; } catch (e) { this.phonesBlocked = true; } }
         return list.sort(byName);
       }
       return ls.get('pelland.players', []).sort(byName);
@@ -779,9 +779,10 @@
       v.querySelectorAll('[data-phone]').forEach(b => b.onclick = () => {
         const pl = S.players.find(x => x.id === b.dataset.phone);
         openSheet(`<h3>Téléphone de ${esc(pl.name)}</h3>
-          <p class="note">${pl.phone ? `Numéro actuel : <b style="font-size:20px">${esc(fmtPhone(pl.phone))}</b>` : pl.authEmail ? `Numéro actuel : se termine par <b>${esc(pl.phoneHint || '')}</b>. Le numéro complet s’affichera après la prochaine connexion de ${esc(pl.name)}.` : 'Aucun numéro pour l’instant.'}</p>
+          <p class="note">${pl.phone ? `Numéro actuel : <b style="font-size:20px">${esc(fmtPhone(pl.phone))}</b>` : pl.authEmail ? `Numéro actuel : se termine par <b>${esc(pl.phoneHint || '')}</b>. Entrez le numéro complet une fois ci-dessous et touchez Enregistrer : il s’affichera ensuite.` : 'Aucun numéro pour l’instant.'}</p>
           <label>${pl.authEmail ? 'Nouveau numéro' : 'Numéro'}<input id="phIn" type="tel" inputmode="tel" placeholder="450 555-1234" value="${esc(pl.phone ? fmtPhone(pl.phone) : '')}"></label>
           <p class="note">Ce numéro sert de mot de passe pour se connecter. Il est visible seulement par les joueurs connectés.</p>
+          ${Store.phonesBlocked ? '<div class="warn">La base refuse de garder les numéros complets : la règle « phones » n’est pas encore publiée dans Firebase (Firestore → Règles).</div>' : ''}
           <div class="row"><button class="btn small" id="phSave" type="button">Enregistrer</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`, sh => {
           sh.querySelector('[data-close]').onclick = closeSheet;
           sh.querySelector('#phSave').onclick = async () => {
