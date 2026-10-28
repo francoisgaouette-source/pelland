@@ -364,7 +364,7 @@
         <button class="tile" data-go="courses"><span class="pin">⛳</span><div><strong>Terrains</strong><span>Ajouter ou corriger un terrain</span></div></button>
         <button class="tile" data-go="players"><span class="pin"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M15.5 2.5 9 17.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M9 17.2c-.4 1.2-1.6 2.2-3.4 2.4l-2.1.2c-.6.1-.9.7-.6 1.2.2.3.5.5.9.5h4.6c1.6 0 2.7-.9 3.1-2.2l.3-.9" fill="currentColor"/><circle cx="18.5" cy="19.5" r="1.8" fill="currentColor"/></svg></span><div><strong>Joueurs</strong><span>Ajouter ou retirer des joueurs</span></div></button>
         <button class="tile" data-go="quatuors"><span class="pin" style="font-family:var(--display);font-weight:700">4</span><div><strong>Parties à venir</strong><span>Dates offertes, disponibilités et groupes de 4</span></div></button>
-        <button class="tile primary" data-go="setup"><span class="pin">+</span><div><strong>Nouvelle partie</strong><span>Terrain, joueurs, index, tertres, handicap</span></div></button>
+        <button class="tile" data-go="setup"><span class="pin">+</span><div><strong>Nouvelle partie</strong><span>Terrain, joueurs, index, tertres, handicap</span></div></button>
         <button class="tile" data-go="live"><span class="pin">⏵</span><div><strong>Parties en cours</strong><span>Les parties qui ont lieu en ce moment</span></div></button>
         <button class="tile" data-go="history"><span class="pin">≡</span><div><strong>Parties jouées</strong><span>Les parties terminées</span></div></button>
       </div>
