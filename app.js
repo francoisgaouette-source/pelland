@@ -330,6 +330,7 @@
     if (S.unwatchPres && view !== 'game') { S.unwatchPres(); S.unwatchPres = null; }
     if (view !== 'game' && view !== 'setup' && Voice.wake) Voice.setWake(false);
     S.view = view; Object.assign(S, opts);
+    if (view === 'setup' && !S.offres) Store.listOffres().then(l => { S.offres = l; if (S.view === 'setup') render(); });
     if (view === 'quatuors') { Store.listOffres().then(l => { S.offres = l; if (S.view === 'quatuors') render(); }); Store.listQuatuors().then(l => { S.quatuors = l; }); }
     if (view === 'offre') { S.offre = undefined; S.offreSel = null; }
     if (view === 'course' && 'editCourse' in opts) { S.cardImgs = []; S.cardStatus = ''; }
@@ -488,6 +489,14 @@
       });
     draw();
   }
+  // Dates offertes (Parties à venir) avec les joueurs qui se sont dits disponibles
+  function offreDates() {
+    const out = [];
+    (S.offres || []).forEach(o => o.dates.forEach(dt => { if (dt < Date.now() - 864e5) return;
+      const names = offreReps(o).filter(r => (r.dates || []).includes(dt)).sort((a, b) => (a.at || 0) - (b.at || 0)).map(r => r.name);
+      out.push({ key: o.id + '|' + dt, label: `${o.course.replace(/^Club de golf /i, '')} – ${fmtDate(dt)}`, names }); }));
+    return out.sort((a, b) => +a.key.split('|')[1] - +b.key.split('|')[1]);
+  }
   function draftFromQuatuor(x) {
     const d = newDraft(), me = L.norm(ls.get('pelland.me', '') || '');
     if (x.players.length === 3) { d.count = 3; d.players = d.players.slice(0, 3); }
@@ -541,6 +550,8 @@
           <button type="button" data-count="4" aria-pressed="${(d.count || 4) === 4}"><b>4 joueurs</b><small>La game à Pelland</small></button>
           <button type="button" data-count="3" aria-pressed="${d.count === 3}"><b>3 joueurs</b><small>Le 9 points</small></button>
         </div>
+        ${offreDates().length ? `<label>Choisir parmi ceux qui ont répondu<select id="offPick"><option value="">— Tous les joueurs —</option>${offreDates().map(x => `<option value="${x.key}" ${d.offre === x.key ? 'selected' : ''}>${esc(x.label)} (${x.names.length} dispo)</option>`).join('')}</select></label>
+        ${d.offre ? `<p class="note">Disponibles : ${esc((offreDates().find(x => x.key === d.offre) || { names: [] }).names.join(', ') || 'personne')}</p>` : ''}` : ''}
         ${(S.quatuors || []).length ? `<label>Quatuor<select id="quatPick"><option value="">— Choisir un quatuor (facultatif) —</option>${S.quatuors.map(x => `<option value="${esc(x.id)}">${esc(x.name || x.players.join(', '))}</option>`).join('')}</select></label>` : ''}
         ${d.players.map((p, i) => `
           <div class="prow">
@@ -591,7 +602,8 @@
     const inLib = S.players.some(x => L.norm(x.name) === L.norm(p.name || ''));
     const custom = !S.players.length || p.custom || (p.name && !inLib);
     const taken = d.players.map((q, j) => j !== i ? L.norm(q.name || '') : '').filter(Boolean);
-    const opts = S.players.filter(x => !taken.includes(L.norm(x.name)));
+    const dispo = d.offre ? ((offreDates().find(x => x.key === d.offre) || {}).names || []).map(L.norm) : null;
+    const opts = S.players.filter(x => !taken.includes(L.norm(x.name)) && (!dispo || dispo.includes(L.norm(x.name)) || L.norm(x.name) === L.norm(p.name || '')));
     const sel = S.players.length ? `<select id="ps${i}"><option value="">— Choisir —</option>${opts.map(x => `<option value="${esc(x.name)}" ${!custom && L.norm(x.name) === L.norm(p.name || '') ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}<option value="__other" ${custom ? 'selected' : ''}>Autre (taper le nom)…</option></select>` : '';
     const inp = custom ? `<input id="pn${i}" type="text" value="${esc(p.name)}" placeholder="Prénom et nom" autocapitalize="words" ${S.players.length ? 'style="margin-top:6px"' : ''}>` : '';
     return sel + inp;
@@ -1108,6 +1120,9 @@
         $('#create').disabled = m.length > 0;
       };
       $('#course').onchange = e => { d.courseId = e.target.value; render(); };
+      const op = $('#offPick'); if (op) op.onchange = e => { d.offre = e.target.value || null;
+        if (d.offre) { const x = offreDates().find(y => y.key === d.offre), ok = (x ? x.names : []).map(L.norm); d.players.forEach(p => { if (p.name && !ok.includes(L.norm(p.name))) { p.name = ''; p.custom = false; } }); }
+        render(); };
       const qp = $('#quatPick'); if (qp) qp.onchange = e => { const x = S.quatuors.find(q => q.id === e.target.value); if (!x) return;
         const nd = draftFromQuatuor(x); nd.courseId = d.courseId; nd.mode = d.mode; nd.stake = d.stake; nd.leadChangeValue = d.leadChangeValue; nd.perPoint = d.perPoint; S.draft = nd; render(); };
       d.players.forEach((p, i) => {
