@@ -503,7 +503,7 @@
   }
   function draftFromQuatuor(x) {
     const d = newDraft(), me = L.norm(ls.get('pelland.me', '') || '');
-    if (x.players.length === 3) { d.count = 3; d.players = d.players.slice(0, 3); }
+
     x.players.forEach((n, i) => { if (d.players[i]) { d.players[i].name = n; d.players[i].custom = false; } });
     const r = x.players.findIndex(n => L.norm(n) === me); if (r >= 0) d.responsable = r;
     return d;
@@ -518,11 +518,14 @@
   }
   // Ce qui manque avant de pouvoir créer la partie
   function validIndex(v) { const x = parseFloat(String(v).replace(',', '.')); return String(v).trim() !== '' && /^[-+]?\d+([.,]\d)?$/.test(String(v).trim()) && x >= -10 && x <= 54; }
+  // 4 joueurs = la game à Pelland ; 3 joueurs (4e case vide) = le 9 points
+  const filledIdx = d => d.players.map((p, i) => i).filter(i => String(d.players[i].name || '').trim());
+  function syncCount(d) { d.count = filledIdx(d).length === 3 ? 3 : 4; return d.count; }
   function missingList(d) {
-    const out = [];
-    d.players.forEach((p, i) => {
-      if (!String(p.name || '').trim()) out.push(`le nom du joueur ${i + 1}`);
-      else if (!String(p.index).trim()) out.push(`l'index de ${p.name.trim()}`);
+    const out = [], idx = filledIdx(d);
+    if (idx.length < 3) d.players.forEach((p, i) => { if (i < 3 && !String(p.name || '').trim()) out.push(`le nom du joueur ${i + 1}`); });
+    idx.forEach(i => { const p = d.players[i];
+      if (!String(p.index).trim()) out.push(`l'index de ${p.name.trim()}`);
       else if (!validIndex(p.index)) out.push(`un index valide pour ${p.name.trim()} (ex. 12,4)`);
     });
     return out;
@@ -532,12 +535,14 @@
     if (!c) return null;
     const ok = !missingList(d).length;
     if (!ok) return { c, ready: false };
-    const ps = L.buildPlayers(c, d.players.map(p => ({ name: p.name.trim(), index: parseFloat(String(p.index).replace(',', '.')), tee: p.tee })), d.mode);
+    const ps = L.buildPlayers(c, filledIdx(d).map(i => d.players[i]).map(p => ({ name: p.name.trim(), index: parseFloat(String(p.index).replace(',', '.')), tee: p.tee })), d.mode);
     return { c, ready: true, ps };
   }
   function vSetup() {
     $('#barTitle').textContent = 'Nouvelle partie';
     const d = S.draft || (S.draft = newDraft());
+    while (d.players.length < 4) d.players.push({ name: '', index: '', tee: (d.players[0] || {}).tee || 'II' });
+    syncCount(d);
     const od = d.offre ? offreDates().find(x => x.key === d.offre) : null;
     const fromOffre = od ? S.courses.find(x => x.name === od.course) : null;
     if (fromOffre) d.courseId = fromOffre.id;
@@ -553,16 +558,12 @@
       </section>
       <section class="card">
         <div class="step">2 à 5 · Joueurs, responsable, index, tertre</div>
-        <div class="seg">
-          <button type="button" data-count="4" aria-pressed="${(d.count || 4) === 4}"><b>4 joueurs</b><small>La game à Pelland</small></button>
-          <button type="button" data-count="3" aria-pressed="${d.count === 3}"><b>3 joueurs</b><small>Le 9 points</small></button>
-        </div>
         ${offreDates().length ? `<label>Choisir parmi ceux qui ont répondu pour cette partie<select id="offPick"><option value="">— Tous les joueurs —</option>${offreDates().map(x => `<option value="${x.key}" ${d.offre === x.key ? 'selected' : ''}>${esc(x.label)} (${x.names.length} dispo)</option>`).join('')}</select></label>
         ${d.offre ? (() => { const nm = (offreDates().find(x => x.key === d.offre) || { names: [] }).names; return `<p class="note">Disponibles : ${esc(nm.join(', ') || 'personne')}${nm.length ? `<br><b>${esc(groupsText(nm.length))}</b>` : ''}</p>`; })() : ''}` : ''}
         ${(S.quatuors || []).length ? `<label>Quatuor<select id="quatPick"><option value="">— Choisir un quatuor (facultatif) —</option>${S.quatuors.map(x => `<option value="${esc(x.id)}">${esc(x.name || x.players.join(', '))}</option>`).join('')}</select></label>` : ''}
         ${d.players.map((p, i) => `
           <div class="prow">
-            <label>Joueur ${i + 1}${playerPicker(d, i)}</label>
+            <label>Joueur ${i + 1}${i === 3 ? ' <small class="opt">(laisser vide pour jouer à 3 : le 9 points)</small>' : ''}${playerPicker(d, i)}</label>
             <label>Index<input id="pi${i}" type="text" inputmode="decimal" value="${esc(p.index)}" placeholder="" aria-label="Index de ${esc(p.name || 'joueur ' + (i + 1))}"></label>
             <label>Tertre<select id="pt${i}">${teeOpts(p.tee)}</select></label>
             <label class="resp"><input type="radio" name="resp" value="${i}" ${d.responsable === i ? 'checked' : ''}> Responsable de la partie</label>
@@ -997,7 +998,7 @@
       v.querySelectorAll('[data-oauto]').forEach(b => b.onclick = () => { const [id, dt] = b.dataset.oauto.split('|'); autoQuatuorsSheet(S.offres.find(x => x.id === id), +dt); });
       v.querySelectorAll('[data-oquat]').forEach(b => b.onclick = () => {
         const key = b.dataset.oquat, x = offreDates().find(y => y.key === key), d = newDraft();
-        d.offre = key; if (x && x.names.length === 3) { d.count = 3; d.players = d.players.slice(0, 3); }
+        d.offre = key; void x;
         go('setup', { draft: d });
       });
       const nq = S.newQuat;
@@ -1173,13 +1174,13 @@
       $('#create').onclick = async () => {
         const pv = draftPreview(d);
         if (!pv || !pv.ready) { const m = 'Il manque ' + missingList(d).slice(0, 2).join(' et ') + '.'; toast(m); setReply(m); Voice.say(m); return; }
-        const neuf = d.count === 3;
+        const neuf = syncCount(d) === 3, rIdx = filledIdx(d).indexOf(d.responsable);
         if (!neuf && !d.teamMode) { toast('Choisissez la formation des équipes (étape 7).'); return; }
         const names = pv.ps.map(p => L.norm(p.name));
         if (new Set(names).size < names.length) return toast('Le même joueur est choisi deux fois.');
         ls.set('pelland.lastPlayers', d.players);
         const id = await Store.newCode();
-        const g = { id, createdAt: Date.now(), ownerUid: Store.uid, course: pv.c, courseId: pv.c.id, mode: d.mode, responsable: d.responsable,
+        const g = { id, createdAt: Date.now(), ownerUid: Store.uid, course: pv.c, courseId: pv.c.id, mode: d.mode, responsable: rIdx >= 0 ? rIdx : 0,
           format: neuf ? 'neuf' : 'pelland', players: pv.ps, teams: neuf ? null : draftTeams(d, pv.ps), teamMode: neuf ? null : d.teamMode, stake: money(d.stake), leadChangeValue: money(d.leadChangeValue), perPoint: String(d.perPoint || '').trim() === '' ? 1 : money(d.perPoint), currentHole: 1, scores: {}, events: {}, status: 'en cours' };
         try { await Store.saveGame(g); S.draft = null; openGame(id); toast('Partie créée.'); }
         catch (e) { toast('Création impossible : ' + e.message); }
