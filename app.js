@@ -277,7 +277,7 @@
     if (S.unwatch && view !== 'game') { S.unwatch(); S.unwatch = null; S.game = null; }
     if (view !== 'game' && view !== 'setup' && Voice.wake) Voice.setWake(false);
     S.view = view; Object.assign(S, opts);
-    if (view === 'history') { S.historyList = null; S.confirmDelGame = null; }
+    if (view === 'history' || view === 'live') { S.historyList = null; S.confirmDelGame = null; }
     if (view === 'setup') { setHeard('Touchez le micro et dites les joueurs et leurs index.'); setReply(''); }
     if (view === 'game') { setHeard('Appuyez sur le micro et parlez.'); setReply(''); }
     render(); window.scrollTo(0, 0);
@@ -290,7 +290,7 @@
     const showDock = false; // plus d'interface vocale
     document.body.classList.toggle('view-game', S.view === 'game');
     $('#dock').hidden = !showDock; document.body.classList.toggle('no-dock', !showDock);
-    const R = { home: vHome, setup: vSetup, game: vGame, join: vJoin, history: vHistory, courses: vCourses, course: vCourse, players: vPlayers, login: vLogin }[S.view];
+    const R = { home: vHome, setup: vSetup, game: vGame, join: vJoin, history: vHistory, live: vHistory, courses: vCourses, course: vCourse, players: vPlayers, login: vLogin }[S.view];
     v.innerHTML = R();
     bind[S.view] && bind[S.view](v);
   }
@@ -305,8 +305,9 @@
       <div class="hero"><h1>La game à Pelland</h1><p>Carte de pointage pour quatre joueurs.</p></div>
       <div class="tiles">
         <button class="tile" data-go="courses"><span class="pin">⛳</span><div><strong>Terrains</strong><span>Ajouter ou corriger un terrain avant la partie</span></div></button>
-        <button class="tile" data-go="players"><span class="pin">☺</span><div><strong>Joueurs</strong><span>Ajouter ou retirer des joueurs avant la partie</span></div></button>
+        <button class="tile" data-go="players"><span class="pin"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M15.5 2.5 9 17.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M9 17.2c-.4 1.2-1.6 2.2-3.4 2.4l-2.1.2c-.6.1-.9.7-.6 1.2.2.3.5.5.9.5h4.6c1.6 0 2.7-.9 3.1-2.2l.3-.9" fill="currentColor"/><circle cx="18.5" cy="19.5" r="1.8" fill="currentColor"/></svg></span><div><strong>Joueurs</strong><span>Ajouter ou retirer des joueurs avant la partie</span></div></button>
         <button class="tile primary" data-go="setup"><span class="pin">+</span><div><strong>Nouvelle partie</strong><span>Terrain, joueurs, index, tertres, handicap</span></div></button>
+        <button class="tile" data-go="live"><span class="pin">⏵</span><div><strong>Parties en cours</strong><span>Les parties qui ont lieu en ce moment</span></div></button>
         ${last ? `<button class="tile" data-open="${esc(last)}"><span class="pin">▶</span><div><strong>Reprendre la partie${lastDate ? ' du ' + esc(lastDate) : ''}</strong><span>${info && info.id === last ? `${esc(info.course.replace(/^Club de golf /i, ''))} · ${esc(info.players.join(', '))} · trou ${info.hole}` : 'Dernière partie ouverte sur ce téléphone'}</span></div></button>` : ''}
         <button class="tile" data-go="join"><span class="pin">#</span><div><strong>Rejoindre une partie</strong><span>Avec le code donné par le responsable</span></div></button>
         <button class="tile" data-go="history"><span class="pin">≡</span><div><strong>Historique</strong><span>Toutes les parties enregistrées</span></div></button>
@@ -375,7 +376,7 @@
       <section class="card">
         <div class="step">Argent</div>
         <div class="row" style="flex-wrap:nowrap">
-          <label style="flex:1">La game vaut au minimum<span class="money-in"><input id="stake" type="text" inputmode="decimal" placeholder="0" value="${esc(fmtIn(d.stake))}"><i>$</i></span></label>
+          <label style="flex:1">La game commence à<span class="money-in"><input id="stake" type="text" inputmode="decimal" placeholder="0" value="${esc(fmtIn(d.stake))}"><i>$</i></span></label>
           <label style="flex:1">$ quand la partie tourne<span class="money-in"><input id="lcv" type="text" inputmode="decimal" placeholder="0" value="${esc(fmtIn(d.leadChangeValue))}"><i>$</i></span></label>
         </div>
       </section>
@@ -431,7 +432,7 @@
     if (!pv || !pv.ready) return '<p class="note">Entrez les quatre prénoms et index pour voir les coups et les équipes.</p>';
     return `<table><thead><tr><th>Joueur</th><th>Tertre</th><th style="text-align:right">Index</th><th style="text-align:right">Hcp</th><th style="text-align:right">Coups</th></tr></thead><tbody>
       ${pv.ps.map(p => `<tr><td>${esc(p.name)}</td><td>${esc(p.tee)}</td><td class="n">${String(p.index).replace('.', ',')}</td><td class="n">${p.courseHandicap}</td><td class="n"><b>${p.strokes}</b></td></tr>`).join('')}
-      </tbody></table>${d.teamMode ? teamsHtml(pv.ps, draftTeams(d, pv.ps)) : '<p class="note">Choisissez la formation des équipes à l\'étape 7.</p>'}<p class="note">Hcp = handicap de parcours = index × slope ÷ 113 + (évaluation − normale), arrondi.</p>`;
+      </tbody></table>${d.teamMode ? teamsHtml(pv.ps, draftTeams(d, pv.ps)) : '<p class="note">Choisissez la formation des équipes à l\'étape 7.</p>'}<p class="note">${d.mode === 'full' ? '<b>Coups</b> : chaque joueur reçoit son handicap de parcours (Hcp).' : '<b>Coups</b> = Hcp du joueur − Hcp le plus bas du groupe. Le meilleur joue à 0.'} Les coups se placent sur les trous les plus difficiles d’abord : avec 7 coups, 1 coup sur les trous de difficulté 1 à 7. Au-delà de 18 coups, on recommence : un 2<sup>e</sup> coup sur les trous les plus difficiles.</p>`;
   }
 
   const teamOf = (g, i) => L.getTeams(g).findIndex(x => x.includes(i));
@@ -504,7 +505,9 @@
       const hp = L.holeTotal(g, hole);
       if (hp) { cum[0] += hp[0]; cum[1] += hp[1]; }
       const tot = hp ? leadHtml(cum) : '';
-      return `<tr class="${hole === h ? 'cur' : ''}"><th class="h"><button class="cell" data-hole="${hole}" style="font-size:19px">${hole}</button></th><td class="m">${ih.par}</td><td class="m">${ih.si}</td>${cells}<td class="stat"><div class="ev">${st.join('')}</div></td><td class="calc">${esc(calc.replace(/^ · /, ''))}</td><td class="tp0">${hp ? hp[0] : ''}</td><td class="tp1">${hp ? hp[1] : ''}</td></tr>`;
+      const calcTxt = esc(calc.replace(/^ · /, '').trim());
+      const sub = (status || calcTxt) ? `<tr class="calc-row ${hole === h ? 'cur' : ''}"><td colspan="9">${status ? `<i class="${status === 'Normal' ? '' : 'p'}">${status}</i> ` : ''}${calcTxt}</td></tr>` : '';
+      return `<tr class="${hole === h ? 'cur' : ''} ${sub ? 'has-sub' : ''}"><th class="h"><button class="cell" data-hole="${hole}" style="font-size:19px">${hole}</button></th><td class="m">${ih.par}</td><td class="m">${ih.si}</td>${cells}<td class="stat col-wide"><div class="ev">${st.join('')}</div></td><td class="calc col-wide">${calcTxt}</td><td class="tp0">${hp ? hp[0] : ''}</td><td class="tp1">${hp ? hp[1] : ''}</td></tr>${sub}`;
     };
     const sumRow = (label, from, to, final) => {
       const cells = colOrder.map(pi => { const p = g.players[pi];
@@ -512,7 +515,7 @@
         return `<td>${any ? s : ''}</td>`;
       }).join('');
       let par = 0, tb = [0, 0]; for (let x = from; x <= to; x++) { par += L.holeInfo(g, x, 0).par; const hp = L.holeTotal(g, x); if (hp) { tb[0] += hp[0]; tb[1] += hp[1]; } }
-      return `<tr class="sum"><td colspan="2">${label}</td><td>${par}</td>${cells}<td></td><td></td><td class="tp0">${tb[0]}</td><td class="tp1">${tb[1]}</td></tr>`;
+      return `<tr class="sum"><td colspan="2">${label}</td><td>${par}</td>${cells}<td class="col-wide"></td><td class="col-wide"></td><td class="tp0">${tb[0]}</td><td class="tp1">${tb[1]}</td></tr>`;
     };
     const cum = [0, 0];
     const ini = L.initials(g.players);
@@ -526,8 +529,17 @@
           <div class="hole-nav"><button data-nav="-1" aria-label="Trou précédent">‹</button><button data-nav="1" aria-label="Trou suivant">›</button></div>
         </div>
         ${owner && g.status !== 'terminée' ? `<button class="btn invite-btn" data-invite type="button">Inviter les joueurs</button>` : ''}
+        ${owner ? `<div class="row game-actions">${g.status === 'terminée'
+          ? '<span class="note">Partie terminée et sauvegardée.</span><button class="btn ghost small" data-reopen type="button">Rouvrir</button>'
+          : '<button class="btn small" data-finish type="button">Terminer et sauvegarder</button>'}
+          ${S.confirmDelGame === g.id
+            ? '<button class="btn small" data-delthis type="button" style="background:var(--red)">Confirmer l\'effacement</button><button class="btn ghost small" data-canceldelgame type="button">Annuler</button>'
+            : '<button class="btn ghost small" data-askdelthis type="button">Effacer la partie</button>'}</div>` : ''}
+        ${!owner && Store.mode === 'firebase' && Store.email ? (S.confirmClaim === g.id
+          ? `<div class="row game-actions"><button class="btn small" data-claim type="button">Oui, je deviens responsable</button><button class="btn ghost small" data-cancelclaim type="button">Annuler</button></div>`
+          : `<div class="row game-actions"><button class="btn ghost small light" data-askclaim type="button">Devenir responsable de cette partie</button><span class="note light">pour entrer les scores, la terminer ou l'effacer</span></div>`) : ''}
         <div class="money-boxes">
-          <div class="mbox green"><span>La game vaut au minimum</span><b>${g.stake ? fmt$(g.stake) : '—'}</b></div>
+          <div class="mbox green"><span>La game commence à</span><b>${g.stake ? fmt$(g.stake) : '—'}</b></div>
           <div class="mbox green"><span>La partie a tourné</span><b>${L.leadChanges(g)}${g.leadChangeValue ? ` · ${fmt$(L.leadChanges(g) * g.leadChangeValue)}` : ''}</b></div>
         </div>
         <div class="team-blocks">${[1, 0].map(k => { const tm = L.getTeams(g)[k], teamPts = L.teamPoints(g).tot;
@@ -545,32 +557,29 @@
 
 
       <div class="card-scroll"><table class="sc">
-        <thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${colOrder.map(i => { const p = g.players[i]; return `<th class="pc tc${teamOf(g, i)}" title="${esc(p.name)}">${esc(ini[i])}</th>`; }).join('')}<th>Statut</th><th>Calcul</th><th class="tc0">Rouge</th><th class="tc1">Bleu</th></tr></thead>
+        <thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${colOrder.map(i => { const p = g.players[i]; return `<th class="pc tc${teamOf(g, i)}" title="${esc(p.name)}">${esc(ini[i])}</th>`; }).join('')}<th class="col-wide">Statut</th><th class="col-wide">Calcul</th><th class="tc0">Rouge</th><th class="tc1">Bleu</th></tr></thead>
         <tbody>${Array.from({ length: 9 }, (_, i) => row(i + 1)).join('')}${sumRow('Aller', 1, 9)}${Array.from({ length: 9 }, (_, i) => row(i + 10)).join('')}${sumRow('Retour', 10, 18)}${sumRow('Total', 1, 18, true)}</tbody>
       </table></div>
-      <div class="legend"><span>★ responsable de la partie (il entre les scores)</span><span>${BALL} coup reçu · petit chiffre = net</span><span>Calcul : ↓ plus bas net · ↑ plus haut net · R/B équipe qui reçoit · ×2 press · ×4 reroll · S skin · C cabane · $ normale 3 · = résultat net</span><span>Noms à la couleur de l'équipe : <b class="tc1">Bleus</b> · <b class="tc0">Rouges</b></span><span>${g.players.map((p, i) => `<b class="tc${teamOf(g, i)}">${esc(ini[i])}</b> ${esc(p.name)}`).join(' · ')}</span><span>Faites glisser la carte vers la gauche pour voir le calcul</span></div>
+      <div class="legend"><span>★ responsable de la partie (il entre les scores)</span><span>${BALL} coup reçu · petit chiffre = net</span><span>Calcul : ↓ plus bas net · ↑ plus haut net · R/B équipe qui reçoit · ×2 press · ×4 reroll · S skin · C cabane · $ normale 3 · = résultat net</span><span>Noms à la couleur de l'équipe : <b class="tc1">Bleus</b> · <b class="tc0">Rouges</b></span><span>${g.players.map((p, i) => `<b class="tc${teamOf(g, i)}">${esc(ini[i])}</b> ${esc(p.name)}`).join(' · ')}</span><span class="narrow-only">Sous chaque trou : statut (Normal, Press, Reroll) et calcul des points</span></div>
       <section class="card">
         <h2>${owner ? 'Vous êtes le responsable' : 'Vous suivez la partie'}</h2>
         <p class="note">${owner
           ? 'Touchez un joueur pour entrer les 4 scores et la skin du trou. Touchez une case de la carte pour corriger un autre trou. Le bouton Press apparaît sous l\'équipe en déficit, puis Reroll sous l\'autre.'
           : 'La carte se met à jour en direct à chaque score entré par le responsable.'}</p>
         ${Store.mode === 'firebase' ? `<p class="note">Code à donner aux autres joueurs : <b class="num" style="font-size:22px;letter-spacing:.15em">${esc(g.id)}</b></p>` : ''}
-        ${owner ? `<div class="row game-actions">${g.status === 'terminée'
-          ? '<span class="note">Partie terminée et sauvegardée.</span><button class="btn ghost small" data-reopen type="button">Rouvrir</button>'
-          : '<button class="btn small" data-finish type="button">Terminer et sauvegarder</button>'}
-          ${S.confirmDelGame === g.id
-            ? '<button class="btn small" data-delthis type="button" style="background:var(--red)">Confirmer l\'effacement</button><button class="btn ghost small" data-canceldelgame type="button">Annuler</button>'
-            : '<button class="btn ghost small" data-askdelthis type="button">Effacer la partie</button>'}</div>` : ''}
       </section>`;
   }
 
   // ---------------- Historique ----------------
   let historyCache = null;
   function vHistory() {
-    $('#barTitle').textContent = 'Historique';
-    if (S.historyList == null) { Store.listGames().then(l => { S.historyList = l; if (S.view === 'history') render(); }).catch(e => toast(e.message)); return '<p class="note">Chargement…</p>'; }
-    const list = S.historyList;
-    if (!list.length) return '<section class="card"><h2>Aucune partie encore</h2><p class="note">Les parties apparaîtront ici dès leur création.</p></section>';
+    const live = S.view === 'live';
+    $('#barTitle').textContent = live ? 'Parties en cours' : 'Historique';
+    if (S.historyList == null) { Store.listGames().then(l => { S.historyList = l; if (S.view === 'history' || S.view === 'live') render(); }).catch(e => toast(e.message)); return '<p class="note">Chargement…</p>'; }
+    const list = live ? S.historyList.filter(g => g.status !== 'terminée') : S.historyList;
+    if (!list.length) return live
+      ? '<section class="card"><h2>Aucune partie en cours</h2><p class="note">Les parties apparaissent ici dès leur création, jusqu’à ce que le responsable les termine.</p></section>'
+      : '<section class="card"><h2>Aucune partie encore</h2><p class="note">Les parties apparaîtront ici dès leur création.</p></section>';
     return `<div class="list">${list.map(g => {
       const d = new Date(g.createdAt);
       const played = Object.keys(g.scores || {}).filter(k => (g.scores[k] || []).some(v => v != null)).length;
@@ -695,6 +704,7 @@
       $('#joinBtn').onclick = () => { const code = $('#code').value.trim().toUpperCase(); if (code) openGame(code); };
       $('#code').onkeydown = e => { if (e.key === 'Enter') $('#joinBtn').click(); };
     },
+    live(v) { bind.history(v); },
     history(v) {
       commonNav(v);
       v.querySelectorAll('[data-askdelgame]').forEach(b => b.onclick = () => { S.confirmDelGame = b.dataset.askdelgame; render(); });
@@ -796,6 +806,13 @@
       });
       v.querySelectorAll('[data-cell]').forEach(b => b.onclick = () => { const [h] = b.dataset.cell.split(':').map(Number); allScoresSheet(h); });
       v.querySelectorAll('[data-allscores]').forEach(b => b.onclick = () => allScoresSheet(+b.dataset.allscores));
+      const ac = v.querySelector('[data-askclaim]'); if (ac) ac.onclick = () => { S.confirmClaim = S.game.id; render(); };
+      const cc = v.querySelector('[data-cancelclaim]'); if (cc) cc.onclick = () => { S.confirmClaim = null; render(); };
+      const cl = v.querySelector('[data-claim]'); if (cl) cl.onclick = async () => {
+        const ng = JSON.parse(JSON.stringify(S.game)); ng.ownerUid = Store.uid;
+        try { await Store.saveGame(ng); S.game = ng; S.confirmClaim = null; toast('Vous êtes maintenant le responsable de cette partie.'); render(); }
+        catch (e) { toast('Impossible : publiez les nouvelles règles Firestore. (' + e.message + ')'); }
+      };
       const inv = v.querySelector('[data-invite]'); if (inv) inv.onclick = () => invitePlayers(S.game);
       const fin = v.querySelector('[data-finish]'); if (fin) fin.onclick = async () => {
         const ng = JSON.parse(JSON.stringify(S.game)); ng.status = 'terminée'; ng.finishedAt = Date.now();
