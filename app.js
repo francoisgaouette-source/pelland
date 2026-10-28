@@ -383,7 +383,7 @@
       <section class="card">
         <div class="step">Argent</div>
         <div class="row" style="flex-wrap:nowrap">
-          <label style="flex:1">$ au début de la game<span class="money-in"><input id="stake" type="text" inputmode="decimal" placeholder="0" value="${esc(fmtIn(d.stake))}"><i>$</i></span></label>
+          <label style="flex:1">La game commence à<span class="money-in"><input id="stake" type="text" inputmode="decimal" placeholder="0" value="${esc(fmtIn(d.stake))}"><i>$</i></span></label>
           <label style="flex:1">$ à chaque fois que la partie tourne<span class="money-in"><input id="lcv" type="text" inputmode="decimal" placeholder="0" value="${esc(fmtIn(d.leadChangeValue))}"><i>$</i></span></label>
         </div>
       </section>
@@ -552,7 +552,7 @@
           ? `<div class="row game-actions"><button class="btn small" data-claim type="button">Oui, je deviens responsable</button><button class="btn ghost small" data-cancelclaim type="button">Annuler</button></div>`
           : `<div class="row game-actions"><button class="btn ghost small light" data-askclaim type="button">Devenir responsable de cette partie</button><span class="note light">pour entrer les scores, la terminer ou l'effacer</span></div>`) : ''}
         <div class="money-boxes">
-          <div class="mbox green"><span>$ au début de la game</span><b>${g.stake ? fmt$(g.stake) : '—'}</b></div>
+          <div class="mbox green"><span>La game commence à</span><b>${g.stake ? fmt$(g.stake) : '—'}</b></div>
           <div class="mbox green"><span>La partie a tourné</span><b>${L.leadChanges(g)}${g.leadChangeValue ? ` · ${fmt$(L.leadChanges(g) * g.leadChangeValue)}` : ''}</b></div>
         </div>
         <div class="team-blocks">${[1, 0].map(k => { const tm = L.getTeams(g)[k], teamPts = L.teamPoints(g).tot;
