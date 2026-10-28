@@ -379,17 +379,14 @@
     const q = S.quatuors || [], nq = S.newQuat || (S.newQuat = { name: '', players: ['', '', '', ''] });
     const opts = i => { const taken = nq.players.filter((x, j) => j !== i && x).map(L.norm);
       return `<option value="">— Joueur ${i + 1} —</option>` + S.players.filter(p => !taken.includes(L.norm(p.name))).map(p => `<option value="${esc(p.name)}" ${p.name === nq.players[i] ? 'selected' : ''}>${esc(p.name)}</option>`).join(''); };
-    return `${offresHtml()}<section class="card">
-        <div class="quat-picks">${[0, 1, 2, 3].map(i => `<select data-qp="${i}">${opts(i)}</select>`).join('')}</div>
-        <button class="btn" id="qsave" type="button">Enregistrer le quatuor</button>
-        ${S.players.length < 4 ? '<p class="note">Ajoutez d’abord au moins 4 joueurs dans <b>Joueurs</b>.</p>' : ''}
-      </section>
+    void opts;
+    return `${offresHtml()}
       <div class="list">${q.length ? q.map(x => `<div class="item quat">
           <div><b>${esc(x.name || x.players.join(', '))}</b>${x.name ? `<span>${esc(x.players.join(', '))}</span>` : ''}</div>
           <span class="row" style="flex-wrap:nowrap;flex:none">${S.confirmDelQ === x.id
             ? `<button class="btn small" data-qdel="${esc(x.id)}" type="button" style="background:var(--red)">Retirer</button><button class="btn ghost small" data-qcancel type="button">Annuler</button>`
             : `<button class="btn small" data-qplay="${esc(x.id)}" type="button">Jouer</button><button class="btn ghost small" data-qask="${esc(x.id)}" type="button">Retirer</button>`}</span></div>`).join('')
-        : '<p class="note">Aucun quatuor pour l’instant. Un quatuor remplit les 4 joueurs d’une nouvelle partie en un geste.</p>'}</div>`;
+        : ''}</div>`;
   }
   // ---------------- Offres de parties ----------------
   const fmtDate = ms => new Date(ms).toLocaleString('fr-CA', { weekday: 'short', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' }).replace(' h 00', ' h').replace(/(\d+):(\d+)/, '$1 h $2');
@@ -996,14 +993,13 @@
       });
       v.querySelectorAll('[data-oauto]').forEach(b => b.onclick = () => { const [id, dt] = b.dataset.oauto.split('|'); autoQuatuorsSheet(S.offres.find(x => x.id === id), +dt); });
       v.querySelectorAll('[data-oquat]').forEach(b => b.onclick = () => {
-        const [id, dt] = b.dataset.oquat.split('|'); const o = S.offres.find(x => x.id === id);
-        const yes = offreReps(o).filter(r => (r.dates || []).includes(+dt)).map(r => r.name).filter(n => S.players.some(p => L.norm(p.name) === L.norm(n)));
-        S.newQuat = { name: `${o.course.replace(/^Club de golf /i, '')} – ${fmtDate(+dt)}`, players: [0, 1, 2, 3].map(i => (S.players.find(p => L.norm(p.name) === L.norm(yes[i] || '')) || {}).name || '') };
-        render(); setTimeout(() => { const q = $('.quat-picks'); if (q) q.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 50);
+        const key = b.dataset.oquat, x = offreDates().find(y => y.key === key), d = newDraft();
+        d.offre = key; if (x && x.names.length === 3) { d.count = 3; d.players = d.players.slice(0, 3); }
+        go('setup', { draft: d });
       });
       const nq = S.newQuat;
       v.querySelectorAll('[data-qp]').forEach(sl => sl.onchange = e => { nq.players[+sl.dataset.qp] = e.target.value; render(); });
-      $('#qsave').onclick = async () => {
+      const qs = $('#qsave'); if (qs) qs.onclick = async () => {
         if (nq.players.some(x => !x)) return toast('Choisissez les 4 joueurs.');
         const list = (S.quatuors || []).concat([{ id: 'q' + Date.now().toString(36), name: nq.name, players: nq.players.slice() }]);
         try { await Store.saveQuatuors(list); S.quatuors = list; S.newQuat = null; render(); } catch (e) { toast('Enregistrement impossible : ' + e.message); }
