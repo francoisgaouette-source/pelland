@@ -56,6 +56,7 @@
       if (player.authEmail) {
         try { const c = await auth.signInWithEmailAndPassword(player.authEmail, digits); this.uid = c.user.uid; this.email = c.user.email; }
         catch (e) { throw new Error('Numéro de téléphone incorrect pour ' + player.name + '.'); }
+        this.savePhone(player.id, digits);
       } else {
         const all = await this.listPlayers();
         if (all.some(x => x.authEmail)) throw new Error('Le téléphone de ' + player.name + ' n\'est pas encore enregistré. Demandez à un membre de l\'ajouter dans Joueurs.');
@@ -64,6 +65,7 @@
         const c = await auth.createUserWithEmailAndPassword(email, digits);
         this.uid = c.user.uid; this.email = email;
         await this.db.collection('players').doc(player.id).set({ authEmail: email, phoneHint: digits.slice(-2) }, { merge: true });
+        this.savePhone(player.id, digits);
       }
       this.needLogin = false;
       ls.set('pelland.me', player.name);
@@ -74,13 +76,16 @@
     async setPhone(player, phone) {
       const digits = String(phone || '').replace(/\D/g, '');
       if (digits.length < 7) throw new Error('Numéro de téléphone invalide (10 chiffres).');
-      if (this.mode !== 'firebase') { const list = ls.get('pelland.players', []); const x = list.find(q => q.id === player.id); if (x) { x.phoneHint = digits.slice(-2); x.authEmail = 'local'; } ls.set('pelland.players', list); return; }
+      if (this.mode !== 'firebase') { const list = ls.get('pelland.players', []); const x = list.find(q => q.id === player.id); if (x) { x.phoneHint = digits.slice(-2); x.phone = digits; x.authEmail = 'local'; } ls.set('pelland.players', list); return; }
       const sec = firebase.apps.find(a => a.name === 'invite') || firebase.initializeApp(this.cfg, 'invite');
       const email = player.id.replace(/[^a-z0-9-]/gi, '') + '-' + Date.now().toString(36) + '@pelland.golf';
       await sec.auth().createUserWithEmailAndPassword(email, digits);
       try { await sec.auth().signOut(); } catch (e) { }
       await this.db.collection('players').doc(player.id).set({ authEmail: email, phoneHint: digits.slice(-2) }, { merge: true });
+      await this.savePhone(player.id, digits);
     },
+    // Numéro complet : gardé à part, lisible seulement par les membres connectés
+    async savePhone(id, digits) { try { await this.db.collection('phones').doc(id).set({ phone: digits }); } catch (e) { console.warn('phones', e.message); } },
     async ensureSeed() {
       const list = await this.listCourses();
       if (!list.find(c => c.id === L.PINEGROVE.id)) await this.saveCourse(L.PINEGROVE);
@@ -132,7 +137,9 @@
     async listPlayers() {
       if (this.mode === 'firebase') {
         const snap = await this.db.collection('players').get();
-        return snap.docs.map(d => ({ ...d.data(), id: d.id })).sort(byName);
+        const list = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+        if (this.email) { try { const ph = await this.db.collection('phones').get(); const m = {}; ph.docs.forEach(d => { m[d.id] = d.data().phone; }); list.forEach(p => { if (m[p.id]) p.phone = m[p.id]; }); } catch (e) { } }
+        return list.sort(byName);
       }
       return ls.get('pelland.players', []).sort(byName);
     },
@@ -142,7 +149,7 @@
       const list = ls.get('pelland.players', []); list.push(p); ls.set('pelland.players', list); return p;
     },
     async deletePlayer(id) {
-      if (this.mode === 'firebase') { await this.db.collection('players').doc(id).delete(); return; }
+      if (this.mode === 'firebase') { await this.db.collection('players').doc(id).delete(); try { await this.db.collection('phones').doc(id).delete(); } catch (e) { } return; }
       ls.set('pelland.players', ls.get('pelland.players', []).filter(x => x.id !== id));
     },
     async deleteGame(id) {
@@ -277,6 +284,7 @@
     if (S.unwatch && view !== 'game') { S.unwatch(); S.unwatch = null; S.game = null; }
     if (view !== 'game' && view !== 'setup' && Voice.wake) Voice.setWake(false);
     S.view = view; Object.assign(S, opts);
+    if (view === 'course' && 'editCourse' in opts) { S.cardImgs = []; S.cardStatus = ''; }
     if (view === 'history' || view === 'live') { S.historyList = null; S.confirmDelGame = null; }
     if (view === 'setup') { setHeard('Touchez le micro et dites les joueurs et leurs index.'); setReply(''); }
     if (view === 'game') { setHeard('Appuyez sur le micro et parlez.'); setReply(''); }
@@ -413,6 +421,7 @@
   }
   function money(v) { const x = parseFloat(String(v || '').replace(',', '.').replace(/[^0-9.]/g, '')); return isNaN(x) ? 0 : x; }
   // « 20 » → « 20,00 » ; vide reste vide
+  function fmtPhone(d) { d = String(d || '').replace(/\D/g, ''); if (d.length === 11 && d[0] === '1') d = d.slice(1); return d.length === 10 ? `${d.slice(0, 3)} ${d.slice(3, 6)}-${d.slice(6)}` : d; }
   function fmtIn(v) { if (String(v || '').trim() === '') return ''; return money(v).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
   const fmt$ = x => Number(x || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' $';
   // « 11 coups : 1 2 3 4 5 7 8 9 10 12 14 » (un chiffre en double = 2 coups sur ce trou)
@@ -617,7 +626,7 @@
       ${(() => { const dups = duplicateMap(S.players); const nd = Object.keys(dups).length; return nd ? `<div class="warn">${nd} joueurs semblent en double. Vérifiez les noms marqués « Doublon ? » et retirez celui de trop.</div>` : ''; })()}
       <div class="list">${S.players.length ? (() => { const dups = duplicateMap(S.players); return S.players.map(p => `<div class="item pl-row ${dups[p.id] ? 'dup' : ''}"><b>${esc(p.name)}${dups[p.id] ? ` <span class="dup-flag" title="Ressemble à ${esc(dups[p.id].join(', '))}">Doublon ?</span>` : ''}</b>${S.confirmDel === p.id
         ? `<span class="row"><button class="btn small" data-delp="${esc(p.id)}" type="button" style="background:var(--red)">Confirmer</button><button class="btn ghost small" data-canceldel type="button">Annuler</button></span>`
-        : `<span class="row" style="flex-wrap:nowrap;flex:none"><button class="btn ghost small" data-phone="${esc(p.id)}" type="button">${p.authEmail ? '☎ ••' + esc(p.phoneHint || '') : '+ Téléphone'}</button><button class="btn ghost small" data-askdel="${esc(p.id)}" type="button">Retirer</button></span>`}</div>`).join(''); })() : '<p class="note">Aucun joueur pour l\'instant.</p>'}</div>`;
+        : `<span class="row" style="flex-wrap:nowrap;flex:none"><button class="btn ghost small" data-phone="${esc(p.id)}" type="button">${p.phone ? '☎ ' + esc(fmtPhone(p.phone)) : p.authEmail ? '☎ ••' + esc(p.phoneHint || '') : '+ Téléphone'}</button><button class="btn ghost small" data-askdel="${esc(p.id)}" type="button">Retirer</button></span>`}</div>`).join(''); })() : '<p class="note">Aucun joueur pour l\'instant.</p>'}</div>`;
   }
   function vCourses() {
     $('#barTitle').textContent = 'Terrains';
@@ -628,7 +637,16 @@
   function vCourse() {
     const c = S.editCourse || (S.editCourse = { name: '', city: '', holes: Array.from({ length: 18 }, () => ({ par: 4, si: '' })), tees: [{ name: 'Blanc', rating: '', slope: '' }] });
     $('#barTitle').textContent = c.id ? 'Modifier le terrain' : 'Nouveau terrain';
+    const imgs = S.cardImgs || [];
     return `
+      <section class="card card-upload">
+        <h2>Carte de pointage</h2>
+        <p class="note">Prenez la carte en photo (recto et verso) ou choisissez un PDF. L’app lit les normales, les handicaps et les tertres et remplit le formulaire : vérifiez ensuite avec la photo.</p>
+        <label class="btn upload-btn" for="cardFile">Téléverser la carte</label>
+        <input id="cardFile" type="file" accept="image/*,application/pdf" multiple hidden>
+        <div id="cardStatus" class="note">${esc(S.cardStatus || '')}</div>
+        ${imgs.length ? `<div class="card-thumbs">${imgs.map((u, i) => `<button type="button" data-viewcard="${i}"><img src="${u}" alt="Carte ${i + 1}"></button>`).join('')}</div><p class="note">Touchez une photo pour l’agrandir.</p>` : ''}
+      </section>
       <section class="card">
         <label>Nom du terrain<input id="cname" type="text" value="${esc(c.name)}" placeholder="Club de golf …"></label>
         <label>Ville<input id="ccity" type="text" value="${esc(c.city || '')}"></label>
@@ -648,6 +666,72 @@
         ${c.holes.map((h, i) => `<span class="hh">${i + 1}</span><input data-hole="${i}:par" type="text" inputmode="numeric" value="${esc(h.par)}"><input data-hole="${i}:si" type="text" inputmode="numeric" value="${esc(h.si)}">`).join('')}</div>
       </section>
       <button class="btn" id="saveCourse" type="button">Enregistrer le terrain</button>`;
+  }
+
+  // ---------------- Lecture de la carte (photo ou PDF) ----------------
+  const loadScript = (() => { const done = {}; return src => done[src] || (done[src] = new Promise((ok, ko) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => { delete done[src]; ko(new Error('connexion requise pour lire la carte')); }; document.head.appendChild(s); })); })();
+  async function fileToCanvas(file, max = 2200) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((ok, ko) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ko(new Error('image illisible')); i.src = url; });
+      const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const cv = document.createElement('canvas'); cv.width = Math.round(img.naturalWidth * k); cv.height = Math.round(img.naturalHeight * k);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height); return cv;
+    } finally { URL.revokeObjectURL(url); }
+  }
+  // Agrandit, passe en noir et blanc et efface les lignes du quadrillage (elles nuisent à la lecture des chiffres)
+  function cleanForOcr(src) {
+    const k = Math.max(1, Math.min(2.5, 2400 / src.width));
+    const W = Math.round(src.width * k), H = Math.round(src.height * k);
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const g = cv.getContext('2d', { willReadFrequently: true }); g.imageSmoothingQuality = 'high'; g.drawImage(src, 0, 0, W, H);
+    const im = g.getImageData(0, 0, W, H), d = im.data, n = W * H, lum = new Uint8Array(n);
+    for (let i = 0; i < n; i++) lum[i] = (d[i * 4] * 299 + d[i * 4 + 1] * 587 + d[i * 4 + 2] * 114) / 1000;
+    // seuil local (moyenne sur un bloc) : tolère l'ombre et l'éclairage inégal d'une photo
+    const B = Math.max(15, Math.round(W / 60)), ii = new Float64Array((W + 1) * (H + 1));
+    for (let y = 0; y < H; y++) { let r = 0; for (let x = 0; x < W; x++) { r += lum[y * W + x]; ii[(y + 1) * (W + 1) + x + 1] = ii[y * (W + 1) + x + 1] + r; } }
+    const dark = new Uint8Array(n);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const x0 = Math.max(0, x - B), x1 = Math.min(W, x + B), y0 = Math.max(0, y - B), y1 = Math.min(H, y + B);
+      const m = (ii[y1 * (W + 1) + x1] - ii[y0 * (W + 1) + x1] - ii[y1 * (W + 1) + x0] + ii[y0 * (W + 1) + x0]) / ((x1 - x0) * (y1 - y0));
+      dark[y * W + x] = lum[y * W + x] < m * 0.82 ? 1 : 0;
+    }
+    const kill = new Uint8Array(n), hMin = Math.round(W * 0.06), vMin = Math.round(H * 0.045);
+    for (let y = 0; y < H; y++) { let s = -1; for (let x = 0; x <= W; x++) { const on = x < W && dark[y * W + x]; if (on && s < 0) s = x; if (!on && s >= 0) { if (x - s >= hMin) for (let j = s; j < x; j++) kill[y * W + j] = 1; s = -1; } } }
+    for (let x = 0; x < W; x++) { let s = -1; for (let y = 0; y <= H; y++) { const on = y < H && dark[y * W + x]; if (on && s < 0) s = y; if (!on && s >= 0) { if (y - s >= vMin) for (let j = s; j < y; j++) kill[j * W + x] = 1; s = -1; } } }
+    for (let i = 0; i < n; i++) { const v = dark[i] && !kill[i] ? 0 : 255; d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; d[i * 4 + 3] = 255; }
+    g.putImageData(im, 0, 0); return cv;
+  }
+  async function ocrCanvas(cv, status) {
+    status('Chargement du lecteur de texte…');
+    await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
+    const w = await Tesseract.createWorker(['fra', 'eng'], 1, { logger: m => { if (m.status === 'recognizing text') status(`Lecture de la carte… ${Math.round(m.progress * 100)} %`); } });
+    try {
+      await w.setParameters({ preserve_interword_spaces: '1', tessedit_pageseg_mode: '6' });
+      const { data } = await w.recognize(cleanForOcr(cv));
+      window.__cardText = (window.__cardText || '') + '\n' + (data.text || '');
+      return data.text || '';
+    }
+    finally { await w.terminate(); }
+  }
+  async function readPdf(file, status) {
+    status('Ouverture du PDF…');
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+    const out = [];
+    for (let n = 1; n <= Math.min(pdf.numPages, 4); n++) {
+      const page = await pdf.getPage(n);
+      const vp = page.getViewport({ scale: Math.min(3, 2200 / page.getViewport({ scale: 1 }).width) });
+      const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
+      await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+      (S.cardImgs = S.cardImgs || []).push(cv.toDataURL('image/jpeg', .7)); render();
+      const tc = await page.getTextContent(); const rows = {};
+      tc.items.forEach(it => { const y = Math.round(it.transform[5] / 4); (rows[y] = rows[y] || []).push(it); });
+      const text = Object.keys(rows).sort((a, b) => b - a).map(y => rows[y].sort((a, b) => a.transform[4] - b.transform[4]).map(i => i.str).join(' ')).join('\n');
+      out.push(text.replace(/\s/g, '').length > 40 ? text : await ocrCanvas(cv, status));
+    }
+    return out;
   }
 
   // =====================================================================
@@ -683,8 +767,8 @@
       v.querySelectorAll('[data-phone]').forEach(b => b.onclick = () => {
         const pl = S.players.find(x => x.id === b.dataset.phone);
         openSheet(`<h3>Téléphone de ${esc(pl.name)}</h3>
-          <p class="note">Ce numéro sert de mot de passe pour se connecter. Il n'est pas affiché dans l'app.${pl.authEmail ? ' Un nouveau numéro remplace l\'ancien.' : ''}</p>
-          <input id="phIn" type="tel" inputmode="tel" placeholder="450 555-1234">
+          <p class="note">Ce numéro sert de mot de passe pour se connecter. Il est visible seulement par les joueurs connectés.${pl.authEmail ? ' Un nouveau numéro remplace l\'ancien.' : ''}</p>
+          <input id="phIn" type="tel" inputmode="tel" placeholder="450 555-1234" value="${esc(pl.phone ? fmtPhone(pl.phone) : '')}">
           <div class="row"><button class="btn small" id="phSave" type="button">Enregistrer</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`, sh => {
           sh.querySelector('[data-close]').onclick = closeSheet;
           sh.querySelector('#phSave').onclick = async () => {
@@ -725,6 +809,31 @@
         v.querySelectorAll('[data-tee]').forEach(i => { const [k, f] = i.dataset.tee.split(':'); c.tees[k][f] = i.value; });
         v.querySelectorAll('[data-hole]').forEach(i => { const [k, f] = i.dataset.hole.split(':'); c.holes[k][f] = i.value; });
       };
+      $('#cardFile').onchange = async e => {
+        const files = [...e.target.files]; e.target.value = ''; if (!files.length) return;
+        sync();
+        const status = t => { S.cardStatus = t; const el = $('#cardStatus'); if (el) el.textContent = t; };
+        try {
+          const texts = [];
+          for (const f of files) {
+            if (/pdf/i.test(f.type) || /\.pdf$/i.test(f.name)) texts.push(...await readPdf(f, status));
+            else { const cv = await fileToCanvas(f); (S.cardImgs = S.cardImgs || []).push(cv.toDataURL('image/jpeg', .7)); render(); texts.push(await ocrCanvas(cv, status)); }
+          }
+          const r = L.parseCardText(texts.join('\n'));
+          if (r.pars) r.pars.forEach((x, i) => { c.holes[i].par = x; });
+          if (r.sis) r.sis.forEach((x, i) => { c.holes[i].si = x; });
+          if (r.tees.length) {
+            const blank = c.tees.every(t => !String(t.rating).trim() && !String(t.slope).trim());
+            if (blank) c.tees = r.tees.map(t => ({ name: t.name, rating: String(t.rating).replace('.', ','), slope: String(t.slope) }));
+            else r.tees.forEach(t => { if (!c.tees.some(x => String(x.name).toLowerCase() === t.name.toLowerCase())) c.tees.push({ name: t.name, rating: String(t.rating).replace('.', ','), slope: String(t.slope) }); });
+          }
+          if (!String(c.name).trim() && r.name) c.name = r.name;
+          const ok = x => x ? 'trouvées ✓' : 'à entrer à la main';
+          status(`Lecture terminée. Normales : ${ok(r.pars)}. Handicaps : ${r.sis ? 'trouvés ✓' : 'à entrer à la main'}. Tertres : ${r.tees.length ? r.tees.length + ' trouvé' + (r.tees.length > 1 ? 's' : '') + ' ✓' : 'à entrer à la main'}. Vérifiez chaque valeur avec la photo.`);
+          render();
+        } catch (err) { status('Lecture impossible : ' + (err && err.message || err) + '. Entrez les valeurs à la main en regardant la photo.'); render(); }
+      };
+      v.querySelectorAll('[data-viewcard]').forEach(b => b.onclick = () => openSheet(`<div class="card-view"><img src="${S.cardImgs[+b.dataset.viewcard]}" alt="Carte"></div><div class="sheet-actions"><button class="btn" data-close type="button">Fermer</button></div>`, sh => { sh.querySelector('[data-close]').onclick = closeSheet; }));
       $('#addTee').onclick = () => { sync(); c.tees.push({ name: '', rating: '', slope: '' }); render(); };
       v.querySelectorAll('[data-deltee]').forEach(b => b.onclick = () => { sync(); if (c.tees.length > 1) c.tees.splice(+b.dataset.deltee, 1); render(); });
       $('#saveCourse').onclick = async () => {

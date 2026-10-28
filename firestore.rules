@@ -1,22 +1,35 @@
 rules_version = '2';
 // Règles de sécurité Firestore pour Pelland.
-// - Tout joueur connecté (connexion anonyme automatique) peut lire les terrains et les parties.
-// - Tout joueur peut ajouter ou corriger un terrain.
-// - Seul le téléphone qui a créé une partie (le responsable) peut la modifier.
+// - Seuls les joueurs connectés avec leur nom et leur téléphone (compte « Email/Password ») ont accès.
+// - La liste des noms des joueurs est lisible pour afficher l'écran de connexion (aucun téléphone n'y est stocké).
+// - Seul le responsable qui a créé une partie peut la modifier ou l'effacer.
 service cloud.firestore {
   match /databases/{database}/documents {
+    function membre() {
+      return request.auth != null && request.auth.token.firebase.sign_in_provider == 'password';
+    }
+    match /players/{playerId} {
+      allow read: if true;
+      allow create, delete: if membre();
+      // le premier membre enregistre son propre compte au moment de sa première connexion
+      allow update: if membre();
+    }
+    // numéros de téléphone complets : visibles seulement par les membres connectés
+    match /phones/{playerId} {
+      allow read, write: if membre();
+    }
     match /courses/{courseId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null;
+      allow read, create, update: if membre();
       allow delete: if false;
     }
     match /games/{gameId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.ownerUid == request.auth.uid;
-      allow update: if request.auth != null
-                    && resource.data.ownerUid == request.auth.uid
-                    && request.resource.data.ownerUid == resource.data.ownerUid;
-      allow delete: if false;
+      allow read: if membre();
+      allow create: if membre() && request.resource.data.ownerUid == request.auth.uid;
+      // le responsable modifie sa partie ; un autre membre peut « devenir responsable » (reprise de la partie)
+      allow update: if membre()
+                    && (resource.data.ownerUid == request.auth.uid
+                        || request.resource.data.ownerUid == request.auth.uid);
+      allow delete: if membre() && resource.data.ownerUid == request.auth.uid;
     }
   }
 }

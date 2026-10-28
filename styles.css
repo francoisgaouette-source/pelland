@@ -484,3 +484,11 @@ table.sc tr.has-sub > * { border-bottom: 0; }
   .cell.birdie > span { width: 28px; height: 28px; }
 }
 .hole-card > .invite-btn:first-child { width: 100%; margin-bottom: 12px; }
+/* Téléversement de la carte de pointage */
+.upload-btn { display: flex; align-items: center; justify-content: center; text-align: center; cursor: pointer; }
+.card-thumbs { display: flex; gap: 8px; overflow-x: auto; margin-top: 10px; }
+.card-thumbs button { flex: none; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); overflow: hidden; }
+.card-thumbs img { display: block; height: 110px; width: auto; }
+.card-view { overflow: auto; max-height: 75dvh; -webkit-overflow-scrolling: touch; }
+.card-view img { display: block; width: 100%; height: auto; }
+#cardStatus:empty { display: none; }

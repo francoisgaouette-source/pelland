@@ -828,6 +828,46 @@
     return null;
   }
 
-  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, TEAMS, teamFromText, makeTeams, orderTeams, getTeams, teamName, netScore, holeMultiplier, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, cabaneTeam, cabanes, calcText, par3Results, describePar3, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup, resolveName, nextPrompt, trailingTeam, pressTeamOf, initials, leadChanges, totalText, holeNetText };
+  // ---------------- Lecture d'une carte de pointage (texte OCR ou PDF) ----------------
+  // Renvoie { name, holes:[{par,si}]|null, pars:[18]|null, sis:[18]|null, tees:[{name,rating,slope}] }
+  function parseCardText(text) {
+    const fix = l => l.replace(/[|\[\]{}()!«»"“”‘’_~=+*#<>—–]/g, ' ').replace(/(?<=\d)[oO](?=\d|\b)/g, '0').replace(/\b[lI](?=\d)/g, '1');
+    const lines = String(text || '').split(/\r?\n/).map(l => fix(l).trim()).filter(Boolean);
+    const ints = l => (l.match(/\d+(?:[.,]\d+)?/g) || []).filter(x => !/[.,]/.test(x)).map(Number);
+    const isPerm = (a, n) => a.length === n && new Set(a).size === n && a.every(x => x >= 1 && x <= 18);
+    const parRe = /\b(par|normale?s?|norm\.?)\b/i, siRe = /(handicap|hcp|hdcp|hdc|hand\.?|index|difficult|stroke|\bs\.?i\.?\b)/i;
+    // --- normales : on garde les 3 à 6, on retire les totaux
+    const parRuns = [];
+    lines.forEach(l => { if (!parRe.test(l)) return; const v = ints(l).filter(x => x >= 3 && x <= 6); if (v.length >= 18) parRuns.push(v.slice(0, 18)); else if (v.length >= 9) parRuns.push(v.slice(0, 9)); });
+    if (!parRuns.length) lines.forEach(l => { const all = ints(l); const v = all.filter(x => x >= 3 && x <= 6); if (v.length >= 9 && v.length >= all.length - 3 && !/\d{3}/.test(l)) parRuns.push(v.length >= 18 ? v.slice(0, 18) : v.slice(0, 9)); });
+    let pars = null;
+    const p18 = parRuns.find(r => r.length === 18); if (p18) pars = p18;
+    else { const nine = parRuns.filter(r => r.length === 9); if (nine.length >= 2) pars = nine[0].concat(nine[1]); }
+    // --- handicaps : chaque nombre de 1 à 18 une seule fois
+    const siRuns = [];
+    const take = l => { const v = ints(l).filter(x => x >= 1 && x <= 18); return v; };
+    lines.forEach(l => { if (!siRe.test(l)) return; const v = take(l); if (v.length >= 18 && isPerm(v.slice(0, 18), 18)) siRuns.push(v.slice(0, 18)); else if (v.length >= 9 && new Set(v.slice(0, 9)).size === 9) siRuns.push(v.slice(0, 9)); });
+    if (!siRuns.length) lines.forEach(l => { const all = ints(l); const v = all.filter(x => x >= 1 && x <= 18); if (v.length >= 9 && v.length === all.length && !(parRe.test(l))) { if (v.length >= 18 && isPerm(v.slice(0, 18), 18)) siRuns.push(v.slice(0, 18)); else if (new Set(v.slice(0, 9)).size === 9 && v.slice(0, 9).some(x => x > 9)) siRuns.push(v.slice(0, 9)); } });
+    let sis = siRuns.find(r => r.length === 18) || null;
+    if (!sis) { const nine = siRuns.filter(r => r.length === 9);
+      outer: for (let i = 0; i < nine.length; i++) for (let j = i + 1; j < nine.length; j++) { const c = nine[i].concat(nine[j]); if (isPerm(c, 18)) { sis = c; break outer; } } }
+    // --- tertres : « Blanc 70,7 / 129 », « Bleu 71.5 129 », « II … 70,7 … 129 »
+    const tees = [], seen = new Set();
+    lines.forEach(l => {
+      const m = l.match(/(\d{2}[.,]\d)\s*(?:\/|-|\s)\s*(\d{2,3})\b/); if (!m) return;
+      const rating = parseFloat(m[1].replace(',', '.')), slope = parseInt(m[2], 10);
+      if (!(rating > 55 && rating < 82) || !(slope >= 55 && slope <= 155)) return;
+      let name = l.slice(0, m.index).replace(/(évaluation|evaluation|rating|slope|course|parcours|hommes?|men|femmes?|women|ladies|[:\/\-–])/gi, ' ').replace(/\s+/g, ' ').trim();
+      name = name.replace(/^[^A-Za-zÀ-ÿ0-9]+/, '').replace(/[^A-Za-zÀ-ÿ0-9]+$/, '');
+      if (!name) name = 'Tertre ' + (tees.length + 1);
+      const key = name.toLowerCase() + rating + slope; if (seen.has(key)) return; seen.add(key);
+      tees.push({ name: name.slice(0, 24), rating, slope });
+    });
+    const nameLine = lines.find(l => /(golf|club)/i.test(l) && !/\d{2}/.test(l));
+    const holes = pars || sis ? Array.from({ length: 18 }, (_, i) => ({ par: pars ? pars[i] : '', si: sis ? sis[i] : '' })) : null;
+    return { name: nameLine ? nameLine.replace(/\s+/g, ' ').slice(0, 60) : '', pars, sis, holes, tees };
+  }
+
+  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, TEAMS, teamFromText, makeTeams, orderTeams, getTeams, teamName, netScore, holeMultiplier, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, cabaneTeam, cabanes, calcText, par3Results, describePar3, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup, resolveName, nextPrompt, trailingTeam, pressTeamOf, initials, leadChanges, totalText, holeNetText, parseCardText };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PellandLogic = api;
 })(this);
