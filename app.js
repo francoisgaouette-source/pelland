@@ -914,7 +914,7 @@
         const id = await Store.newCode();
         const g = { id, createdAt: Date.now(), ownerUid: Store.uid, course: pv.c, courseId: pv.c.id, mode: d.mode, responsable: d.responsable,
           players: pv.ps, teams: draftTeams(d, pv.ps), teamMode: d.teamMode, stake: money(d.stake), leadChangeValue: money(d.leadChangeValue), perPoint: String(d.perPoint || '').trim() === '' ? 1 : money(d.perPoint), currentHole: 1, scores: {}, events: {}, status: 'en cours' };
-        try { await Store.saveGame(g); S.draft = null; openGame(id); const msg = 'Partie créée.'; setHeard('« Créer la partie »'); setReply(msg); Voice.say(msg); }
+        try { await Store.saveGame(g); S.draft = null; openGame(id); toast('Partie créée.'); confirmText(g); }
         catch (e) { toast('Création impossible : ' + e.message); }
       };
     },
@@ -1151,6 +1151,30 @@
     const href = ios ? `sms:/open?addresses=${d}&body=${encodeURIComponent(body)}` : `sms:${d}?body=${encodeURIComponent(body)}`;
     window.__lastSms = href;
     (window.top || window).location.href = href;
+  }
+  // À la création d'une partie : texto aux joueurs pour confirmer leur présence
+  function confirmText(g) {
+    const { nums, missing } = playerNumbers(g); if (!nums.length) return;
+    const T = L.getTeams(g);
+    const date = new Date(g.createdAt || Date.now()).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' });
+    const body = [`Tu es inscrit à la game à Pelland – ${g.course.name.replace(/^Club de golf /i, '')}, ${date}.`,
+      `Bleus : ${T[1].map(i => g.players[i].name).join(', ')}`, `Rouges : ${T[0].map(i => g.players[i].name).join(', ')}`,
+      g.stake ? `La game commence à ${fmt$(money(g.stake))}.` : '',
+      'Confirme ta présence en répondant OUI.', `Suivre la partie : ${inviteLink(g)}`].filter(Boolean).join('\n');
+    if (missing.length) toast(`Pas de numéro pour ${missing.join(', ')}.`);
+    openSms(nums, body);
+  }
+  function playerNumbers(g) {
+    const me = L.norm(ls.get('pelland.me', '') || ''), nums = [], missing = [];
+    g.players.forEach(p => { if (L.norm(p.name) === me) return;
+      const lib = (S.players || []).find(x => L.norm(x.name) === L.norm(p.name));
+      if (lib && lib.phone) nums.push(lib.phone); else missing.push(p.name); });
+    return { nums, missing };
+  }
+  function openSms(nums, text) {
+    const body = encodeURIComponent(text), ios = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
+    const url = ios ? `sms:/open?addresses=${nums.join(',')}&body=${body}` : `sms:${nums.join(',')}?body=${body}`;
+    window.__lastSms = url; (window.top || window).location.href = url;
   }
   function textPlayers(g) {
     const me = L.norm(ls.get('pelland.me', '') || '');
