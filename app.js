@@ -570,10 +570,7 @@
       ${(() => { const t = L.teamPoints(g).tot, d = Math.abs(t[0] - t[1]), k = t[0] > t[1] ? 0 : 1, o = 1 - k;
         const pts = `<div class="lb-pts"><span class="tc1">Bleus <b>${t[1]}</b></span><span class="tc0">Rouges <b>${t[0]}</b></span></div>`;
         if (t[0] === t[1]) return `<div class="leader-box even"><span>Meneurs</span><div><b>Égalité</b><small>0 point net d’écart</small></div>${pts}</div>`;
-        const stake = money(g.stake), lc = L.leadChanges(g), lcv = money(g.leadChangeValue), pp = g.perPoint == null || g.perPoint === '' ? 1 : money(g.perPoint);
-        const p3n = p3.money[k] - p3.money[o];
-        const parts = [[stake, 'game'], [lc * lcv, `${lc} revirement${lc > 1 ? 's' : ''}`], [p3n, 'normales 3'], [d * pp, `${d} pt${d > 1 ? 's' : ''} × ${fmt$(pp)}`]];
-        const tot = parts.reduce((a, x) => a + x[0], 0);
+        const { parts, tot } = leaderMoney(g);
         return `<div class="leader-box t${k}"><span>Meneurs</span><div><b class="tc${k}">${L.TEAMS[k]}</b><small>+${d} point${d > 1 ? 's' : ''} net${d > 1 ? 's' : ''}</small></div>${pts}
           <div class="lb-money"><span>Gain par joueur des ${L.TEAMS[k]} en ce moment</span><b class="tc${k}">${fmt$(tot)}</b></div>
           <div class="lb-detail">${parts.map(([v, l]) => `<span>${v < 0 ? '−' : '+'} ${fmt$(Math.abs(v))} <i>${l}</i></span>`).join('')}</div></div>`; })()}
@@ -581,6 +578,7 @@
         <thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${colOrder.map(i => { const p = g.players[i]; return `<th class="pc tc${teamOf(g, i)}" title="${esc(p.name)}">${esc(ini[i])}</th>`; }).join('')}<th class="col-wide">Statut</th><th class="col-wide">Calcul</th><th class="tc0">Rouge</th><th class="tc1">Bleu</th></tr></thead>
         <tbody>${Array.from({ length: 9 }, (_, i) => row(i + 1)).join('')}${sumRow('Aller', 1, 9)}${Array.from({ length: 9 }, (_, i) => row(i + 10)).join('')}${sumRow('Retour', 10, 18)}${sumRow('Total', 1, 18, true)}</tbody>
       </table></div>
+      <button class="btn sms-btn" data-sms type="button">Texto aux joueurs</button>
         ${owner ? `<div class="row game-actions bottom-actions">${g.status === 'terminée'
           ? '<span class="note">Partie terminée.</span><button class="btn ghost small" data-reopen type="button">Rouvrir</button>'
           : '<button class="btn small" data-finish type="button">Terminer la partie</button>'}
@@ -952,6 +950,7 @@
       v.querySelectorAll('[data-unpress]').forEach(b => b.onclick = () => commit([{ type: 'unpress', hole: hh }]));
       v.querySelectorAll('[data-reroll-team]').forEach(b => b.onclick = () => commit([{ type: 'reroll', hole: hh, on: b.dataset.rerollTeam === '1' }]));
       v.querySelectorAll('[data-detail]').forEach(r => r.onclick = () => holeDetail(+r.dataset.detail));
+      const sm = v.querySelector('[data-sms]'); if (sm) sm.onclick = () => textPlayers(S.game);
       v.querySelectorAll('[data-hole]').forEach(b => b.onclick = () => { const h = +b.dataset.hole; if (isOwner()) holeSheet(h); else { S.game.currentHole = h; render(); } });
     }
   };
@@ -1120,6 +1119,42 @@
   }
   function closeSheet() { $('#sheetWrap').hidden = true; }
   // Saisie manuelle : les 4 scores du trou et la skin, en une seule fois.
+  // Gain par joueur de l'équipe qui mène : game + revirements + normales 3 (net) + points × $/point
+  function leaderMoney(g) {
+    const t = L.teamPoints(g).tot, d = Math.abs(t[0] - t[1]), k = t[0] > t[1] ? 0 : 1, o = 1 - k, p3 = L.par3Results(g);
+    const stake = money(g.stake), lc = L.leadChanges(g), lcv = money(g.leadChangeValue), pp = g.perPoint == null || g.perPoint === '' ? 1 : money(g.perPoint);
+    const parts = [[stake, 'game'], [lc * lcv, `${lc} revirement${lc > 1 ? 's' : ''}`], [p3.money[k] - p3.money[o], 'normales 3'], [d * pp, `${d} pt${d > 1 ? 's' : ''} × ${fmt$(pp)}`]];
+    return { t, d, k, tie: t[0] === t[1], parts, tot: parts.reduce((a, x) => a + x[0], 0) };
+  }
+  // Texto aux joueurs : ouvre Messages avec les numéros et le résumé de la partie
+  function smsSummary(g) {
+    const m = leaderMoney(g), T = L.getTeams(g);
+    const played = Object.keys(g.scores || {}).filter(x => (g.scores[x] || []).some(v => v != null)).map(Number);
+    const last = played.length ? Math.max(...played) : 0, done = g.status === 'terminée';
+    const date = new Date(g.createdAt || Date.now()).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' });
+    const lines = [`La game à Pelland – ${g.course.name.replace(/^Club de golf /i, '')}, ${date}`];
+    lines.push(done ? 'Résultat final :' : last ? `Après ${last} trou${last > 1 ? 's' : ''} :` : 'La partie commence.');
+    if (last) {
+      if (m.tie) lines.push(`Égalité, ${m.t[0]} points chacun.`);
+      else lines.push(`${L.TEAMS[m.k]} ${done ? 'gagnent' : 'mènent'} par ${m.d} point${m.d > 1 ? 's' : ''} nets (Bleus ${m.t[1]} · Rouges ${m.t[0]}).`, `${done ? 'Gain' : 'Gain en ce moment'} : ${fmt$(m.tot)} par joueur pour les ${L.TEAMS[m.k]}.`);
+    }
+    lines.push(`Bleus : ${T[1].map(i => g.players[i].name).join(', ')}`, `Rouges : ${T[0].map(i => g.players[i].name).join(', ')}`);
+    lines.push(inviteLink(g));
+    return lines.join('\n');
+  }
+  function textPlayers(g) {
+    const me = L.norm(ls.get('pelland.me', '') || '');
+    const nums = [], missing = [];
+    g.players.forEach(p => { if (L.norm(p.name) === me) return;
+      const lib = (S.players || []).find(x => L.norm(x.name) === L.norm(p.name));
+      if (lib && lib.phone) nums.push(lib.phone); else missing.push(p.name); });
+    const body = encodeURIComponent(smsSummary(g));
+    const ios = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
+    const url = ios ? `sms:/open?addresses=${nums.join(',')}&body=${body}` : `sms:${nums.join(',')}?body=${body}`;
+    if (missing.length) toast(`Pas de numéro complet pour ${missing.join(', ')} : ajoutez-le dans Joueurs.`);
+    window.__lastSms = url;
+    (window.top || window).location.href = url;
+  }
   // Détail d'un trou (en touchant la ligne de calcul sous le trou)
   function holeDetail(h) {
     const g = S.game; if (!g) return;

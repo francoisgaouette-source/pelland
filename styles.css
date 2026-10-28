@@ -539,3 +539,4 @@ table.sc tr.calc-row td:last-child::after { content: ' ›'; color: var(--muted)
 .lb-money b { font-family: var(--display); font-size: 28px; }
 .lb-detail { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .lb-detail i { font-style: normal; }
+.sms-btn { background: #2f7cf6; color: #fff; width: 100%; max-width: 640px; }
