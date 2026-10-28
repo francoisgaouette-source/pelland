@@ -582,3 +582,5 @@ table.sc tr.calc-row td:last-child::after { content: ' ›'; color: var(--muted)
 table.sc.neuf thead th.pc { width: 15%; }
 .leader-box > .nf-r { display: grid; grid-template-columns: 1fr auto 76px; gap: 10px; align-items: baseline; }
 .offre-d span.grp { color: var(--ink); font-weight: 600; margin-top: 2px; }
+.fixed-course { display: grid; gap: 2px; margin: 4px 0 0; } .fixed-course b { font-size: 19px; }
+.fixed-course { display: grid; gap: 2px; margin: 4px 0 0; } .fixed-course b { font-size: 19px; }

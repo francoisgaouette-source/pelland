@@ -498,7 +498,7 @@
     const out = [];
     (S.offres || []).forEach(o => o.dates.forEach(dt => { if (dt < Date.now() - 864e5) return;
       const names = offreReps(o).filter(r => (r.dates || []).includes(dt)).sort((a, b) => (a.at || 0) - (b.at || 0)).map(r => r.name);
-      out.push({ key: o.id + '|' + dt, label: `${o.course.replace(/^Club de golf /i, '')} – ${fmtDate(dt)}`, names }); }));
+      out.push({ key: o.id + '|' + dt, course: o.course, label: `${o.course.replace(/^Club de golf /i, '')} – ${fmtDate(dt)}`, names }); }));
     return out.sort((a, b) => +a.key.split('|')[1] - +b.key.split('|')[1]);
   }
   function draftFromQuatuor(x) {
@@ -538,6 +538,9 @@
   function vSetup() {
     $('#barTitle').textContent = 'Nouvelle partie';
     const d = S.draft || (S.draft = newDraft());
+    const od = d.offre ? offreDates().find(x => x.key === d.offre) : null;
+    const fromOffre = od ? S.courses.find(x => x.name === od.course) : null;
+    if (fromOffre) d.courseId = fromOffre.id;
     const c = S.courses.find(x => x.id === d.courseId) || S.courses[0];
     if (c && !c.tees.find(t => t.name === d.players[0].tee)) d.players.forEach(p => (p.tee = c.tees[0].name));
     const teeOpts = sel => (c ? c.tees : []).map(t => `<option value="${esc(t.name)}" ${t.name === sel ? 'selected' : ''}>${esc(t.name)}</option>`).join('');
@@ -545,8 +548,8 @@
       ${d.players.map((_, i) => `<datalist id="playerList${i}">${listOptions(d, i)}</datalist>`).join('')}
       <section class="card">
         <div class="step">1 · Terrain</div>
-        <select id="course">${S.courses.map(x => `<option value="${esc(x.id)}" ${x.id === d.courseId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
-        <p class="note">Le terrain n'est pas dans la liste ? Ajoutez-le d'abord dans <b>Terrains</b>, à l'accueil.</p>
+        ${fromOffre ? `<p class="fixed-course"><b>${esc(fromOffre.name)}</b><span class="note">Choisi dans Parties à venir</span></p>` : `<select id="course">${S.courses.map(x => `<option value="${esc(x.id)}" ${x.id === d.courseId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
+        <p class="note">Le terrain n'est pas dans la liste ? Ajoutez-le d'abord dans <b>Terrains</b>, à l'accueil.</p>`}
       </section>
       <section class="card">
         <div class="step">2 à 5 · Joueurs, responsable, index, tertre</div>
@@ -1122,7 +1125,7 @@
         $('#missingNote').textContent = m.length ? 'Il manque ' + m.join(', ') + '.' : '';
         $('#create').disabled = m.length > 0;
       };
-      $('#course').onchange = e => { d.courseId = e.target.value; render(); };
+      if ($('#course')) $('#course').onchange = e => { d.courseId = e.target.value; render(); };
       const op = $('#offPick'); if (op) op.onchange = e => { d.offre = e.target.value || null;
         if (d.offre) { const x = offreDates().find(y => y.key === d.offre), ok = (x ? x.names : []).map(L.norm); d.players.forEach(p => { if (p.name && !ok.includes(L.norm(p.name))) { p.name = ''; p.custom = false; } }); }
         render(); };
