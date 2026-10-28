@@ -516,7 +516,7 @@ table.sc tr.calc-row td:last-child::after { content: ' ›'; color: var(--muted)
 .leader-box { display: grid; gap: 2px; padding: 12px 16px; border-radius: var(--r); background: var(--surface); border: 2px solid var(--line); }
 .leader-box.t0 { border-color: var(--team0); }
 .leader-box.t1 { border-color: var(--team1); }
-.leader-box span { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.leader-box > span { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
 .leader-box b { font-family: var(--display); font-size: 26px; font-weight: 700; }
 .leader-box small { font-family: var(--display); font-size: 22px; font-weight: 700; }
 .leader-box.t0 small { color: var(--team0); } .leader-box.t1 small { color: var(--team1); }
@@ -532,3 +532,10 @@ table.sc tr.calc-row td:last-child::after { content: ' ›'; color: var(--muted)
 .tb-grid .hp .hp-n { opacity: .8; }
 .money-boxes .mbox { align-items: stretch; } .money-boxes .mbox b { align-self: center; text-align: center; margin: auto 0; }
 .tb-grid.two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.lb-pts { display: flex; gap: 16px; font-size: 16px; margin-top: 4px; }
+.lb-pts b { font-family: var(--display); font-size: 20px; }
+.lb-money { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; border-top: 1px solid var(--line); margin-top: 8px; padding-top: 8px; }
+.lb-money span { font-size: 15px; font-weight: 600; }
+.lb-money b { font-family: var(--display); font-size: 28px; }
+.lb-detail { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.lb-detail i { font-style: normal; }
