@@ -543,8 +543,8 @@
           <div class="hole-nav"><button data-nav="-1" aria-label="Trou précédent">‹</button><button data-nav="1" aria-label="Trou suivant">›</button></div>
         </div>
         ${owner ? `<div class="row game-actions">${g.status === 'terminée'
-          ? '<span class="note">Partie terminée et sauvegardée.</span><button class="btn ghost small" data-reopen type="button">Rouvrir</button>'
-          : '<button class="btn small" data-finish type="button">Terminer et sauvegarder</button>'}
+          ? '<span class="note">Partie terminée.</span><button class="btn ghost small" data-reopen type="button">Rouvrir</button>'
+          : '<button class="btn small" data-finish type="button">Terminer la partie</button>'}
           ${S.confirmDelGame === g.id
             ? '<button class="btn small" data-delthis type="button" style="background:var(--red)">Confirmer l\'effacement</button><button class="btn ghost small" data-canceldelgame type="button">Annuler</button>'
             : '<button class="btn ghost small" data-askdelthis type="button">Effacer la partie</button>'}</div>` : ''}
@@ -592,7 +592,7 @@
     const list = S.historyList.filter(g => live ? g.status !== 'terminée' : g.status === 'terminée');
     if (!list.length) return live
       ? '<section class="card"><h2>Aucune partie en cours</h2><p class="note">Les parties apparaissent ici dès leur création, jusqu’à ce que le responsable les termine.</p></section>'
-      : '<section class="card"><h2>Aucune partie terminée</h2><p class="note">Une partie apparaît ici quand le responsable touche « Terminer et sauvegarder ».</p></section>';
+      : '<section class="card"><h2>Aucune partie terminée</h2><p class="note">Une partie apparaît ici quand le responsable touche « Terminer la partie ».</p></section>';
     return `<div class="list">${list.map(g => {
       const d = new Date(g.createdAt);
       const played = Object.keys(g.scores || {}).filter(k => (g.scores[k] || []).some(v => v != null)).length;
@@ -929,7 +929,7 @@
       const inv = v.querySelector('[data-invite]'); if (inv) inv.onclick = () => invitePlayers(S.game);
       const fin = v.querySelector('[data-finish]'); if (fin) fin.onclick = async () => {
         const ng = JSON.parse(JSON.stringify(S.game)); ng.status = 'terminée'; ng.finishedAt = Date.now();
-        try { await Store.saveGame(ng); S.game = ng; toast('Partie terminée et sauvegardée dans l\'historique.'); ls.set('pelland.lastGame', null); go('home'); } catch (e) { toast('Sauvegarde impossible : ' + e.message); }
+        try { await Store.saveGame(ng); S.game = ng; toast('Partie terminée : elle est dans Parties jouées.'); ls.set('pelland.lastGame', null); go('home'); } catch (e) { toast('Impossible de terminer : ' + e.message); }
       };
       const reo = v.querySelector('[data-reopen]'); if (reo) reo.onclick = async () => { const ng = JSON.parse(JSON.stringify(S.game)); ng.status = 'en cours'; delete ng.finishedAt; S.game = ng; render(); await Store.saveGame(ng); };
       const ask = v.querySelector('[data-askdelthis]'); if (ask) ask.onclick = () => { S.confirmDelGame = S.game.id; render(); };
