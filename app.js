@@ -573,14 +573,7 @@
         <thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${colOrder.map(i => { const p = g.players[i]; return `<th class="pc tc${teamOf(g, i)}" title="${esc(p.name)}">${esc(ini[i])}</th>`; }).join('')}<th class="col-wide">Statut</th><th class="col-wide">Calcul</th><th class="tc0">Rouge</th><th class="tc1">Bleu</th></tr></thead>
         <tbody>${Array.from({ length: 9 }, (_, i) => row(i + 1)).join('')}${sumRow('Aller', 1, 9)}${Array.from({ length: 9 }, (_, i) => row(i + 10)).join('')}${sumRow('Retour', 10, 18)}${sumRow('Total', 1, 18, true)}</tbody>
       </table></div>
-      <div class="legend"><span>★ responsable de la partie (il entre les scores)</span><span>${BALL} coup reçu · petit chiffre = net</span><span>Calcul : ↓ plus bas net · ↑ plus haut net · R/B équipe qui reçoit · ×2 press · ×4 reroll · S skin · C cabane · $ normale 3 · = résultat net</span><span>Noms à la couleur de l'équipe : <b class="tc1">Bleus</b> · <b class="tc0">Rouges</b></span><span>${g.players.map((p, i) => `<b class="tc${teamOf(g, i)}">${esc(ini[i])}</b> ${esc(p.name)}`).join(' · ')}</span><span class="narrow-only">Sous chaque trou : statut (Normal, Press, Reroll) et calcul des points</span></div>
-      <section class="card">
-        <h2>${owner ? 'Vous êtes le responsable' : 'Vous suivez la partie'}</h2>
-        <p class="note">${owner
-          ? 'Touchez un joueur pour entrer les 4 scores et la skin du trou. Touchez une case de la carte pour corriger un autre trou. Le bouton Press apparaît sous l\'équipe en déficit, puis Reroll sous l\'autre.'
-          : 'La carte se met à jour en direct à chaque score entré par le responsable.'}</p>
-        ${Store.mode === 'firebase' ? `<p class="note">Code à donner aux autres joueurs : <b class="num" style="font-size:22px;letter-spacing:.15em">${esc(g.id)}</b></p>` : ''}
-      </section>`;
+      <div class="legend"><span>★ responsable de la partie (il entre les scores)</span><span>${BALL} coup reçu · petit chiffre = net</span><span>Calcul : ↓ plus bas net · ↑ plus haut net · R/B équipe qui reçoit · ×2 press · ×4 reroll · S skin · C cabane · $ normale 3 · = résultat net</span><span>Noms à la couleur de l'équipe : <b class="tc1">Bleus</b> · <b class="tc0">Rouges</b></span><span>${g.players.map((p, i) => `<b class="tc${teamOf(g, i)}">${esc(ini[i])}</b> ${esc(p.name)}`).join(' · ')}</span><span class="narrow-only">Sous chaque trou : statut (Normal, Press, Reroll) et calcul des points</span></div>`;
   }
 
   // ---------------- Historique ----------------
