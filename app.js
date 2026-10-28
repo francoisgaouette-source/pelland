@@ -523,6 +523,7 @@
   function syncCount(d) { d.count = filledIdx(d).length === 3 ? 3 : 4; return d.count; }
   function missingList(d) {
     const out = [], idx = filledIdx(d);
+    if (offreDates().length && !d.offre) return ['la date de la partie'];
     if (idx.length < 3) d.players.forEach((p, i) => { if (i < 3 && !String(p.name || '').trim()) out.push(`le nom du joueur ${i + 1}`); });
     idx.forEach(i => { const p = d.players[i];
       if (!String(p.index).trim()) out.push(`l'index de ${p.name.trim()}`);
@@ -608,11 +609,13 @@
   function playerPicker(d, i) {
     const p = d.players[i];
     const inLib = S.players.some(x => L.norm(x.name) === L.norm(p.name || ''));
-    const custom = !S.players.length || p.custom || (p.name && !inLib);
+    const needDate = offreDates().length > 0, custom = !S.players.length;
     const taken = d.players.map((q, j) => j !== i ? L.norm(q.name || '') : '').filter(Boolean);
     const dispo = d.offre ? ((offreDates().find(x => x.key === d.offre) || {}).names || []).map(L.norm) : null;
-    const opts = S.players.filter(x => !taken.includes(L.norm(x.name)) && (!dispo || dispo.includes(L.norm(x.name)) || L.norm(x.name) === L.norm(p.name || '')));
-    const sel = S.players.length ? `<select id="ps${i}"><option value="">— Choisir —</option>${opts.map(x => `<option value="${esc(x.name)}" ${!custom && L.norm(x.name) === L.norm(p.name || '') ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}<option value="__other" ${custom ? 'selected' : ''}>Autre (taper le nom)…</option></select>` : '';
+    if (needDate && !d.offre) return `<select id="ps${i}" disabled><option>— Choisissez d’abord la date —</option></select>`;
+    const opts = S.players.filter(x => !taken.includes(L.norm(x.name)) && (!dispo || dispo.includes(L.norm(x.name))));
+    void inLib;
+    const sel = S.players.length ? `<select id="ps${i}"><option value="">— Choisir —</option>${opts.map(x => `<option value="${esc(x.name)}" ${!custom && L.norm(x.name) === L.norm(p.name || '') ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>` : '';
     const inp = custom ? `<input id="pn${i}" type="text" value="${esc(p.name)}" placeholder="Prénom et nom" autocapitalize="words" ${S.players.length ? 'style="margin-top:6px"' : ''}>` : '';
     return sel + inp;
   }
