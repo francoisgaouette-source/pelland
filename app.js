@@ -451,8 +451,7 @@
   // « Claude : 12 − 7 = 5 coups (trous de difficulté 1 à 5) »
   function coupsCalc(ps, mode) {
     const lo = Math.min(...ps.map(p => p.courseHandicap));
-    const where = n => n <= 0 ? 'aucun coup' : n <= 18 ? `trous de difficulté 1 à ${n}` : `1 coup partout + un 2<sup>e</sup> sur les trous 1 à ${n - 18}`;
-    return '<span class="coups-calc">' + ps.map(p => `<span><b>${esc(p.name)}</b> : ${mode === 'full' ? `Hcp ${p.courseHandicap}` : `${p.courseHandicap} − ${lo}`} = <b>${p.strokes} coup${Math.abs(p.strokes) > 1 ? 's' : ''}</b>${p.strokes > 0 ? ` (${where(p.strokes)})` : ''}</span>`).join('') + '</span>';
+    return '<span class="coups-calc">' + ps.map(p => `<span><b>${esc(p.name)}</b> : ${mode === 'full' ? `Hcp ${p.courseHandicap}` : `${p.courseHandicap} − ${lo}`} = <b>${p.strokes} coup${Math.abs(p.strokes) > 1 ? 's' : ''}</b></span>`).join('') + '</span>';
   }
   const teamOf = (g, i) => L.getTeams(g).findIndex(x => x.includes(i));
   // Résumé : Bleus à gauche, Rouges à droite ; nom, index, score ; points et argent de l'équipe.
