@@ -576,7 +576,7 @@
         const parts = [[stake, 'game'], [lc * lcv, `${lc} revirement${lc > 1 ? 's' : ''}`], [p3n, 'normales 3'], [d * pp, `${d} pt${d > 1 ? 's' : ''} × ${fmt$(pp)}`]];
         const tot = parts.reduce((a, x) => a + x[0], 0);
         return `<div class="leader-box t${k}"><span>Meneurs</span><div><b class="tc${k}">${L.TEAMS[k]}</b><small>+${d} point${d > 1 ? 's' : ''} net${d > 1 ? 's' : ''}</small></div>${pts}
-          <div class="lb-money"><span>Gain des ${L.TEAMS[k]} en ce moment</span><b class="tc${k}">${fmt$(tot)}</b></div>
+          <div class="lb-money"><span>Gain par joueur des ${L.TEAMS[k]} en ce moment</span><b class="tc${k}">${fmt$(tot)}</b></div>
           <div class="lb-detail">${parts.map(([v, l]) => `<span>${v < 0 ? '−' : '+'} ${fmt$(Math.abs(v))} <i>${l}</i></span>`).join('')}</div></div>`; })()}
       <div class="card-scroll"><table class="sc">
         <thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${colOrder.map(i => { const p = g.players[i]; return `<th class="pc tc${teamOf(g, i)}" title="${esc(p.name)}">${esc(ini[i])}</th>`; }).join('')}<th class="col-wide">Statut</th><th class="col-wide">Calcul</th><th class="tc0">Rouge</th><th class="tc1">Bleu</th></tr></thead>
