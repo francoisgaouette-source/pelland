@@ -591,7 +591,7 @@
       const played = Object.keys(g.scores || {}).filter(k => (g.scores[k] || []).some(v => v != null)).length;
       const t = L.teamPoints(g).tot;
       const res = t[0] === t[1] ? 'égalité' : `${L.TEAMS[t[0] > t[1] ? 0 : 1]} +${Math.abs(t[0] - t[1])}`;
-      const mine = g.ownerUid === Store.uid;
+      const mine = Store.mode !== 'firebase' || !!Store.email;
       const done = g.status === 'terminée';
       return `<div class="item hist ${done ? 'done' : ''}"><button class="hist-open" data-open="${esc(g.id)}" type="button"><b>${d.toLocaleDateString('fr-CA', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })} · ${esc(g.course.name.replace(/^Club de golf /i, ''))}</b>
         <span><span class="hist-st">${done ? 'Terminée' : 'En cours'}</span> ${g.players.map(p => esc(p.name)).join(', ')} · ${played}/18 trous · ${res}</span></button>
@@ -791,7 +791,7 @@
       v.querySelectorAll('[data-askdelgame]').forEach(b => b.onclick = () => { S.confirmDelGame = b.dataset.askdelgame; render(); });
       v.querySelectorAll('[data-canceldelgame]').forEach(b => b.onclick = () => { S.confirmDelGame = null; render(); });
       v.querySelectorAll('[data-delgame]').forEach(b => b.onclick = async () => {
-        try { await removeGame(b.dataset.delgame); S.historyList = S.historyList.filter(x => x.id !== b.dataset.delgame); S.confirmDelGame = null; toast('Partie effacée.'); render(); }
+        try { await removeGame(b.dataset.delgame, S.historyList.find(x => x.id === b.dataset.delgame)); S.historyList = S.historyList.filter(x => x.id !== b.dataset.delgame); S.confirmDelGame = null; toast('Partie effacée.'); render(); }
         catch (e) { toast('Effacement impossible : ' + e.message); }
       });
     },
@@ -963,7 +963,9 @@
       sh.querySelector('[data-close]').onclick = closeSheet;
     });
   }
-  async function removeGame(id) {
+  async function removeGame(id, g) {
+    // une partie créée par un autre membre (ou avant la connexion par téléphone) : on en devient responsable, puis on l'efface
+    if (g && g.ownerUid !== Store.uid) { const ng = JSON.parse(JSON.stringify(g)); ng.ownerUid = Store.uid; await Store.saveGame(ng); }
     await Store.deleteGame(id);
     if (ls.get('pelland.lastGame', null) === id) { ls.set('pelland.lastGame', null); ls.set('pelland.lastGameInfo', null); }
   }
