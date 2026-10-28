@@ -547,8 +547,8 @@
           ? `<div class="row game-actions"><button class="btn small" data-claim type="button">Oui, je deviens responsable</button><button class="btn ghost small" data-cancelclaim type="button">Annuler</button></div>`
           : `<div class="row game-actions"><button class="btn ghost small light" data-askclaim type="button">Devenir responsable de cette partie</button><span class="note light">pour entrer les scores, la terminer ou l'effacer</span></div>`) : ''}
         <div class="money-boxes">
-          <div class="mbox green"><span>La game commence à</span><b>${g.stake ? fmt$(g.stake) : '—'}</b></div>
-          <div class="mbox green"><span>À chaque revirement</span><b>${L.leadChanges(g)}${g.leadChangeValue ? ` · ${fmt$(L.leadChanges(g) * g.leadChangeValue)}` : ''}</b></div>
+          <div class="mbox green"><span>La game commence à</span><b>${g.stake ? fmt$(money(g.stake)) : '—'}</b></div>
+          <div class="mbox green"><span>À chaque revirement</span><b>${g.leadChangeValue ? fmt$(L.leadChanges(g) * money(g.leadChangeValue)) : '—'}</b></div>
         </div>
         <div class="team-blocks">${[1, 0].map(k => { const tm = L.getTeams(g)[k], teamPts = L.teamPoints(g).tot;
           const tt = L.trailingTeam(g, h), pt = L.pressTeamOf(g, h), started = ((g.scores || {})[h] || []).some(v => v != null);
