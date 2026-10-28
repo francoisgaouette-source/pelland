@@ -521,7 +521,7 @@
       if (hp) { cum[0] += hp[0]; cum[1] += hp[1]; }
       const tot = hp ? leadHtml(cum) : '';
       const calcTxt = esc(calc.replace(/^ · /, '').trim());
-      const sub = (status || calcTxt) ? `<tr class="calc-row ${hole === h ? 'cur' : ''}"><td colspan="3"></td><td colspan="6">${status ? `<i class="${status === 'Normal' ? '' : 'p'}">${status}</i> ` : ''}${calcTxt}</td></tr>` : '';
+      const sub = (status || calcTxt) ? `<tr class="calc-row ${hole === h ? 'cur' : ''}" data-detail="${hole}"><td colspan="3"></td><td colspan="6">${status ? `<i class="${status === 'Normal' ? '' : 'p'}">${status}</i> ` : ''}${calcTxt}</td></tr>` : '';
       return `<tr class="${hole === h ? 'cur' : ''} ${sub ? 'has-sub' : ''}"><th class="h"><button class="cell" data-hole="${hole}" style="font-size:19px">${hole}</button></th><td class="m">${ih.par}</td><td class="m">${ih.si}</td>${cells}<td class="stat col-wide"><div class="ev">${st.join('')}</div></td><td class="calc col-wide">${calcTxt}</td><td class="tp0">${hp ? hp[0] : ''}</td><td class="tp1">${hp ? hp[1] : ''}</td></tr>${sub}`;
     };
     const sumRow = (label, from, to, final) => {
@@ -937,6 +937,7 @@
       v.querySelectorAll('[data-press-team]').forEach(b => b.onclick = () => commit([{ type: 'press', hole: hh, team: +b.dataset.pressTeam, player: null }]));
       v.querySelectorAll('[data-unpress]').forEach(b => b.onclick = () => commit([{ type: 'unpress', hole: hh }]));
       v.querySelectorAll('[data-reroll-team]').forEach(b => b.onclick = () => commit([{ type: 'reroll', hole: hh, on: b.dataset.rerollTeam === '1' }]));
+      v.querySelectorAll('[data-detail]').forEach(r => r.onclick = () => holeDetail(+r.dataset.detail));
       v.querySelectorAll('[data-hole]').forEach(b => b.onclick = () => { const h = +b.dataset.hole; if (isOwner()) holeSheet(h); else { S.game.currentHole = h; render(); } });
     }
   };
@@ -1105,6 +1106,27 @@
   }
   function closeSheet() { $('#sheetWrap').hidden = true; }
   // Saisie manuelle : les 4 scores du trou et la skin, en une seule fois.
+  // Détail d'un trou (en touchant la ligne de calcul sous le trou)
+  function holeDetail(h) {
+    const g = S.game; if (!g) return;
+    const ih = L.holeInfo(g, h, 0), e = (g.events || {})[h] || {}, mult = L.holeMultiplier(g, h);
+    const order = [...L.getTeams(g)[1], ...L.getTeams(g)[0]];
+    const rows = order.map(pi => { const p = g.players[pi], s = L.getScore(g, h, pi), k = L.strokesOnHole(p.strokes, ih.si);
+      return `<tr><td class="tc${teamOf(g, pi)}">${esc(p.name)}</td><td>${s == null ? '—' : s}</td><td>${k > 0 ? BALL.repeat(k) : k < 0 ? '○'.repeat(-k) : '—'}</td><td><b>${s == null ? '—' : s - k}</b></td></tr>`; }).join('');
+    const lines = [];
+    lines.push(`<b>Statut :</b> ${e.reroll ? 'Reroll (points ×4)' : (e.presses || []).length ? 'Press (points ×2)' : 'Normal'}`);
+    const pts = L.describeHolePoints(g, h); if (pts) lines.push(`<b>Points :</b> ${esc(pts)}${mult > 1 ? ` Multipliés par ${mult}.` : ''}`);
+    const sk = L.describeSkin(g, h); if (sk) lines.push(`<b>Skin :</b> ${esc(sk)}`);
+    const p3 = L.describePar3(g, h); if (p3) lines.push(`<b>Normale 3 :</b> ${esc(p3)}`);
+    const hp = L.holeTotal(g, h); if (hp) lines.push(`<b>Résultat du trou :</b> <span class="tc0">Rouges ${hp[0]}</span> · <span class="tc1">Bleus ${hp[1]}</span>`);
+    const cum = [0, 0]; for (let x = 1; x <= h; x++) { const t = L.holeTotal(g, x); if (t) { cum[0] += t[0]; cum[1] += t[1]; } }
+    if (hp) lines.push(`<b>Après ce trou :</b> ${cum[0] === cum[1] ? 'égalité' : cum[0] > cum[1] ? `<span class="tc0">Rouges ${cum[0]}</span> · Bleus ${cum[1]}` : `<span class="tc1">Bleus ${cum[1]}</span> · Rouges ${cum[0]}`}`);
+    openSheet(`<h3>Trou ${h}</h3><p class="note" style="margin-top:-8px">Normale ${ih.par} · Handicap ${ih.si}</p>
+      <table class="detail-t"><thead><tr><th>Joueur</th><th>Brut</th><th>Coups</th><th>Net</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="detail-lines">${lines.map(l => `<p>${l}</p>`).join('')}</div>
+      <p class="note">Calcul abrégé : ${esc(L.calcText(g, h).replace(/^ · /, ''))}</p>
+      <div class="sheet-actions"><button class="btn" data-close type="button">Fermer</button></div>`, sh => { sh.querySelector('[data-close]').onclick = closeSheet; });
+  }
   function allScoresSheet(h) {
     const g = S.game, P = g.players;
     const vals = P.map((p, pi) => L.getScore(g, h, pi));
