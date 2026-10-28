@@ -585,3 +585,4 @@ table.sc.neuf thead th.pc { width: 15%; }
 .fixed-course { display: grid; gap: 2px; margin: 4px 0 0; } .fixed-course b { font-size: 19px; }
 .fixed-course { display: grid; gap: 2px; margin: 4px 0 0; } .fixed-course b { font-size: 19px; }
 .opt { font-weight: 400; color: var(--muted); font-size: 12px; }
+.dispo-btns { gap: 8px; } .dispo-btns .btn { flex: 1; }

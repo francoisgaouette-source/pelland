@@ -429,7 +429,7 @@
     return `<section class="card"><h2>${esc(o.course)}</h2>
       <p class="note">${past ? 'La date butoir est passée : les réponses sont fermées.' : `Cochez les dates où vous êtes disponible, avant le <b>${esc(fmtDay(o.deadline))}</b>.`}</p>
       <div class="dispo">${o.dates.map(dt => `<button type="button" class="dispo-d" data-dispo="${dt}" aria-pressed="${sel.includes(dt)}" ${past ? 'disabled' : ''}><b>${sel.includes(dt) ? '✓' : ''}</b><span>${esc(fmtDate(dt))}</span></button>`).join('')}</div>
-      ${past ? '' : `<button class="btn" id="dispoSave" type="button">Enregistrer mes disponibilités</button>`}
+      <div class="row dispo-btns">${past ? '' : `<button class="btn" id="dispoSave" type="button">Enregistrer</button>`}<button class="btn ghost" id="dispoCancel" type="button">${past ? 'Retour' : 'Annuler'}</button></div>
       ${o[key] ? `<p class="note">Réponse enregistrée${sel.length ? '' : ' : aucune date'}.</p>` : ''}</section>`;
   }
   // Tailles des groupes : le plus de 4 possible, des groupes de 3 au besoin (5 → 4 + 1 en attente)
@@ -964,10 +964,11 @@
     offre(v) {
       commonNav(v);
       v.querySelectorAll('[data-dispo]').forEach(b => b.onclick = () => { const dt = +b.dataset.dispo, a = S.offreSel; const i = a.indexOf(dt); if (i >= 0) a.splice(i, 1); else a.push(dt); render(); });
+      const cn = $('#dispoCancel'); if (cn) cn.onclick = () => { history.replaceState(null, '', location.pathname); go('home'); };
       const sv = $('#dispoSave'); if (sv) sv.onclick = async () => {
         const me = ls.get('pelland.me', '') || ''; if (!me) return toast('Connectez-vous d’abord.');
         const rep = { name: me, dates: S.offreSel.slice().sort(), at: Date.now() };
-        try { await Store.saveOffre({ id: S.offre.id, ['rep_' + presKey(me)]: rep }, true); S.offre['rep_' + presKey(me)] = rep; toast('Disponibilités enregistrées. Merci !'); render(); }
+        try { await Store.saveOffre({ id: S.offre.id, ['rep_' + presKey(me)]: rep }, true); S.offre['rep_' + presKey(me)] = rep; render(); }
         catch (e) { toast('Enregistrement impossible : ' + e.message); }
       };
     },
