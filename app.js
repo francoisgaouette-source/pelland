@@ -617,13 +617,13 @@
   function vLogin() {
     $('#barTitle').textContent = 'Pelland';
     $('#back').hidden = true;
-    const me = ls.get('pelland.me', '');
+    const me = ls.get('pelland.me', ''), invited = new URLSearchParams(location.search).get('joueur');
     return `<div class="hero"><h1>La game à Pelland</h1><p>Réservé aux joueurs du groupe.</p></div>
       <section class="card"><h2>Connexion</h2>
-        <label>Votre nom<select id="loginName"><option value="">— Choisir —</option>${S.players.map(p => `<option value="${esc(p.id)}" ${p.name === me ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
+        <label>Votre nom<select id="loginName"><option value="">— Choisir —</option>${S.players.map(p => `<option value="${esc(p.id)}" ${(invited ? p.id === invited : p.name === me) ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
         <label>Votre numéro de téléphone<input id="loginPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="450 555-1234"></label>
         <button class="btn" id="loginBtn" type="button">Entrer</button>
-        <p class="note" id="loginMsg">Votre numéro sert de mot de passe. Il n'est visible par personne.</p>
+        <p class="note" id="loginMsg">Votre numéro sert de mot de passe. Seuls les joueurs du groupe peuvent le voir.</p>
       </section>`;
   }
   function vPlayers() {
@@ -767,7 +767,7 @@
         const near = duplicateMap(S.players.concat([{ id: '__new', name: n }]))['__new'];
         if (near && S.confirmAdd !== n) { S.confirmAdd = n; return toast(`Ressemble à ${near.join(', ')}. Touchez Ajouter de nouveau pour confirmer.`); }
         S.confirmAdd = null;
-        try { const np = await Store.savePlayer(n); const ph = $('#newPhone').value.trim(); if (ph) await Store.setPhone(np, ph); S.players = await Store.listPlayers(); toast(`${n} ajouté${ph ? ' avec son téléphone' : ''}.`); render(); if (ph) inviteText(n, ph); else setTimeout(() => $('#newPlayer') && $('#newPlayer').focus(), 50); }
+        try { const np = await Store.savePlayer(n); const ph = $('#newPhone').value.trim(); if (ph) await Store.setPhone(np, ph); S.players = await Store.listPlayers(); toast(`${n} ajouté${ph ? ' avec son téléphone' : ''}.`); render(); if (ph) inviteText(n, ph, np.id); else setTimeout(() => $('#newPlayer') && $('#newPlayer').focus(), 50); }
         catch (e) { toast('Ajout impossible : ' + e.message); }
       };
       $('#addPlayer').onclick = add;
@@ -783,7 +783,7 @@
           <div class="row"><button class="btn small" id="phSave" type="button">Enregistrer</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`, sh => {
           sh.querySelector('[data-close]').onclick = closeSheet;
           sh.querySelector('#phSave').onclick = async () => {
-            try { const first = !pl.authEmail, ph = sh.querySelector('#phIn').value; await Store.setPhone(pl, ph); closeSheet(); S.players = await Store.listPlayers(); toast('Téléphone enregistré.'); render(); if (first) inviteText(pl.name, ph); }
+            try { const first = !pl.authEmail, ph = sh.querySelector('#phIn').value; await Store.setPhone(pl, ph); closeSheet(); S.players = await Store.listPlayers(); toast('Téléphone enregistré.'); render(); if (first) inviteText(pl.name, ph, pl.id); }
             catch (e) { toast(e.message.includes('auth/') ? 'Impossible : vérifiez que Email/Password est activé dans Firebase.' : e.message); }
           };
           setTimeout(() => { const i = sh.querySelector('#phIn'); i.focus(); i.select(); }, 50);
@@ -1143,10 +1143,10 @@
     return lines.join('\n');
   }
   // Texto d'invitation quand on ajoute un joueur avec son téléphone
-  function inviteText(name, phone) {
+  function inviteText(name, phone, id) {
     const d = String(phone || '').replace(/\D/g, ''); if (d.length < 10) return;
-    const url = location.origin + location.pathname;
-    const body = `Salut ${name.split(' ')[0]} ! Tu as été invité à te joindre à la game à Pelland. Ouvre l’app : ${url} — connecte-toi avec ton nom et ton numéro de téléphone (${fmtPhone(d)}). Sur iPhone : bouton Partager, puis « Sur l’écran d’accueil ».`;
+    const url = location.origin + location.pathname + (id ? '?joueur=' + encodeURIComponent(id) : '');
+    const body = `Salut ${name.split(' ')[0]} ! Tu as été invité à te joindre à la game à Pelland. Ouvre l’app : ${url} — ton nom est déjà choisi, entre seulement ton numéro de téléphone (${fmtPhone(d)}) pour te connecter. Sur iPhone : bouton Partager, puis « Sur l’écran d’accueil ».`;
     const ios = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
     const href = ios ? `sms:/open?addresses=${d}&body=${encodeURIComponent(body)}` : `sms:${d}?body=${encodeURIComponent(body)}`;
     window.__lastSms = href;
