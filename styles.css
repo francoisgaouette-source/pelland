@@ -552,3 +552,17 @@ table.sc tr.calc-row td:last-child::after { content: ' ›'; color: var(--muted)
 .pres-btns .on-no { border-color: var(--red); color: var(--red); }
 .toast { top: calc(72px + env(safe-area-inset-top, 0px)); bottom: auto; }
 .quat-picks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; } .item.quat { display: flex; align-items: center; justify-content: space-between; gap: 8px; } .item.quat span { display: block; font-size: 14px; color: var(--muted); }
+/* Offres de parties */
+.offre-form { display: grid; gap: 8px; } .offre-form .lbl { font-size: 14px; color: var(--muted); font-weight: 500; }
+.offre-form input[type=date], .offre-form input[type=datetime-local] { width: 100%; min-height: 46px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; background: var(--bg); color: var(--ink); font-size: 17px; }
+.offre-form .x { height: 46px; width: 44px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.offre { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; display: grid; gap: 8px; }
+.offre-h { display: grid; } .offre-h small { color: var(--muted); font-size: 14px; }
+.offre-d { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; }
+.offre-d span:not(.cnt) { display: block; font-size: 14px; color: var(--muted); }
+.offre-d .cnt { font-family: var(--display); font-weight: 700; font-size: 20px; min-width: 28px; text-align: center; border-radius: 99px; background: var(--line); padding: 2px 8px; }
+.offre-d .cnt.ok { background: #2fb36b; color: #fff; }
+.dispo { display: grid; gap: 8px; margin: 8px 0; }
+.dispo-d { display: grid; grid-template-columns: 32px 1fr; align-items: center; gap: 10px; text-align: left; min-height: 54px; padding: 8px 12px; border: 2px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--ink); font-size: 17px; }
+.dispo-d b { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; }
+.dispo-d[aria-pressed=true] { border-color: #2fb36b; } .dispo-d[aria-pressed=true] b { background: #2fb36b; border-color: #2fb36b; color: #fff; }

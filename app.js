@@ -153,6 +153,23 @@
       if (this.mode === 'firebase') { await this.db.collection('players').doc('_quatuors').set({ list, updatedAt: Date.now() }); return; }
       ls.set('pelland.quatuors', list);
     },
+    // Offres de parties : players/_offre_<id> = { id, course, dates:[ms], deadline:ms, by, createdAt, rep_<joueur>: { name, dates:[ms], at } }
+    async listOffres() {
+      if (this.mode === 'firebase') { try { const sn = await this.db.collection('players').get(); return sn.docs.filter(d => d.id.startsWith('_offre_')).map(d => d.data()).sort((a, b) => b.createdAt - a.createdAt); } catch (e) { return []; } }
+      return Object.values(ls.get('pelland.offres', {})).sort((a, b) => b.createdAt - a.createdAt);
+    },
+    async getOffre(id) {
+      if (this.mode === 'firebase') { const d = await this.db.collection('players').doc('_offre_' + id).get(); return d.exists ? d.data() : null; }
+      return ls.get('pelland.offres', {})[id] || null;
+    },
+    async saveOffre(o, merge) {
+      if (this.mode === 'firebase') { await this.db.collection('players').doc('_offre_' + o.id).set(o, merge ? { merge: true } : undefined); return; }
+      const all = ls.get('pelland.offres', {}); all[o.id] = merge ? { ...(all[o.id] || {}), ...o } : o; ls.set('pelland.offres', all);
+    },
+    async deleteOffre(id) {
+      if (this.mode === 'firebase') { await this.db.collection('players').doc('_offre_' + id).delete(); return; }
+      const all = ls.get('pelland.offres', {}); delete all[id]; ls.set('pelland.offres', all);
+    },
     async savePlayer(name) {
       const p = { id: slug(name) + '-' + Math.random().toString(36).slice(2, 6), name: name.trim(), updatedAt: Date.now() };
       if (this.mode === 'firebase') { await this.db.collection('players').doc(p.id).set(p); return p; }
@@ -313,6 +330,8 @@
     if (S.unwatchPres && view !== 'game') { S.unwatchPres(); S.unwatchPres = null; }
     if (view !== 'game' && view !== 'setup' && Voice.wake) Voice.setWake(false);
     S.view = view; Object.assign(S, opts);
+    if (view === 'quatuors') { Store.listOffres().then(l => { S.offres = l; if (S.view === 'quatuors') render(); }); Store.listQuatuors().then(l => { S.quatuors = l; }); }
+    if (view === 'offre') { S.offre = undefined; S.offreSel = null; }
     if (view === 'course' && 'editCourse' in opts) { S.cardImgs = []; S.cardStatus = ''; }
     if (view === 'history' || view === 'live') { S.historyList = null; S.confirmDelGame = null; }
     if (view === 'setup') { setHeard('Touchez le micro et dites les joueurs et leurs index.'); setReply(''); }
@@ -327,7 +346,7 @@
     const showDock = false; // plus d'interface vocale
     document.body.classList.toggle('view-game', S.view === 'game');
     $('#dock').hidden = !showDock; document.body.classList.toggle('no-dock', !showDock);
-    const R = { home: vHome, quatuors: vQuatuors, setup: vSetup, game: vGame, join: vJoin, history: vHistory, live: vHistory, courses: vCourses, course: vCourse, players: vPlayers, login: vLogin }[S.view];
+    const R = { home: vHome, quatuors: vQuatuors, offre: vOffre, setup: vSetup, game: vGame, join: vJoin, history: vHistory, live: vHistory, courses: vCourses, course: vCourse, players: vPlayers, login: vLogin }[S.view];
     v.innerHTML = R();
     bind[S.view] && bind[S.view](v);
   }
@@ -359,7 +378,7 @@
     const q = S.quatuors || [], nq = S.newQuat || (S.newQuat = { name: '', players: ['', '', '', ''] });
     const opts = i => { const taken = nq.players.filter((x, j) => j !== i && x).map(L.norm);
       return `<option value="">— Joueur ${i + 1} —</option>` + S.players.filter(p => !taken.includes(L.norm(p.name))).map(p => `<option value="${esc(p.name)}" ${p.name === nq.players[i] ? 'selected' : ''}>${esc(p.name)}</option>`).join(''); };
-    return `<section class="card"><h2>Nouveau quatuor</h2>
+    return `${offresHtml()}<section class="card"><h2>Nouveau quatuor</h2>
         <label>Nom du quatuor (facultatif)<input id="qname" type="text" value="${esc(nq.name)}" placeholder="ex. Les habitués du mardi"></label>
         <div class="quat-picks">${[0, 1, 2, 3].map(i => `<select data-qp="${i}">${opts(i)}</select>`).join('')}</div>
         <button class="btn" id="qsave" type="button">Enregistrer le quatuor</button>
@@ -371,6 +390,50 @@
             ? `<button class="btn small" data-qdel="${esc(x.id)}" type="button" style="background:var(--red)">Retirer</button><button class="btn ghost small" data-qcancel type="button">Annuler</button>`
             : `<button class="btn small" data-qplay="${esc(x.id)}" type="button">Jouer</button><button class="btn ghost small" data-qask="${esc(x.id)}" type="button">Retirer</button>`}</span></div>`).join('')
         : '<p class="note">Aucun quatuor pour l’instant. Un quatuor remplit les 4 joueurs d’une nouvelle partie en un geste.</p>'}</div>`;
+  }
+  // ---------------- Offres de parties ----------------
+  const fmtDate = ms => new Date(ms).toLocaleString('fr-CA', { weekday: 'short', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' }).replace(' h 00', ' h').replace(/(\d+):(\d+)/, '$1 h $2');
+  const fmtDay = ms => new Date(ms).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' });
+  const offreReps = o => Object.keys(o).filter(k => k.startsWith('rep_')).map(k => o[k]);
+  function offresHtml() {
+    const f = S.newOffre;
+    const list = (S.offres || []).map(o => {
+      const reps = offreReps(o), past = Date.now() > o.deadline;
+      return `<div class="offre"><div class="offre-h"><b>${esc(o.course)}</b><small>${past ? 'Réponses fermées' : 'Réponses avant le ' + esc(fmtDay(o.deadline))} · ${reps.length} réponse${reps.length > 1 ? 's' : ''}</small></div>
+        ${o.dates.map(dt => { const yes = reps.filter(r => (r.dates || []).includes(dt)).map(r => r.name);
+          return `<div class="offre-d"><div><b>${esc(fmtDate(dt))}</b><span>${yes.length ? esc(yes.join(', ')) : 'Personne pour l’instant'}</span></div><span class="cnt ${yes.length >= 4 ? 'ok' : ''}">${yes.length}</span>${yes.length >= 4 ? `<button class="btn small" data-oquat="${esc(o.id)}|${dt}" type="button">Quatuor</button>` : ''}</div>`; }).join('')}
+        <div class="row"><button class="btn ghost small" data-osms="${esc(o.id)}" type="button">Renvoyer le texto</button><button class="btn ghost small" data-odel="${esc(o.id)}" type="button">${S.confirmDelO === o.id ? 'Confirmer' : 'Retirer'}</button></div></div>`; }).join('');
+    const form = f ? `<div class="offre-form">
+        <label>Terrain<select id="oCourse">${S.courses.map(c => `<option value="${esc(c.name)}" ${c.name === f.course ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
+        <div class="lbl">Dates offertes</div>
+        ${f.dates.map((d, i) => `<div class="row" style="flex-wrap:nowrap"><input type="datetime-local" data-od="${i}" value="${esc(d)}" style="flex:1;min-width:0"><button class="x" type="button" data-odx="${i}" aria-label="Retirer">×</button></div>`).join('')}
+        <button class="btn ghost small" id="oAddDate" type="button">+ Ajouter une date</button>
+        <label>Date butoir pour répondre<input type="date" id="oDeadline" value="${esc(f.deadline)}"></label>
+        <div class="row"><button class="btn sms-btn" id="oSend" type="button">Enregistrer et texter les joueurs</button><button class="btn ghost small" id="oCancel" type="button">Annuler</button></div></div>`
+      : `<button class="btn" id="oNew" type="button">Offrir des parties</button>`;
+    return `<section class="card"><h2>Parties offertes</h2><p class="note">Proposez des dates : tous les joueurs reçoivent un texto et indiquent dans l’app les dates où ils sont disponibles, avant la date butoir.</p>${form}${list}</section>`;
+  }
+  function offreSms(o) {
+    const me = L.norm(ls.get('pelland.me', '') || '');
+    const nums = (S.players || []).filter(p => p.phone && L.norm(p.name) !== me).map(p => p.phone);
+    const missing = (S.players || []).filter(p => !p.phone && L.norm(p.name) !== me).map(p => p.name);
+    const body = [`La game à Pelland – parties offertes à ${o.course.replace(/^Club de golf /i, '')} :`, ...o.dates.map(d => '• ' + fmtDate(d)),
+      `Indique tes disponibilités avant le ${fmtDay(o.deadline)} : ${location.origin + location.pathname}?offre=${o.id}`].join('\n');
+    if (missing.length) toast(`Pas de numéro pour ${missing.join(', ')}.`);
+    openSms(nums, body);
+  }
+  function vOffre() {
+    $('#barTitle').textContent = 'Disponibilités';
+    const o = S.offre;
+    if (o === undefined) { Store.getOffre(S.offreId).then(x => { S.offre = x; if (S.view === 'offre') render(); }); return '<p class="note">Chargement…</p>'; }
+    if (!o) return '<section class="card"><h2>Offre introuvable</h2><p class="note">Elle a peut-être été retirée.</p></section>';
+    const me = ls.get('pelland.me', '') || '', key = 'rep_' + presKey(me), mine = (o[key] || {}).dates || [], past = Date.now() > o.deadline;
+    const sel = S.offreSel || (S.offreSel = mine.slice());
+    return `<section class="card"><h2>${esc(o.course)}</h2>
+      <p class="note">${past ? 'La date butoir est passée : les réponses sont fermées.' : `Cochez les dates où vous êtes disponible, avant le <b>${esc(fmtDay(o.deadline))}</b>.`}</p>
+      <div class="dispo">${o.dates.map(dt => `<button type="button" class="dispo-d" data-dispo="${dt}" aria-pressed="${sel.includes(dt)}" ${past ? 'disabled' : ''}><b>${sel.includes(dt) ? '✓' : ''}</b><span>${esc(fmtDate(dt))}</span></button>`).join('')}</div>
+      ${past ? '' : `<button class="btn" id="dispoSave" type="button">Enregistrer mes disponibilités</button>`}
+      ${o[key] ? `<p class="note">Réponse enregistrée${sel.length ? '' : ' : aucune date'}.</p>` : ''}</section>`;
   }
   function draftFromQuatuor(x) {
     const d = newDraft(), me = L.norm(ls.get('pelland.me', '') || '');
@@ -817,8 +880,46 @@
       $('#loginBtn').onclick = go2;
       $('#loginPhone').onkeydown = e => { if (e.key === 'Enter') go2(); };
     },
+    offre(v) {
+      commonNav(v);
+      v.querySelectorAll('[data-dispo]').forEach(b => b.onclick = () => { const dt = +b.dataset.dispo, a = S.offreSel; const i = a.indexOf(dt); if (i >= 0) a.splice(i, 1); else a.push(dt); render(); });
+      const sv = $('#dispoSave'); if (sv) sv.onclick = async () => {
+        const me = ls.get('pelland.me', '') || ''; if (!me) return toast('Connectez-vous d’abord.');
+        const rep = { name: me, dates: S.offreSel.slice().sort(), at: Date.now() };
+        try { await Store.saveOffre({ id: S.offre.id, ['rep_' + presKey(me)]: rep }, true); S.offre['rep_' + presKey(me)] = rep; toast('Disponibilités enregistrées. Merci !'); render(); }
+        catch (e) { toast('Enregistrement impossible : ' + e.message); }
+      };
+    },
     quatuors(v) {
       commonNav(v);
+      const f = S.newOffre;
+      const on = $('#oNew'); if (on) on.onclick = () => { const dl = new Date(Date.now() + 3 * 864e5); S.newOffre = { course: (S.courses[0] || {}).name || '', dates: [''], deadline: dl.toISOString().slice(0, 10) }; render(); };
+      if (f) {
+        const syncO = () => { f.course = $('#oCourse').value; f.deadline = $('#oDeadline').value; v.querySelectorAll('[data-od]').forEach(i => { f.dates[+i.dataset.od] = i.value; }); };
+        $('#oAddDate').onclick = () => { syncO(); f.dates.push(''); render(); };
+        v.querySelectorAll('[data-odx]').forEach(b => b.onclick = () => { syncO(); f.dates.splice(+b.dataset.odx, 1); if (!f.dates.length) f.dates.push(''); render(); });
+        $('#oCancel').onclick = () => { S.newOffre = null; render(); };
+        $('#oSend').onclick = async () => {
+          syncO();
+          const dates = f.dates.filter(Boolean).map(x => new Date(x).getTime()).filter(x => !isNaN(x)).sort((a, b) => a - b);
+          if (!dates.length) return toast('Ajoutez au moins une date.');
+          if (!f.deadline) return toast('Choisissez la date butoir.');
+          const o = { id: Date.now().toString(36), course: f.course, dates, deadline: new Date(f.deadline + 'T23:59:59').getTime(), by: ls.get('pelland.me', '') || '', createdAt: Date.now() };
+          try { await Store.saveOffre(o); S.offres = [o].concat(S.offres || []); S.newOffre = null; render(); offreSms(o); }
+          catch (e) { toast('Enregistrement impossible : ' + e.message); }
+        };
+      }
+      v.querySelectorAll('[data-osms]').forEach(b => b.onclick = () => offreSms(S.offres.find(o => o.id === b.dataset.osms)));
+      v.querySelectorAll('[data-odel]').forEach(b => b.onclick = async () => {
+        if (S.confirmDelO !== b.dataset.odel) { S.confirmDelO = b.dataset.odel; return render(); }
+        try { await Store.deleteOffre(b.dataset.odel); S.offres = S.offres.filter(o => o.id !== b.dataset.odel); S.confirmDelO = null; render(); } catch (e) { toast('Retrait impossible : ' + e.message); }
+      });
+      v.querySelectorAll('[data-oquat]').forEach(b => b.onclick = () => {
+        const [id, dt] = b.dataset.oquat.split('|'); const o = S.offres.find(x => x.id === id);
+        const yes = offreReps(o).filter(r => (r.dates || []).includes(+dt)).map(r => r.name).filter(n => S.players.some(p => L.norm(p.name) === L.norm(n)));
+        S.newQuat = { name: `${o.course.replace(/^Club de golf /i, '')} – ${fmtDate(+dt)}`, players: [0, 1, 2, 3].map(i => (S.players.find(p => L.norm(p.name) === L.norm(yes[i] || '')) || {}).name || '') };
+        render(); setTimeout(() => { const q = $('#qname'); if (q) q.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 50);
+      });
       const nq = S.newQuat;
       $('#qname').oninput = e => { nq.name = e.target.value; };
       v.querySelectorAll('[data-qp]').forEach(sl => sl.onchange = e => { nq.players[+sl.dataset.qp] = e.target.value; nq.name = $('#qname').value; render(); });
@@ -1452,7 +1553,9 @@
     try { S.quatuors = await Store.listQuatuors(); } catch (e) { S.quatuors = []; }
     const params = new URLSearchParams(location.search);
     const code = (params.get('partie') || params.get('code') || '').toUpperCase();
-    if (code) openGame(code);
+    const offreId = params.get('offre');
+    if (offreId) go('offre', { offreId });
+    else if (code) openGame(code);
     else if (params.has('ecoute') || params.has('pelland')) {
       // Ouverture par le raccourci Siri : reprendre la dernière partie et écouter
       const last = ls.get('pelland.lastGame', null);
