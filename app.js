@@ -320,7 +320,7 @@
         <button class="tile" data-go="history"><span class="pin">≡</span><div><strong>Parties jouées</strong><span>Les parties terminées</span></div></button>
       </div>
       ${Store.mode === 'firebase' && Store.email ? `<p class="note">Connecté : <b>${esc(ls.get('pelland.me', '') || '')}</b> · <button class="linkbtn" id="logout" type="button">Se déconnecter</button></p>` : ''}
-      <p class="note">${Store.mode === 'firebase' ? 'Base partagée active : les autres joueurs suivent la partie en direct par le lien d’invitation ou par Parties en cours.' : 'Mode local : les parties restent sur ce téléphone.'}</p>
+      <p class="note">${Store.mode === 'firebase' ? 'Base partagée active : les autres joueurs suivent la partie en direct dans Parties en cours.' : 'Mode local : les parties restent sur ce téléphone.'}</p>
       ${Store.mode === 'local' && Store.error ? `<div class="warn"><b>Pourquoi le mode local :</b> ${esc(Store.error)}</div>` : ''}`;
   }
 
@@ -537,7 +537,6 @@
 
     return `
       <section class="hole-card" aria-live="polite">
-        ${owner && g.status !== 'terminée' ? `<button class="btn invite-btn" data-invite type="button">Inviter les joueurs</button>` : ''}
         <div class="hole-top">
           <div class="hole-no">${h}</div>
           <div class="hole-meta">Normale <b>${hi.par}</b> · Handicap <b>${hi.si}</b>${meta.map(m => ` · <b>${m}</b>`).join('')}</div>
