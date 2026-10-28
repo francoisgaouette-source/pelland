@@ -440,9 +440,15 @@
     if (!pv || !pv.ready) return '<p class="note">Entrez les quatre prénoms et index pour voir les coups et les équipes.</p>';
     return `<table><thead><tr><th>Joueur</th><th>Tertre</th><th style="text-align:right">Index</th><th style="text-align:right">Hcp</th><th style="text-align:right">Coups</th></tr></thead><tbody>
       ${pv.ps.map(p => `<tr><td>${esc(p.name)}</td><td>${esc(p.tee)}</td><td class="n">${String(p.index).replace('.', ',')}</td><td class="n">${p.courseHandicap}</td><td class="n"><b>${p.strokes}</b></td></tr>`).join('')}
-      </tbody></table>${d.teamMode ? teamsHtml(pv.ps, draftTeams(d, pv.ps)) : '<p class="note">Choisissez la formation des équipes à l\'étape 7.</p>'}<p class="note">${d.mode === 'full' ? '<b>Coups</b> : chaque joueur reçoit son handicap de parcours (Hcp).' : '<b>Coups</b> = Hcp du joueur − Hcp le plus bas du groupe. Le meilleur joue à 0.'} Les coups se placent sur les trous les plus difficiles d’abord : avec 7 coups, 1 coup sur les trous de difficulté 1 à 7. Au-delà de 18 coups, on recommence : un 2<sup>e</sup> coup sur les trous les plus difficiles.</p>`;
+      </tbody></table>${d.teamMode ? teamsHtml(pv.ps, draftTeams(d, pv.ps)) : '<p class="note">Choisissez la formation des équipes à l\'étape 7.</p>'}<p class="note">${d.mode === 'full' ? '<b>Coups</b> : chaque joueur reçoit son handicap de parcours (Hcp).' : '<b>Coups</b> = Hcp du joueur − Hcp le plus bas du groupe. Le meilleur joue à 0.'}${coupsCalc(pv.ps, d.mode)} Les coups se placent d’abord sur les trous les plus difficiles : 7 coups, 1 par trou, pour des trous de difficulté 1 à 7. Au-delà de 18 coups, on recommence : un 2<sup>e</sup> coup sur les trous les plus difficiles.</p>`;
   }
 
+  // « Claude : 12 − 7 = 5 coups (trous de difficulté 1 à 5) »
+  function coupsCalc(ps, mode) {
+    const lo = Math.min(...ps.map(p => p.courseHandicap));
+    const where = n => n <= 0 ? 'aucun coup' : n <= 18 ? `trous de difficulté 1 à ${n}` : `1 coup partout + un 2<sup>e</sup> sur les trous 1 à ${n - 18}`;
+    return '<span class="coups-calc">' + ps.map(p => `<span><b>${esc(p.name)}</b> : ${mode === 'full' ? `Hcp ${p.courseHandicap}` : `${p.courseHandicap} − ${lo}`} = <b>${p.strokes} coup${Math.abs(p.strokes) > 1 ? 's' : ''}</b>${p.strokes > 0 ? ` (${where(p.strokes)})` : ''}</span>`).join('') + '</span>';
+  }
   const teamOf = (g, i) => L.getTeams(g).findIndex(x => x.includes(i));
   // Résumé : Bleus à gauche, Rouges à droite ; nom, index, score ; points et argent de l'équipe.
   function summaryHtml(g, tots, p3) {
