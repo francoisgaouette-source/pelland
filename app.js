@@ -138,11 +138,20 @@
     async listPlayers() {
       if (this.mode === 'firebase') {
         const snap = await this.db.collection('players').get();
-        const list = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+        const list = snap.docs.filter(d => !d.id.startsWith('_')).map(d => ({ ...d.data(), id: d.id }));
         if (this.email) { try { const ph = await this.db.collection('phones').get(); const m = {}; ph.docs.forEach(d => { m[d.id] = d.data().phone; }); list.forEach(p => { if (m[p.id]) p.phone = m[p.id]; }); this.phonesBlocked = false; } catch (e) { this.phonesBlocked = true; } }
         return list.sort(byName);
       }
       return ls.get('pelland.players', []).sort(byName);
+    },
+    // Quatuors (groupes de 4 joueurs) : gardés dans players/_quatuors (aucune nouvelle règle Firebase)
+    async listQuatuors() {
+      if (this.mode === 'firebase') { try { const d = await this.db.collection('players').doc('_quatuors').get(); return (d.exists && d.data().list) || []; } catch (e) { return []; } }
+      return ls.get('pelland.quatuors', []);
+    },
+    async saveQuatuors(list) {
+      if (this.mode === 'firebase') { await this.db.collection('players').doc('_quatuors').set({ list, updatedAt: Date.now() }); return; }
+      ls.set('pelland.quatuors', list);
     },
     async savePlayer(name) {
       const p = { id: slug(name) + '-' + Math.random().toString(36).slice(2, 6), name: name.trim(), updatedAt: Date.now() };
@@ -318,7 +327,7 @@
     const showDock = false; // plus d'interface vocale
     document.body.classList.toggle('view-game', S.view === 'game');
     $('#dock').hidden = !showDock; document.body.classList.toggle('no-dock', !showDock);
-    const R = { home: vHome, setup: vSetup, game: vGame, join: vJoin, history: vHistory, live: vHistory, courses: vCourses, course: vCourse, players: vPlayers, login: vLogin }[S.view];
+    const R = { home: vHome, quatuors: vQuatuors, setup: vSetup, game: vGame, join: vJoin, history: vHistory, live: vHistory, courses: vCourses, course: vCourse, players: vPlayers, login: vLogin }[S.view];
     v.innerHTML = R();
     bind[S.view] && bind[S.view](v);
   }
@@ -334,6 +343,7 @@
       <div class="tiles">
         <button class="tile" data-go="courses"><span class="pin">⛳</span><div><strong>Terrains</strong><span>Ajouter ou corriger un terrain avant la partie</span></div></button>
         <button class="tile" data-go="players"><span class="pin"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M15.5 2.5 9 17.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M9 17.2c-.4 1.2-1.6 2.2-3.4 2.4l-2.1.2c-.6.1-.9.7-.6 1.2.2.3.5.5.9.5h4.6c1.6 0 2.7-.9 3.1-2.2l.3-.9" fill="currentColor"/><circle cx="18.5" cy="19.5" r="1.8" fill="currentColor"/></svg></span><div><strong>Joueurs</strong><span>Ajouter ou retirer des joueurs avant la partie</span></div></button>
+        <button class="tile" data-go="quatuors"><span class="pin" style="font-family:var(--display);font-weight:700">4</span><div><strong>Quatuors</strong><span>Les groupes de 4 qui jouent ensemble</span></div></button>
         <button class="tile primary" data-go="setup"><span class="pin">+</span><div><strong>Nouvelle partie</strong><span>Terrain, joueurs, index, tertres, handicap</span></div></button>
         <button class="tile" data-go="live"><span class="pin">⏵</span><div><strong>Parties en cours</strong><span>Les parties qui ont lieu en ce moment</span></div></button>
         <button class="tile" data-go="history"><span class="pin">≡</span><div><strong>Parties jouées</strong><span>Les parties terminées</span></div></button>
@@ -341,6 +351,32 @@
       ${Store.mode === 'firebase' && Store.email ? `<p class="note">Connecté : <b>${esc(ls.get('pelland.me', '') || '')}</b> · <button class="linkbtn" id="logout" type="button">Se déconnecter</button></p>` : ''}
       <p class="note">${Store.mode === 'firebase' ? 'Base partagée active : les autres joueurs suivent la partie en direct dans Parties en cours.' : 'Mode local : les parties restent sur ce téléphone.'}</p>
       ${Store.mode === 'local' && Store.error ? `<div class="warn"><b>Pourquoi le mode local :</b> ${esc(Store.error)}</div>` : ''}`;
+  }
+
+  // ---------------- Quatuors ----------------
+  function vQuatuors() {
+    $('#barTitle').textContent = 'Quatuors';
+    const q = S.quatuors || [], nq = S.newQuat || (S.newQuat = { name: '', players: ['', '', '', ''] });
+    const opts = i => { const taken = nq.players.filter((x, j) => j !== i && x).map(L.norm);
+      return `<option value="">— Joueur ${i + 1} —</option>` + S.players.filter(p => !taken.includes(L.norm(p.name))).map(p => `<option value="${esc(p.name)}" ${p.name === nq.players[i] ? 'selected' : ''}>${esc(p.name)}</option>`).join(''); };
+    return `<section class="card"><h2>Nouveau quatuor</h2>
+        <label>Nom du quatuor (facultatif)<input id="qname" type="text" value="${esc(nq.name)}" placeholder="ex. Les habitués du mardi"></label>
+        <div class="quat-picks">${[0, 1, 2, 3].map(i => `<select data-qp="${i}">${opts(i)}</select>`).join('')}</div>
+        <button class="btn" id="qsave" type="button">Enregistrer le quatuor</button>
+        ${S.players.length < 4 ? '<p class="note">Ajoutez d’abord au moins 4 joueurs dans <b>Joueurs</b>.</p>' : ''}
+      </section>
+      <div class="list">${q.length ? q.map(x => `<div class="item quat">
+          <div><b>${esc(x.name || x.players.join(', '))}</b>${x.name ? `<span>${esc(x.players.join(', '))}</span>` : ''}</div>
+          <span class="row" style="flex-wrap:nowrap;flex:none">${S.confirmDelQ === x.id
+            ? `<button class="btn small" data-qdel="${esc(x.id)}" type="button" style="background:var(--red)">Retirer</button><button class="btn ghost small" data-qcancel type="button">Annuler</button>`
+            : `<button class="btn small" data-qplay="${esc(x.id)}" type="button">Jouer</button><button class="btn ghost small" data-qask="${esc(x.id)}" type="button">Retirer</button>`}</span></div>`).join('')
+        : '<p class="note">Aucun quatuor pour l’instant. Un quatuor remplit les 4 joueurs d’une nouvelle partie en un geste.</p>'}</div>`;
+  }
+  function draftFromQuatuor(x) {
+    const d = newDraft(), me = L.norm(ls.get('pelland.me', '') || '');
+    x.players.forEach((n, i) => { if (d.players[i]) { d.players[i].name = n; d.players[i].custom = false; } });
+    const r = x.players.findIndex(n => L.norm(n) === me); if (r >= 0) d.responsable = r;
+    return d;
   }
 
   // ---------------- Nouvelle partie ----------------
@@ -384,6 +420,7 @@
       </section>
       <section class="card">
         <div class="step">2 à 5 · Joueurs, responsable, index, tertre</div>
+        ${(S.quatuors || []).length ? `<label>Quatuor<select id="quatPick"><option value="">— Choisir un quatuor (facultatif) —</option>${S.quatuors.map(x => `<option value="${esc(x.id)}">${esc(x.name || x.players.join(', '))}</option>`).join('')}</select></label>` : ''}
         ${d.players.map((p, i) => `
           <div class="prow">
             <label>Joueur ${i + 1}${playerPicker(d, i)}</label>
@@ -780,6 +817,25 @@
       $('#loginBtn').onclick = go2;
       $('#loginPhone').onkeydown = e => { if (e.key === 'Enter') go2(); };
     },
+    quatuors(v) {
+      commonNav(v);
+      const nq = S.newQuat;
+      $('#qname').oninput = e => { nq.name = e.target.value; };
+      v.querySelectorAll('[data-qp]').forEach(sl => sl.onchange = e => { nq.players[+sl.dataset.qp] = e.target.value; nq.name = $('#qname').value; render(); });
+      $('#qsave').onclick = async () => {
+        nq.name = $('#qname').value.trim();
+        if (nq.players.some(x => !x)) return toast('Choisissez les 4 joueurs.');
+        const list = (S.quatuors || []).concat([{ id: 'q' + Date.now().toString(36), name: nq.name, players: nq.players.slice() }]);
+        try { await Store.saveQuatuors(list); S.quatuors = list; S.newQuat = null; render(); } catch (e) { toast('Enregistrement impossible : ' + e.message); }
+      };
+      v.querySelectorAll('[data-qplay]').forEach(b => b.onclick = () => { const x = S.quatuors.find(q => q.id === b.dataset.qplay); go('setup', { draft: draftFromQuatuor(x) }); });
+      v.querySelectorAll('[data-qask]').forEach(b => b.onclick = () => { S.confirmDelQ = b.dataset.qask; render(); });
+      v.querySelectorAll('[data-qcancel]').forEach(b => b.onclick = () => { S.confirmDelQ = null; render(); });
+      v.querySelectorAll('[data-qdel]').forEach(b => b.onclick = async () => {
+        const list = S.quatuors.filter(q => q.id !== b.dataset.qdel);
+        try { await Store.saveQuatuors(list); S.quatuors = list; S.confirmDelQ = null; render(); } catch (e) { toast('Retrait impossible : ' + e.message); }
+      });
+    },
     players(v) {
       const add = async () => {
         const n = $('#newPlayer').value.trim(); if (!n) return;
@@ -891,6 +947,8 @@
         $('#create').disabled = m.length > 0;
       };
       $('#course').onchange = e => { d.courseId = e.target.value; render(); };
+      const qp = $('#quatPick'); if (qp) qp.onchange = e => { const x = S.quatuors.find(q => q.id === e.target.value); if (!x) return;
+        const nd = draftFromQuatuor(x); nd.courseId = d.courseId; nd.mode = d.mode; nd.stake = d.stake; nd.leadChangeValue = d.leadChangeValue; nd.perPoint = d.perPoint; S.draft = nd; render(); };
       d.players.forEach((p, i) => {
         const ps = $('#ps' + i);
         if (ps) ps.onchange = e => {
@@ -1391,6 +1449,7 @@
     }
     try { S.courses = await Store.listCourses(); } catch (e) { S.courses = [L.PINEGROVE]; }
     try { S.players = await Store.listPlayers(); } catch (e) { S.players = []; }
+    try { S.quatuors = await Store.listQuatuors(); } catch (e) { S.quatuors = []; }
     const params = new URLSearchParams(location.search);
     const code = (params.get('partie') || params.get('code') || '').toUpperCase();
     if (code) openGame(code);
