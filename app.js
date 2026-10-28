@@ -774,7 +774,7 @@
         const msg = $('#loginMsg');
         if (!pl) { msg.textContent = 'Choisissez votre nom.'; return; }
         $('#loginBtn').disabled = true; msg.textContent = 'Connexion…';
-        try { await Store.login(pl, ph); location.href = location.pathname + location.search; }
+        try { await Store.login(pl, ph); const q = new URLSearchParams(location.search); q.delete('joueur'); location.href = location.pathname + (q.toString() ? '?' + q : ''); }
         catch (e) { msg.textContent = e.message; $('#loginBtn').disabled = false; }
       };
       $('#loginBtn').onclick = go2;
@@ -1377,6 +1377,17 @@
     if (Store.needLogin) {
       try { S.players = await Store.listPlayers(); } catch (e) { S.players = []; }
       S.view = 'login'; render(); return;
+    }
+    // Lien d'invitation (?joueur=…) ouvert par quelqu'un d'autre que la personne connectée : écran de connexion
+    const inv = new URLSearchParams(location.search).get('joueur');
+    if (inv && Store.mode === 'firebase') {
+      let pl = []; try { pl = await Store.listPlayers(); } catch (e) { }
+      const target = pl.find(x => x.id === inv);
+      if (target && L.norm(target.name) !== L.norm(ls.get('pelland.me', '') || '')) {
+        try { await firebase.auth().signOut(); } catch (e) { }
+        Store.email = null; Store.uid = null; Store.needLogin = true; S.players = pl; S.view = 'login'; render(); return;
+      }
+      if (target) history.replaceState(null, '', location.pathname);
     }
     try { S.courses = await Store.listCourses(); } catch (e) { S.courses = [L.PINEGROVE]; }
     try { S.players = await Store.listPlayers(); } catch (e) { S.players = []; }
