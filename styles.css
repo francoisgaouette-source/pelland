@@ -570,3 +570,14 @@ table.sc tr.calc-row td:last-child::after { content: ' ›'; color: var(--muted)
 .auto-groups { display: grid; gap: 8px; }
 .auto-g { border: 2px solid #2fb36b; border-radius: 10px; padding: 8px 12px; display: grid; gap: 2px; }
 .auto-g span { font-size: 16px; } .auto-g.wait { border-color: var(--line); color: var(--muted); }
+/* Le 9 points */
+.team-block.neuf { border: 2px solid rgba(255,255,255,.25); }
+.team-block.neuf .hp .nm { color: #fff; }
+.hp-pts { grid-column: 1 / -1; font-size: 15px; margin-top: 2px; } .hp-pts b { font-family: var(--display); font-size: 22px; color: var(--flag); }
+.leader-box.neuf { border-color: var(--green, #1f6b46); }
+.nf-r { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: baseline; padding: 4px 0; }
+.nf-r b { font-size: 18px; } .nf-r small { font-family: var(--display); font-size: 20px; font-weight: 700; }
+.nf-r em { font-style: normal; font-family: var(--display); font-weight: 700; font-size: 20px; min-width: 70px; text-align: right; }
+.nf-r em.pos { color: #1f9d55; } .nf-r em.neg { color: var(--red); }
+table.sc.neuf thead th.pc { width: 15%; }
+.leader-box > .nf-r { display: grid; grid-template-columns: 1fr auto 76px; gap: 10px; align-items: baseline; }

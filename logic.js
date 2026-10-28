@@ -572,11 +572,12 @@
     actions.forEach(a => {
       if (a.type === 'goto') { g.currentHole = a.hole; say.push(`Trou ${a.hole}, normale ${holeInfo(g, a.hole, 0).par}.`); }
       if (a.type === 'scores') {
-        const row = g.scores[a.hole] = (g.scores[a.hole] || [null, null, null, null]).slice();
+        const row = g.scores[a.hole] = (g.scores[a.hole] || g.players.map(() => null)).slice(0, g.players.length);
+        while (row.length < g.players.length) row.push(null);
         const parts = [];
         Object.entries(a.scores).forEach(([pi, v]) => { row[pi] = v; parts.push(`${g.players[pi].name} ${v}`); });
         say.push(`Trou ${a.hole} : ${parts.join(', ')}.`);
-        if (row.every(v => v != null)) {
+        if (row.every(v => v != null) && g.players.length === 4) {
           const d = describeHolePoints(g, a.hole); if (d) say.push(d);
           say.push(totalText(g));
         }
@@ -868,6 +869,19 @@
     return { name: nameLine ? nameLine.replace(/\s+/g, ' ').slice(0, 60) : '', pars, sis, holes, tees };
   }
 
-  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, TEAMS, teamFromText, makeTeams, orderTeams, getTeams, teamName, netScore, holeMultiplier, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, cabaneTeam, cabanes, calcText, par3Results, describePar3, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup, resolveName, nextPrompt, trailingTeam, pressTeamOf, initials, leadChanges, totalText, holeNetText, parseCardText };
+  // ---------- Le 9 points (3 joueurs) : 5 au meilleur net, 3 au 2e, 1 au 3e ; égalités partagées ----------
+  function neufPoints(game, hole) {
+    if (game.players.length !== 3) return null;
+    const si = game.course.holes[hole - 1].si;
+    const nets = game.players.map((p, i) => { const s = getScore(game, hole, i); return s == null ? null : s - strokesOnHole(p.strokes, si); });
+    if (nets.some(v => v == null)) return null;
+    const order = [0, 1, 2].sort((a, b) => nets[a] - nets[b]), slots = [5, 3, 1], pts = [0, 0, 0];
+    for (let i = 0; i < 3;) { let j = i; while (j + 1 < 3 && nets[order[j + 1]] === nets[order[i]]) j++;
+      const avg = slots.slice(i, j + 1).reduce((a, b) => a + b, 0) / (j - i + 1); for (let k = i; k <= j; k++) pts[order[k]] = avg; i = j + 1; }
+    return { nets, pts };
+  }
+  function neufTotals(game) { const t = [0, 0, 0]; for (let h = 1; h <= 18; h++) { const r = neufPoints(game, h); if (r) r.pts.forEach((v, i) => { t[i] += v; }); } return t; }
+
+  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, TEAMS, teamFromText, makeTeams, orderTeams, getTeams, teamName, netScore, holeMultiplier, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, cabaneTeam, cabanes, calcText, par3Results, describePar3, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup, resolveName, nextPrompt, trailingTeam, pressTeamOf, initials, leadChanges, totalText, holeNetText, parseCardText, neufPoints, neufTotals };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PellandLogic = api;
 })(this);
