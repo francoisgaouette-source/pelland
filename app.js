@@ -725,6 +725,13 @@
         </div>
       </section>
       <section class="card">
+        <div class="step">Jeu ${info('jeu-' + d.format)}</div>
+        <div class="seg holes-seg">${[['18', '18 trous', '1-18'], ['front', 'Aller', '1-9'], ['back', 'Retour', '10-18']].map(([k, t, r]) => `<button type="button" data-holes="${k}" aria-pressed="${(d.holes || '18') === k}"><b>${t}</b><small>${r}</small></button>`).join('')}</div>
+        <div class="games">${games.map(x => `<button type="button" data-game="${x}" aria-pressed="${d.format === x}">${esc(fmtLabel(x))}</button>`).join('')}</div>
+        ${d.format === 'wolf' ? `<p class="note">Le loup tourne dans l’ordre des joueurs : joueur 1 au trou 1, joueur 2 au trou 2, etc.</p>` : ''}
+        ${d.format === 'sixes' ? `<p class="note">Équipes : joueurs 1+2 contre 3+4 (trous 1 à 6), 1+3 contre 2+4 (7 à 12), 1+4 contre 2+3 (13 à 18) ; sur 9 trous, on change aux 3 trous.</p>` : ''}
+      </section>
+      <section class="card">
         <div class="step">Argent ${info(d.format === 'pelland' ? 'argent' : 'jeu-' + d.format)}</div>
         ${d.format !== 'pelland' ? `<div class="row" style="flex-wrap:nowrap"><label style="flex:1">${({ neuf: 'Par point', bestball: 'Par trou gagné', nassau: 'Par pari', wolf: 'Par point', sixes: 'Par tranche gagnée', skins: 'Par skin' })[d.format] || 'Par point'}<span class="money-in"><input id="ppt" type="text" inputmode="decimal" placeholder="1" value="${esc(fmtIn(d.perPoint))}"><i>$</i></span></label><span style="flex:1"></span></div>
         <p class="note">${esc(ruleText(fakeG(d.format)))} ${esc(gainRule({ ...fakeG(d.format), perPoint: d.perPoint }))}.</p>` : `<div class="row" style="flex-wrap:nowrap">
@@ -735,13 +742,6 @@
           <label style="flex:1">Par point net<span class="money-in"><input id="ppt" type="text" inputmode="decimal" placeholder="1" value="${esc(fmtIn(d.perPoint))}"><i>$</i></span></label>
           <span style="flex:1"></span>
         </div>`}
-      </section>
-      <section class="card">
-        <div class="step">Jeu ${info('jeu-' + d.format)}</div>
-        <div class="seg holes-seg">${[['18', '18 trous', '1-18'], ['front', 'Aller', '1-9'], ['back', 'Retour', '10-18']].map(([k, t, r]) => `<button type="button" data-holes="${k}" aria-pressed="${(d.holes || '18') === k}"><b>${t}</b><small>${r}</small></button>`).join('')}</div>
-        <div class="games">${games.map(x => `<button type="button" data-game="${x}" aria-pressed="${d.format === x}">${esc(fmtLabel(x))}</button>`).join('')}</div>
-        ${d.format === 'wolf' ? `<p class="note">Le loup tourne dans l’ordre des joueurs : joueur 1 au trou 1, joueur 2 au trou 2, etc.</p>` : ''}
-        ${d.format === 'sixes' ? `<p class="note">Équipes : joueurs 1+2 contre 3+4 (trous 1 à 6), 1+3 contre 2+4 (7 à 12), 1+4 contre 2+3 (13 à 18) ; sur 9 trous, on change aux 3 trous.</p>` : ''}
       </section>
       ${!teamsUsed ? '' : `<section class="card">
         <div class="step">7 · Équipes ${info('equipes')}</div>
