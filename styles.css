@@ -614,3 +614,8 @@ label.check input { width: 22px; height: 22px; }
 .jeu summary span { color: var(--muted); font-size: 15px; }
 .jeu h3 { font-size: 15px; margin: 14px 0 4px; }
 .jeu ul { margin: 0; padding-left: 20px; } .jeu li { margin: 4px 0; }
+/* Petit « i » d'explication */
+.info { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid currentColor; background: transparent; color: inherit; opacity: .7; font: italic 700 13px/1 Georgia, serif; padding: 0; margin-left: 6px; vertical-align: middle; cursor: pointer; text-transform: none; letter-spacing: 0; }
+.info:hover { opacity: 1; }
+.tb-btn + .info { margin: 8px 0 0 8px; }
+.info-list { margin: 0; padding-left: 20px; } .info-list li { margin: 6px 0; line-height: 1.4; }
