@@ -738,7 +738,7 @@
       </section>
       <section class="card">
         <div class="step">Jeu ${info('jeu-' + d.format)}</div>
-        <div class="seg holes-seg">${[['18', '18 trous'], ['front', 'Aller (1 à 9)'], ['back', 'Retour (10 à 18)']].map(([k, t]) => `<button type="button" data-holes="${k}" aria-pressed="${(d.holes || '18') === k}"><b>${t}</b></button>`).join('')}</div>
+        <div class="seg holes-seg">${[['18', '18 trous', '1-18'], ['front', 'Aller', '1-9'], ['back', 'Retour', '10-18']].map(([k, t, r]) => `<button type="button" data-holes="${k}" aria-pressed="${(d.holes || '18') === k}"><b>${t}</b><small>${r}</small></button>`).join('')}</div>
         <div class="games">${games.map(x => `<button type="button" data-game="${x}" aria-pressed="${d.format === x}">${esc(fmtLabel(x))}</button>`).join('')}</div>
         ${d.format === 'wolf' ? `<p class="note">Le loup tourne dans l’ordre des joueurs : joueur 1 au trou 1, joueur 2 au trou 2, etc.</p>` : ''}
         ${d.format === 'sixes' ? `<p class="note">Équipes : joueurs 1+2 contre 3+4 (trous 1 à 6), 1+3 contre 2+4 (7 à 12), 1+4 contre 2+3 (13 à 18) ; sur 9 trous, on change aux 3 trous.</p>` : ''}
