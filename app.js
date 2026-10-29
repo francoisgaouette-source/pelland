@@ -195,6 +195,15 @@
       if (this.mode === 'firebase') { await this.db.collection('players').doc(this.qDoc()).set({ list, updatedAt: Date.now() }); return; }
       ls.set('pelland.quatuors.' + this.gid, list);
     },
+    // Jeux maison du groupe : players/_jeux_<groupe>
+    async listJeux() {
+      if (this.mode === 'firebase') { try { const d = await this.db.collection('players').doc('_jeux_' + this.gid).get(); return (d.exists && d.data().list) || []; } catch (e) { return []; } }
+      return ls.get('pelland.jeux.' + this.gid, []);
+    },
+    async saveJeux(list) {
+      if (this.mode === 'firebase') { await this.db.collection('players').doc('_jeux_' + this.gid).set({ list, updatedAt: Date.now() }); return; }
+      ls.set('pelland.jeux.' + this.gid, list);
+    },
     qDoc() { return this.gid === 'pelland' ? '_quatuors' : '_quatuors_' + this.gid;
     },
     // Offres de parties : players/_offre_<id> = { id, course, dates:[ms], deadline:ms, by, createdAt, rep_<joueur>: { name, dates:[ms], at } }
@@ -392,7 +401,7 @@
     const showDock = false; // plus d'interface vocale
     document.body.classList.toggle('view-game', S.view === 'game');
     $('#dock').hidden = !showDock; document.body.classList.toggle('no-dock', !showDock);
-    const R = { home: vHome, jeux: vJeux, quatuors: vQuatuors, offre: vOffre, setup: vSetup, game: vGame, join: vJoin, history: vHistory, live: vHistory, courses: vCourses, course: vCourse, players: vPlayers, login: vLogin }[S.view];
+    const R = { home: vHome, jeux: vJeux, jeuEdit: vJeuEdit, quatuors: vQuatuors, offre: vOffre, setup: vSetup, game: vGame, join: vJoin, history: vHistory, live: vHistory, courses: vCourses, course: vCourse, players: vPlayers, login: vLogin }[S.view];
     v.innerHTML = R();
     bind[S.view] && bind[S.view](v);
   }
@@ -440,7 +449,8 @@
   };
   function showInfo(key) {
     let t, lines;
-    if (key.startsWith('jeu-')) { const g = GAMES_INFO.find(x => x.f === key.slice(4)); if (!g) return; t = L.FORMATS[g.f]; lines = [g.who, ...g.rules, ...g.money.map(m => 'Argent : ' + m)]; }
+    if (key.startsWith('jeu-perso')) { const c = key === 'jeu-perso' ? (S.game || {}).custom : jeuOf(key.slice(4)); if (!c) return; t = c.name || 'Jeu maison'; lines = [...persoLines(c), gainRule({ format: 'perso', custom: c, players: [], perPoint: c.pp }) + '.']; }
+    else if (key.startsWith('jeu-')) { const g = GAMES_INFO.find(x => x.f === key.slice(4)); if (!g) return; t = L.FORMATS[g.f]; lines = [g.who, ...g.rules, ...g.money.map(m => 'Argent : ' + m)]; }
     else if (HELP[key]) [t, lines] = HELP[key]; else return;
     openSheet(`<h3>${esc(t)}</h3><ul class="info-list">${lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul><div class="sheet-actions"><button class="btn" data-close type="button">Compris</button></div>`, sh => { sh.querySelector('[data-close]').onclick = closeSheet; });
   }
@@ -471,7 +481,32 @@
     return `<p class="note">Le jeu se choisit en créant la partie. Tout se compte au net, avec les coups de handicap de chacun.</p>
       <div class="jeux">${GAMES_INFO.map(x => `<details class="card jeu"><summary><b>${esc(L.FORMATS[x.f])}</b><span>${esc(x.who)}</span></summary>
         <h3>Règles</h3><ul>${x.rules.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
-        <h3>L’argent</h3><ul>${x.money.map(r => `<li>${esc(r)}</li>`).join('')}</ul></details>`).join('')}</div>`;
+        <h3>L’argent</h3><ul>${x.money.map(r => `<li>${esc(r)}</li>`).join('')}</ul></details>`).join('')}</div>
+      <h2 class="jeux-h">Jeux maison du groupe</h2>
+      <div class="jeux">${(S.jeux || []).map(j => `<details class="card jeu"><summary><b>${esc(j.name)}</b><span>${j.mode === 'equipes' ? '4 joueurs, en équipes de deux' : '3 ou 4 joueurs, chacun pour soi'}</span></summary>
+        <ul>${persoLines(j).map(r => `<li>${esc(r)}</li>`).join('')}<li>${esc(gainRule({ format: 'perso', custom: j, players: [], perPoint: j.pp }))}.</li></ul>
+        ${canOrganize() ? `<div class="row" style="margin-top:10px"><button class="btn small" data-jedit="${esc(j.id)}" type="button">Modifier</button><button class="btn ghost small" data-jdel="${esc(j.id)}" type="button">${S.confirmDelJ === j.id ? 'Confirmer' : 'Retirer'}</button></div>` : ''}</details>`).join('') || '<p class="note">Aucun jeu maison pour l’instant.</p>'}</div>
+      ${canOrganize() ? '<button class="btn" data-jnew type="button">Créer un jeu maison</button>' : ''}`;
+  }
+  function vJeuEdit() {
+    const j = S.editJeu || (S.editJeu = { name: '', mode: 'equipes', low: 2, high: 2, team: 0, birdie: 0, stake: 0, ranks: '5, 3, 1, 0', skin: 0, pp: 1 });
+    $('#barTitle').textContent = j.id ? 'Modifier le jeu' : 'Nouveau jeu maison';
+    const numIn = (k, label, help) => `<label>${label}<input data-jf="${k}" type="text" inputmode="decimal" value="${esc(j[k] ?? '')}"></label>${help ? `<p class="note" style="margin-top:-4px">${help}</p>` : ''}`;
+    return `<section class="card">
+        <label>Nom du jeu<input data-jf="name" type="text" value="${esc(j.name)}" placeholder="ex. La game du mardi"></label>
+        <div class="seg"><button type="button" data-jmode="equipes" aria-pressed="${j.mode === 'equipes'}"><b>En équipes</b><small>2 contre 2, 4 joueurs</small></button><button type="button" data-jmode="individuel" aria-pressed="${j.mode !== 'equipes'}"><b>Chacun pour soi</b><small>3 ou 4 joueurs</small></button></div>
+      </section>
+      <section class="card"><h2>Points à chaque trou</h2><p class="note">Tout se compte au net. Mettez 0 pour ne pas utiliser une règle.</p>
+        ${j.mode === 'equipes'
+          ? numIn('low', 'Plus bas net : points à son équipe') + numIn('high', 'Plus haut net : points à l’équipe adverse') + numIn('team', 'Meilleur total des deux nets de l’équipe') + numIn('birdie', 'Chaque oiselet (au brut) : points à l’équipe')
+          : numIn('ranks', 'Points par rang (1er, 2e, 3e, 4e)', 'Séparés par des virgules, ex. 5, 3, 1, 0. Égalités partagées.') + numIn('birdie', 'Chaque oiselet (au brut)') + numIn('skin', 'Skin : seul meilleur net du trou', 'Reporté au trou suivant en cas d’égalité.')}
+      </section>
+      <section class="card"><h2>L’argent</h2>
+        ${numIn('pp', 'Montant par point ($)')}
+        ${j.mode === 'equipes' ? numIn('stake', 'Mise : gagnée par l’équipe qui mène à la fin ($)') : '<p class="note">Chacun gagne ou paie la différence de points avec chaque autre joueur.</p>'}
+      </section>
+      <section class="card"><h2>Résumé</h2><ul class="info-list" id="jSum">${persoLines(j).map(r => `<li>${esc(r)}</li>`).join('')}</ul></section>
+      <button class="btn" id="jSave" type="button">Enregistrer le jeu</button>`;
   }
   // ---------------- Quatuors ----------------
   function vQuatuors() {
@@ -620,7 +655,13 @@
   // Ce qui manque avant de pouvoir créer la partie
   function validIndex(v) { const x = parseFloat(String(v).replace(',', '.')); return String(v).trim() !== '' && /^[-+]?\d+([.,]\d)?$/.test(String(v).trim()) && x >= -10 && x <= 54; }
   // 4 joueurs = la game à Pelland ; 3 joueurs (4e case vide) = le 9 points
-  const gamesFor = n => n === 3 ? ['neuf', 'skins'] : ['pelland', 'bestball', 'wolf', 'sixes', 'skins'];
+  const gamesFor = n => (n === 3 ? ['neuf', 'skins'] : ['pelland', 'bestball', 'wolf', 'sixes', 'skins'])
+    .concat((S.jeux || []).filter(j => j.mode === 'equipes' ? n === 4 : true).map(j => 'perso:' + j.id));
+  // Jeu maison choisi dans Nouvelle partie → objet « partie » minimal pour les textes de règles
+  const jeuOf = key => (S.jeux || []).find(j => 'perso:' + j.id === key);
+  const fakeG = key => key && key.startsWith('perso:') ? { format: 'perso', custom: jeuOf(key) || {}, players: [] } : { format: key, players: [] };
+  const fmtLabel = key => key && key.startsWith('perso:') ? ((jeuOf(key) || {}).name || 'Jeu maison') : L.FORMATS[key];
+  const gameName = g => L.formatOf(g) === 'perso' ? ((g.custom || {}).name || 'Jeu maison') : L.FORMATS[L.formatOf(g)];
   const filledIdx = d => d.players.map((p, i) => i).filter(i => String(d.players[i].name || '').trim());
   function syncCount(d) { d.count = filledIdx(d).length === 3 ? 3 : 4; return d.count; }
   function missingList(d) {
@@ -647,7 +688,7 @@
     while (d.players.length < 4) d.players.push({ name: '', index: '', tee: (d.players[0] || {}).tee || 'II' });
     syncCount(d);
     const games = gamesFor(d.count); if (!games.includes(d.format)) d.format = games[0];
-    const teamsUsed = d.format === 'pelland' || d.format === 'bestball';
+    const teamsUsed = d.format === 'pelland' || d.format === 'bestball' || ((jeuOf(d.format) || {}).mode === 'equipes');
     const od = d.offre ? offreDates().find(x => x.key === d.offre) : null;
     const fromOffre = od ? S.courses.find(x => x.name === od.course) : null;
     if (fromOffre) d.courseId = fromOffre.id;
@@ -683,8 +724,8 @@
       </section>
       <section class="card">
         <div class="step">Argent ${info(d.format === 'pelland' ? 'argent' : 'jeu-' + d.format)}</div>
-        ${d.format !== 'pelland' ? `<div class="row" style="flex-wrap:nowrap"><label style="flex:1">${({ neuf: 'Par point', bestball: 'Par trou gagné', wolf: 'Par point', sixes: 'Par tranche gagnée', skins: 'Par skin' })[d.format]}<span class="money-in"><input id="ppt" type="text" inputmode="decimal" placeholder="1" value="${esc(fmtIn(d.perPoint))}"><i>$</i></span></label><span style="flex:1"></span></div>
-        <p class="note">${esc(ruleText({ format: d.format, players: [] }))} ${esc(gainRule({ format: d.format, players: [], perPoint: d.perPoint }))}.</p>` : `<div class="row" style="flex-wrap:nowrap">
+        ${d.format !== 'pelland' ? `<div class="row" style="flex-wrap:nowrap"><label style="flex:1">${({ neuf: 'Par point', bestball: 'Par trou gagné', wolf: 'Par point', sixes: 'Par tranche gagnée', skins: 'Par skin' })[d.format] || 'Par point'}<span class="money-in"><input id="ppt" type="text" inputmode="decimal" placeholder="1" value="${esc(fmtIn(d.perPoint))}"><i>$</i></span></label><span style="flex:1"></span></div>
+        <p class="note">${esc(ruleText(fakeG(d.format)))} ${esc(gainRule({ ...fakeG(d.format), perPoint: d.perPoint }))}.</p>` : `<div class="row" style="flex-wrap:nowrap">
           <label style="flex:1">La game commence à<span class="money-in"><input id="stake" type="text" inputmode="decimal" placeholder="0" value="${esc(fmtIn(d.stake))}"><i>$</i></span></label>
           <label style="flex:1">À chaque revirement<span class="money-in"><input id="lcv" type="text" inputmode="decimal" placeholder="0" value="${esc(fmtIn(d.leadChangeValue))}"><i>$</i></span></label>
         </div>
@@ -696,7 +737,7 @@
       <section class="card">
         <div class="step">Jeu ${info('jeu-' + d.format)}</div>
         <div class="seg holes-seg">${[['18', '18 trous'], ['front', 'Aller (1 à 9)'], ['back', 'Retour (10 à 18)']].map(([k, t]) => `<button type="button" data-holes="${k}" aria-pressed="${(d.holes || '18') === k}"><b>${t}</b></button>`).join('')}</div>
-        <div class="games">${games.map(x => `<button type="button" data-game="${x}" aria-pressed="${d.format === x}">${esc(L.FORMATS[x])}</button>`).join('')}</div>
+        <div class="games">${games.map(x => `<button type="button" data-game="${x}" aria-pressed="${d.format === x}">${esc(fmtLabel(x))}</button>`).join('')}</div>
         ${d.format === 'wolf' ? `<p class="note">Le loup tourne dans l’ordre des joueurs : joueur 1 au trou 1, joueur 2 au trou 2, etc.</p>` : ''}
         ${d.format === 'sixes' ? `<p class="note">Équipes : joueurs 1+2 contre 3+4 (trous 1 à 6), 1+3 contre 2+4 (7 à 12), 1+4 contre 2+3 (13 à 18) ; sur 9 trous, on change aux 3 trous.</p>` : ''}
       </section>
@@ -757,7 +798,7 @@
     if (!pv || !pv.ready) return `<p class="note">Entrez les ${d.count === 3 ? 'trois' : 'quatre'} prénoms et index pour voir les coups${d.count === 3 ? '' : ' et les équipes'}.</p>`;
     return `<table><thead><tr><th>Joueur</th><th>Tertre</th><th style="text-align:right">Index</th><th style="text-align:right">Hcp</th><th style="text-align:right">Coups</th></tr></thead><tbody>
       ${pv.ps.map(p => `<tr><td>${esc(p.name)}</td><td>${esc(p.tee)}</td><td class="n">${String(p.index).replace('.', ',')}</td><td class="n">${p.courseHandicap}</td><td class="n"><b>${p.strokes}</b></td></tr>`).join('')}
-      </tbody></table>${!(d.format === 'pelland' || d.format === 'bestball') ? '' : d.teamMode ? teamsHtml(pv.ps, draftTeams(d, pv.ps)) : '<p class="note">Choisissez la formation des équipes à l\'étape 7.</p>'}<p class="note">${d.mode === 'full' ? '<b>Coups</b> : chaque joueur reçoit son handicap de parcours (Hcp).' : '<b>Coups</b> = Hcp du joueur − Hcp le plus bas du groupe. Le meilleur joue à 0.'}${coupsCalc(pv.ps, d.mode)} Les coups se placent d’abord sur les trous les plus difficiles : 7 coups, 1 par trou, pour des trous de difficulté 1 à 7. Au-delà de 18 coups, on recommence : un 2<sup>e</sup> coup sur les trous les plus difficiles.</p>`;
+      </tbody></table>${!(d.format === 'pelland' || d.format === 'bestball' || (jeuOf(d.format) || {}).mode === 'equipes') ? '' : d.teamMode ? teamsHtml(pv.ps, draftTeams(d, pv.ps)) : '<p class="note">Choisissez la formation des équipes à l\'étape 7.</p>'}<p class="note">${d.mode === 'full' ? '<b>Coups</b> : chaque joueur reçoit son handicap de parcours (Hcp).' : '<b>Coups</b> = Hcp du joueur − Hcp le plus bas du groupe. Le meilleur joue à 0.'}${coupsCalc(pv.ps, d.mode)} Les coups se placent d’abord sur les trous les plus difficiles : 7 coups, 1 par trou, pour des trous de difficulté 1 à 7. Au-delà de 18 coups, on recommence : un 2<sup>e</sup> coup sur les trous les plus difficiles.</p>`;
   }
 
   // « Claude : 12 − 7 = 5 coups (trous de difficulté 1 à 5) »
@@ -917,7 +958,7 @@
       const d = new Date(g.createdAt);
       const played = Object.keys(g.scores || {}).filter(k => (g.scores[k] || []).some(v => v != null)).length;
       let res;
-      if (isAlt(g)) { const t = neufGains(g), mx = Math.max(...t); res = `${L.FORMATS[L.formatOf(g)]} · ${g.players.filter((p, i) => t[i] === mx).map(p => p.name.split(' ')[0]).join(', ')} ${mx > 0 ? '+' + fmt$(mx) : ''}`; }
+      if (isAlt(g)) { const t = neufGains(g), mx = Math.max(...t); res = `${gameName(g)} · ${g.players.filter((p, i) => t[i] === mx).map(p => p.name.split(' ')[0]).join(', ')} ${mx > 0 ? '+' + fmt$(mx) : ''}`; }
       else { const t = L.teamPoints(g).tot; res = t[0] === t[1] ? 'égalité' : `${L.TEAMS[t[0] > t[1] ? 0 : 1]} +${Math.abs(t[0] - t[1])}`; }
       const mine = Store.mode !== 'firebase' || !!Store.email;
       const done = g.status === 'terminée';
@@ -1113,6 +1154,31 @@
         const rep = { name: me, dates: S.offreSel.slice().sort(), at: Date.now() };
         try { await Store.saveOffre({ id: S.offre.id, ['rep_' + presKey(me)]: rep }, true); S.offre['rep_' + presKey(me)] = rep; render(); }
         catch (e) { toast('Enregistrement impossible : ' + e.message); }
+      };
+    },
+    jeux(v) {
+      commonNav(v);
+      const jn = v.querySelector('[data-jnew]'); if (jn) jn.onclick = () => go('jeuEdit', { editJeu: null });
+      v.querySelectorAll('[data-jedit]').forEach(b => b.onclick = () => go('jeuEdit', { editJeu: JSON.parse(JSON.stringify(S.jeux.find(j => j.id === b.dataset.jedit))) }));
+      v.querySelectorAll('[data-jdel]').forEach(b => b.onclick = async () => {
+        if (S.confirmDelJ !== b.dataset.jdel) { S.confirmDelJ = b.dataset.jdel; return render(); }
+        const list = S.jeux.filter(j => j.id !== b.dataset.jdel);
+        try { await Store.saveJeux(list); S.jeux = list; S.confirmDelJ = null; render(); } catch (e) { toast('Retrait impossible : ' + e.message); }
+      });
+    },
+    jeuEdit(v) {
+      commonNav(v);
+      const j = S.editJeu, sync = () => v.querySelectorAll('[data-jf]').forEach(i => { j[i.dataset.jf] = i.dataset.jf === 'name' || i.dataset.jf === 'ranks' ? i.value : i.value.replace(',', '.'); });
+      v.querySelectorAll('[data-jf]').forEach(i => i.oninput = () => { sync(); const u = $('#jSum'); if (u) u.innerHTML = persoLines(j).map(r => `<li>${esc(r)}</li>`).join(''); });
+      v.querySelectorAll('[data-jmode]').forEach(b => b.onclick = () => { sync(); j.mode = b.dataset.jmode; render(); });
+      $('#jSave').onclick = async () => {
+        sync();
+        if (!String(j.name).trim()) return toast('Donnez un nom au jeu.');
+        ['low', 'high', 'team', 'birdie', 'stake', 'skin', 'pp'].forEach(k => { j[k] = Number(j[k]) || 0; });
+        if (j.mode === 'equipes' ? !(j.low || j.high || j.team || j.birdie) : !(String(j.ranks).trim() || j.birdie || j.skin)) return toast('Choisissez au moins une façon de gagner des points.');
+        const out = { ...j, name: String(j.name).trim(), id: j.id || 'j' + Date.now().toString(36) };
+        const list = (S.jeux || []).filter(x => x.id !== out.id).concat([out]);
+        try { await Store.saveJeux(list); S.jeux = list; S.editJeu = null; go('jeux'); } catch (e) { toast('Enregistrement impossible : ' + e.message); }
       };
     },
     quatuors(v) {
@@ -1316,7 +1382,7 @@
         render();
       });
       const pt = $('#partner'); if (pt) pt.onchange = () => { const j = +pt.value; d.teams = [[0, j], [1, 2, 3].filter(i => i !== j)]; refresh(); };
-      v.querySelectorAll('[data-game]').forEach(b => b.onclick = () => { d.format = b.dataset.game; render(); });
+      v.querySelectorAll('[data-game]').forEach(b => b.onclick = () => { d.format = b.dataset.game; const jj = jeuOf(d.format); if (jj && jj.pp) d.perPoint = String(jj.pp); render(); });
       v.querySelectorAll('[data-holes]').forEach(b => b.onclick = () => { d.holes = b.dataset.holes; render(); });
       v.querySelectorAll('[data-count]').forEach(b => b.onclick = () => {
         const n = +b.dataset.count; if (n === (d.count || 4)) return;
@@ -1332,14 +1398,14 @@
       $('#create').onclick = async () => {
         const pv = draftPreview(d);
         if (!pv || !pv.ready) { const m = 'Il manque ' + missingList(d).slice(0, 2).join(' et ') + '.'; toast(m); setReply(m); Voice.say(m); return; }
-        syncCount(d); const fmtG = gamesFor(d.count).includes(d.format) ? d.format : gamesFor(d.count)[0], neuf = !(fmtG === 'pelland' || fmtG === 'bestball'), rIdx = filledIdx(d).indexOf(d.responsable);
+        syncCount(d); const fmtG = gamesFor(d.count).includes(d.format) ? d.format : gamesFor(d.count)[0], jeu = jeuOf(fmtG), neuf = !(fmtG === 'pelland' || fmtG === 'bestball' || (jeu && jeu.mode === 'equipes')), rIdx = filledIdx(d).indexOf(d.responsable);
         if (!neuf && !d.teamMode) { toast('Choisissez la formation des équipes (étape 7).'); return; }
         const names = pv.ps.map(p => L.norm(p.name));
         if (new Set(names).size < names.length) return toast('Le même joueur est choisi deux fois.');
         ls.set('pelland.lastPlayers', d.players);
         const id = await Store.newCode();
         const g = { id, createdAt: Date.now(), ownerUid: Store.uid, course: pv.c, courseId: pv.c.id, mode: d.mode, responsable: rIdx >= 0 ? rIdx : 0,
-          format: fmtG, players: pv.ps, teams: neuf ? null : draftTeams(d, pv.ps), teamMode: neuf ? null : d.teamMode, stake: money(d.stake), leadChangeValue: money(d.leadChangeValue), perPoint: String(d.perPoint || '').trim() === '' ? 1 : money(d.perPoint), currentHole: d.holes === 'back' ? 10 : 1, firstHole: d.holes === 'back' ? 10 : 1, lastHole: d.holes === 'front' ? 9 : 18, scores: {}, events: {}, status: 'en cours' };
+          format: jeu ? 'perso' : fmtG, custom: jeu ? JSON.parse(JSON.stringify(jeu)) : null, players: pv.ps, teams: neuf ? null : draftTeams(d, pv.ps), teamMode: neuf ? null : d.teamMode, stake: money(d.stake), leadChangeValue: money(d.leadChangeValue), perPoint: String(d.perPoint || '').trim() === '' ? 1 : money(d.perPoint), currentHole: d.holes === 'back' ? 10 : 1, firstHole: d.holes === 'back' ? 10 : 1, lastHole: d.holes === 'front' ? 9 : 18, scores: {}, events: {}, status: 'en cours' };
         try { await Store.saveGame(g); S.draft = null; openGame(id); toast('Partie créée.'); }
         catch (e) { toast('Création impossible : ' + e.message); }
       };
@@ -1572,7 +1638,7 @@
     const played = Object.keys(g.scores || {}).filter(x => (g.scores[x] || []).some(v => v != null)).map(Number);
     const last = played.length ? Math.max(...played) : 0, done = g.status === 'terminée';
     const date = new Date(g.createdAt || Date.now()).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' });
-    const lines = [`${groupName()} – ${L.FORMATS[L.formatOf(g)]} – ${g.course.name.replace(/^Club de golf /i, '')}, ${date}`];
+    const lines = [`${groupName()} – ${gameName(g)} – ${g.course.name.replace(/^Club de golf /i, '')}, ${date}`];
     lines.push(done ? 'Résultat final :' : last ? `Après ${last} trou${last > 1 ? 's' : ''} :` : 'La partie commence.');
     if (last) {
       if (m.tie) lines.push(`Égalité, ${m.t[0]} points chacun.`);
@@ -1612,7 +1678,25 @@
   // Gain de chacun : différence de points avec chaque autre joueur × $ par point
   function neufGains(g) { return L.altGains(g, neufPP(g)); }
   const ptsLabel = g => ({ neuf: 'pts', skins: 'skins', bestball: 'trous', sixes: 'trous', wolf: 'pts' })[L.formatOf(g)] || 'pts';
+  function persoLines(c) {
+    c = c || {}; const L2 = [];
+    if (c.mode === 'equipes') {
+      L2.push('Équipes de deux (Rouges et Bleus).');
+      if (+c.low) L2.push(`Plus bas net : ${+c.low} point${+c.low > 1 ? 's' : ''} à son équipe.`);
+      if (+c.high) L2.push(`Plus haut net : ${+c.high} point${+c.high > 1 ? 's' : ''} à l’équipe adverse.`);
+      if (+c.team) L2.push(`Meilleur total des deux nets : ${+c.team} point${+c.team > 1 ? 's' : ''}.`);
+      if (+c.birdie) L2.push(`Chaque oiselet (brut) : ${+c.birdie} point${+c.birdie > 1 ? 's' : ''} à l’équipe.`);
+      L2.push('Par trou, seule la différence entre les équipes compte. Égalité : pas de points.');
+    } else {
+      L2.push('Chacun pour soi.');
+      if (String(c.ranks || '').trim()) L2.push(`Points par rang au net (1er, 2e, 3e…) : ${c.ranks}. Égalités partagées.`);
+      if (+c.birdie) L2.push(`Chaque oiselet (brut) : ${+c.birdie} point${+c.birdie > 1 ? 's' : ''}.`);
+      if (+c.skin) L2.push(`Skin (seul meilleur net) : ${+c.skin} point${+c.skin > 1 ? 's' : ''}, reporté en cas d’égalité.`);
+    }
+    return L2;
+  }
   function ruleText(g) {
+    if (L.formatOf(g) === 'perso') return persoLines(g.custom).join(' ');
     return ({ neuf: 'Le 9 points : 5 points au meilleur net, 3 au 2e, 1 au 3e ; égalités partagées.',
       bestball: 'Best Ball : le meilleur net de chaque équipe ; le trou gagné vaut 1 point.',
       sixes: 'Sixes : les équipes changent à chaque tiers de la partie (6 trous sur 18, 3 sur 9) ; meilleur net de l’équipe, 1 point par trou ; l’équipe qui gagne le plus de trous gagne la tranche.',
@@ -1621,6 +1705,7 @@
   }
   function gainRule(g) {
     const pp = fmt$(neufPP(g));
+    if (L.formatOf(g) === 'perso') { const c = g.custom || {}; return c.mode === 'equipes' ? `Gain par joueur = écart de points × ${pp}${+c.stake ? ` + ${fmt$(+c.stake)} à l’équipe qui mène` : ''}` : `Gain = différence de points avec chaque autre joueur × ${pp}`; }
     return ({ neuf: `Gain = différence de points avec chaque autre joueur × ${pp}`, bestball: `Gain = écart de trous gagnés × ${pp} par joueur`,
       sixes: `Gain = ${pp} par tranche gagnée (perdue : −${pp})`, wolf: `Gain = points × ${pp}`, skins: `Gain = skins gagnés × ${pp} payé par chaque autre joueur` })[L.formatOf(g)] || '';
   }
@@ -1628,7 +1713,7 @@
   function altShort(g, r, ini) {
     const f = L.formatOf(g);
     if (!r) return '';
-    if (f === 'neuf') return g.players.map((p, i) => `${ini[i]} ${fmtPts(r.pts[i])}`).join(' · ');
+    if (f === 'neuf' || (f === 'perso' && (g.custom || {}).mode !== 'equipes')) return g.players.map((p, i) => `${ini[i]} ${fmtPts(r.pts[i])}`).join(' · ');
     if (!r.pts) return 'Loup : décision ?';
     if (f === 'skins') return r.win.length ? `Skin ${ini[r.win[0]]}${r.units > 1 ? ' ×' + r.units : ''}` : `Report (${r.carry})`;
     const pre = f === 'wolf' && r.wolf ? `Loup ${ini[L.wolfOf(g, r.hole || 1)]}${r.wolf.partner == null ? (r.wolf.blind ? ' seul aveugle' : ' seul') : ''} · ` : '';
@@ -1639,21 +1724,21 @@
     const played = Object.keys(g.scores || {}).filter(x => (g.scores[x] || []).some(v => v != null)).map(Number), last = played.length ? Math.max(...played) : 0;
     const date = new Date(g.createdAt || Date.now()).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' });
     const rank = g.players.map((p, i) => i).sort((a, b) => gn[b] - gn[a]);
-    return [`${groupName()} – ${L.FORMATS[f]} – ${g.course.name.replace(/^Club de golf /i, '')}, ${date}`, done ? 'Résultat final :' : last ? `Après ${last} trou${last > 1 ? 's' : ''} :` : 'La partie commence.',
+    return [`${groupName()} – ${gameName(g)} – ${g.course.name.replace(/^Club de golf /i, '')}, ${date}`, done ? 'Résultat final :' : last ? `Après ${last} trou${last > 1 ? 's' : ''} :` : 'La partie commence.',
       ...(last ? rank.map((i, r) => `${r + 1}. ${g.players[i].name} : ${fmtPts(t[i])} ${ptsLabel(g)} (${gn[i] >= 0 ? '+' : '−'}${fmt$(Math.abs(gn[i]))})`) : g.players.map(p => p.name)), inviteLink(g)].join('\n');
   }
   function holeDetailNeuf(g, h) {
     const ih = L.holeInfo(g, h, 0), r = L.altHoles(g)[h], f = L.formatOf(g);
     const rows = g.players.map((p, i) => { const s = L.getScore(g, h, i), k = L.strokesOnHole(p.strokes, ih.si);
       return `<tr><td>${esc(p.name)}</td><td>${s == null ? '—' : s}</td><td>${k > 0 ? BALL.repeat(k) : '—'}</td><td><b>${s == null ? '—' : s - k}</b></td><td><b>${r && r.pts ? (r.pts[i] > 0 && f !== 'neuf' ? '+' : '') + fmtPts(r.pts[i]) : '—'}</b></td></tr>`; }).join('');
-    openSheet(`<h3>Trou ${h}</h3><p class="note" style="margin-top:-8px">Normale ${ih.par} · Handicap ${ih.si} · ${esc(L.FORMATS[f])}</p>
+    openSheet(`<h3>Trou ${h}</h3><p class="note" style="margin-top:-8px">Normale ${ih.par} · Handicap ${ih.si} · ${esc(gameName(g))}</p>
       <table class="detail-t"><thead><tr><th>Joueur</th><th>Brut</th><th>Coups</th><th>Net</th><th>Points</th></tr></thead><tbody>${rows}</tbody></table>
       ${r ? `<p class="detail-desc">${esc(r.desc)}</p>` : ''}<p class="note">${esc(ruleText(g))}</p>
       <div class="sheet-actions"><button class="btn" data-close type="button">Fermer</button></div>`, sh => { sh.querySelector('[data-close]').onclick = closeSheet; });
   }
   function vGameNeuf(g) {
     const h = g.currentHole || 1, hi = L.holeInfo(g, h, 0), owner = isOwner();
-    const f = L.formatOf(g), fname = L.FORMATS[f], AH = L.altHoles(g);
+    const f = L.formatOf(g), fname = gameName(g), AH = L.altHoles(g);
     const tots = g.players.map((p, i) => L.totals(g, i)), pts = L.altTotals(g), gn = neufGains(g), ini = L.initials(g.players);
     const wolfNow = f === 'wolf' ? L.wolfOf(g, h) : -1;
     const sixT = f === 'sixes' ? L.sixesTeams(h, g) : f === 'bestball' ? L.getTeams(g) : null;
@@ -1716,7 +1801,7 @@
     const { nums, missing } = playerNumbers(g); if (!nums.length) return;
     const T = isAlt(g) ? null : L.getTeams(g);
     const date = new Date(g.createdAt || Date.now()).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' });
-    const body = [`Tu es inscrit à une partie (${L.FORMATS[L.formatOf(g)]}) – ${g.course.name.replace(/^Club de golf /i, '')}, ${date}.`,
+    const body = [`Tu es inscrit à une partie (${gameName(g)}) – ${g.course.name.replace(/^Club de golf /i, '')}, ${date}.`,
       ...(T ? [`Bleus : ${T[1].map(i => g.players[i].name).join(', ')}`, `Rouges : ${T[0].map(i => g.players[i].name).join(', ')}`] : [`Le 9 points : ${g.players.map(p => p.name).join(', ')}`]),
       !T ? '' : g.stake ? `La game commence à ${fmt$(money(g.stake))}.` : '',
       `Confirme ta présence : ouvre ${inviteLink(g)} et touche « Je serai là ».`].filter(Boolean).join('\n');
@@ -1908,6 +1993,7 @@
     try { S.courses = await Store.listCourses(); } catch (e) { S.courses = [L.PINEGROVE]; }
     try { S.players = await Store.listPlayers(); } catch (e) { S.players = []; }
     try { S.quatuors = await Store.listQuatuors(); } catch (e) { S.quatuors = []; }
+    try { S.jeux = await Store.listJeux(); } catch (e) { S.jeux = []; }
     try { S.groups = await Store.listGroups(); } catch (e) { S.groups = []; }
     const params = new URLSearchParams(location.search);
     const code = (params.get('partie') || params.get('code') || '').toUpperCase();

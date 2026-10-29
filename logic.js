@@ -887,7 +887,7 @@
   function neufTotals(game) { const t = [0, 0, 0]; for (let h = 1; h <= 18; h++) { const r = neufPoints(game, h); if (r) r.pts.forEach((v, i) => { t[i] += v; }); } return t; }
 
   // ---------- Autres jeux : Best Ball, Wolf, Sixes, Skins (et le 9 points) ----------
-  const FORMATS = { pelland: 'La game à Pelland', neuf: 'Le 9 points', bestball: 'Best Ball', wolf: 'Wolf', sixes: 'Sixes', skins: 'Skins' };
+  const FORMATS = { pelland: 'La game à Pelland', neuf: 'Le 9 points', bestball: 'Best Ball', wolf: 'Wolf', sixes: 'Sixes', skins: 'Skins', perso: 'Jeu maison' };
   function formatOf(g) { return g.format || (g.players.length === 3 ? 'neuf' : 'pelland'); }
   function netOf(g, h, i) { const s = getScore(g, h, i); return s == null ? null : s - strokesOnHole(g.players[i].strokes, g.course.holes[h - 1].si); }
   function holeNets(g, h) { const n = g.players.map((_, i) => netOf(g, h, i)); return n.some(v => v == null) ? null : n; }
@@ -923,6 +923,7 @@
         const won = n[wf] < bo; pts[wf] = (won ? 1 : -1) * v * others.length; others.forEach(i => { pts[i] = (won ? -1 : 1) * v; });
         out[h] = { pts, win: won ? [wf] : others, desc: `Loup ${nm(wf)} seul${d.blind ? ' à l’aveugle' : ''} (${v} points par joueur) : ${won ? 'il gagne' : 'il perd'} (${n[wf]} contre ${bo}).`, wolf: d }; continue;
       }
+      if (f === 'perso') { const r = persoHole(g, h, n, carry); carry = r.carry || 0; out[h] = r; continue; }
       if (f === 'skins') {
         const mn = Math.min(...n), who = n.map((v, i) => v === mn ? i : -1).filter(i => i >= 0), units = 1 + carry, pts = P.map(() => 0);
         if (who.length > 1) { carry = units; out[h] = { pts, win: [], desc: `Égalité au meilleur net (${mn}) : ${units} skin${units > 1 ? 's' : ''} reporté${units > 1 ? 's' : ''} au trou suivant.`, carry: units }; continue; }
@@ -933,11 +934,39 @@
     }
     return out;
   }
+  // ---------- Jeu maison : règles choisies par le groupe (g.custom) ----------
+  // équipes : plus bas net (low), plus haut net donne (high), meilleur total d'équipe (team), oiselets (birdie)
+  // chacun pour soi : points par rang (ranks), oiselets (birdie), skins avec report (skin)
+  function persoHole(g, h, n, carry) {
+    const c = g.custom || {}, P = g.players, nm = i => P[i].name, num = x => Number(x) || 0;
+    const par = i => holeInfo(g, h, i).par, gross = i => getScore(g, h, i);
+    const birdies = P.map((_, i) => gross(i) < par(i) ? 1 : 0), parts = [];
+    if (c.mode === 'equipes') {
+      const T = getTeams(g), tp = [0, 0], teamOf = i => T[0].includes(i) ? 0 : 1, mn = Math.min(...n), mx = Math.max(...n);
+      const lowT = [...new Set(P.map((_, i) => i).filter(i => n[i] === mn).map(teamOf))], highT = [...new Set(P.map((_, i) => i).filter(i => n[i] === mx).map(teamOf))];
+      if (num(c.low) && lowT.length === 1 && mn !== mx) { tp[lowT[0]] += num(c.low); parts.push(`plus bas net : +${num(c.low)} ${TEAMS[lowT[0]]}`); }
+      if (num(c.high) && highT.length === 1 && mn !== mx) { tp[1 - highT[0]] += num(c.high); parts.push(`plus haut net : +${num(c.high)} ${TEAMS[1 - highT[0]]}`); }
+      if (num(c.team)) { const s = T.map(t => t.reduce((a, i) => a + n[i], 0)); if (s[0] !== s[1]) { const w = s[0] < s[1] ? 0 : 1; tp[w] += num(c.team); parts.push(`meilleur total : +${num(c.team)} ${TEAMS[w]}`); } }
+      if (num(c.birdie)) P.forEach((_, i) => { if (birdies[i]) { tp[teamOf(i)] += num(c.birdie); parts.push(`oiselet de ${nm(i)} : +${num(c.birdie)}`); } });
+      const d = tp[0] - tp[1], pts = P.map((_, i) => teamOf(i) === 0 ? d : -d);
+      return { pts, win: d ? T[d > 0 ? 0 : 1] : [], desc: parts.length ? parts.join(' ; ') + '.' : 'Pas de points.', teamPts: tp };
+    }
+    const ranks = String(c.ranks || '').split(/[^0-9.]+/).filter(Boolean).map(Number), pts = P.map(() => 0), order = P.map((_, i) => i).sort((a, b) => n[a] - n[b]);
+    if (ranks.length) for (let i = 0; i < order.length;) { let j = i; while (j + 1 < order.length && n[order[j + 1]] === n[order[i]]) j++;
+      let sum = 0; for (let k = i; k <= j; k++) sum += ranks[k] || 0; for (let k = i; k <= j; k++) pts[order[k]] += sum / (j - i + 1); i = j + 1; }
+    if (ranks.length) parts.push(P.map((_, i) => `${nm(i)} ${Math.round(pts[i] * 10) / 10}`).join(', '));
+    if (num(c.birdie)) P.forEach((_, i) => { if (birdies[i]) { pts[i] += num(c.birdie); parts.push(`oiselet de ${nm(i)} : +${num(c.birdie)}`); } });
+    let nc = 0;
+    if (num(c.skin)) { const mn = Math.min(...n), who = P.map((_, i) => i).filter(i => n[i] === mn), units = 1 + (carry || 0);
+      if (who.length > 1) { nc = units; parts.push(`skin reporté (${units})`); } else { pts[who[0]] += units * num(c.skin); parts.push(`skin à ${nm(who[0])} : +${units * num(c.skin)}`); } }
+    return { pts, win: [], desc: parts.length ? parts.join(' ; ') + '.' : 'Pas de points.', carry: nc };
+  }
   function altTotals(g) { const r = altHoles(g), t = g.players.map(() => 0); for (let h = 1; h <= 18; h++) if (r[h] && r[h].pts) r[h].pts.forEach((v, i) => { t[i] += v; }); return t; }
   // Gain de chaque joueur ($) selon le jeu
   function altGains(g, pp) {
     const f = formatOf(g), t = altTotals(g);
-    if (f === 'neuf') return t.map((x, i) => t.reduce((a, y, j) => a + (j === i ? 0 : (x - y) * pp), 0));
+    if (f === 'neuf' || (f === 'perso' && (g.custom || {}).mode !== 'equipes')) return t.map((x, i) => t.reduce((a, y, j) => a + (j === i ? 0 : (x - y) * pp), 0));
+    if (f === 'perso') { const st = Number((g.custom || {}).stake) || 0; return t.map(x => x * pp + Math.sign(x) * st); }
     if (f === 'sixes') { const r = altHoles(g), gn = g.players.map(() => 0);
       [0, 1, 2].forEach(seg => { const s = g.players.map(() => 0); let any = false;
         for (let h = 1; h <= 18; h++) if (r[h] && sixesSeg(h, g) === seg) if (r[h] && r[h].pts) { any = true; r[h].pts.forEach((v, i) => { s[i] += v; }); }
