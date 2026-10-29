@@ -586,3 +586,10 @@ table.sc.neuf thead th.pc { width: 15%; }
 .fixed-course { display: grid; gap: 2px; margin: 4px 0 0; } .fixed-course b { font-size: 19px; }
 .opt { font-weight: 400; color: var(--muted); font-size: 12px; }
 .dispo-btns { gap: 8px; } .dispo-btns .btn { flex: 1; }
+/* Choix du jeu */
+.games { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.games button { min-height: 48px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); font-family: var(--display); font-size: 18px; font-weight: 700; color: var(--ink); }
+.games button[aria-pressed=true] { background: var(--green, #1f6b46); color: #fff; border-color: transparent; }
+.wolf-tag { font-size: 12px; background: var(--flag); color: #1b1b1b; border-radius: 99px; padding: 1px 8px; vertical-align: middle; }
+.pair { color: var(--flag); }
+.detail-desc { font-size: 16px; line-height: 1.4; margin: 4px 0; }

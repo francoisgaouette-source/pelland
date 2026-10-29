@@ -519,6 +519,7 @@
   // Ce qui manque avant de pouvoir créer la partie
   function validIndex(v) { const x = parseFloat(String(v).replace(',', '.')); return String(v).trim() !== '' && /^[-+]?\d+([.,]\d)?$/.test(String(v).trim()) && x >= -10 && x <= 54; }
   // 4 joueurs = la game à Pelland ; 3 joueurs (4e case vide) = le 9 points
+  const gamesFor = n => n === 3 ? ['neuf', 'skins'] : ['pelland', 'bestball', 'wolf', 'sixes', 'skins'];
   const filledIdx = d => d.players.map((p, i) => i).filter(i => String(d.players[i].name || '').trim());
   function syncCount(d) { d.count = filledIdx(d).length === 3 ? 3 : 4; return d.count; }
   function missingList(d) {
@@ -544,6 +545,8 @@
     const d = S.draft || (S.draft = newDraft());
     while (d.players.length < 4) d.players.push({ name: '', index: '', tee: (d.players[0] || {}).tee || 'II' });
     syncCount(d);
+    const games = gamesFor(d.count); if (!games.includes(d.format)) d.format = games[0];
+    const teamsUsed = d.format === 'pelland' || d.format === 'bestball';
     const od = d.offre ? offreDates().find(x => x.key === d.offre) : null;
     const fromOffre = od ? S.courses.find(x => x.name === od.course) : null;
     if (fromOffre) d.courseId = fromOffre.id;
@@ -579,8 +582,8 @@
       </section>
       <section class="card">
         <div class="step">Argent</div>
-        ${d.count === 3 ? `<div class="row" style="flex-wrap:nowrap"><label style="flex:1">Par point<span class="money-in"><input id="ppt" type="text" inputmode="decimal" placeholder="1" value="${esc(fmtIn(d.perPoint))}"><i>$</i></span></label><span style="flex:1"></span></div>
-        <p class="note">Le 9 points : à chaque trou, 5 points au meilleur net, 3 au 2e, 1 au 3e (égalité : on partage). Chacun gagne ou paie la différence de points avec chaque autre joueur.</p>` : `<div class="row" style="flex-wrap:nowrap">
+        ${d.format !== 'pelland' ? `<div class="row" style="flex-wrap:nowrap"><label style="flex:1">${({ neuf: 'Par point', bestball: 'Par trou gagné', wolf: 'Par point', sixes: 'Par tranche de 6 trous', skins: 'Par skin' })[d.format]}<span class="money-in"><input id="ppt" type="text" inputmode="decimal" placeholder="1" value="${esc(fmtIn(d.perPoint))}"><i>$</i></span></label><span style="flex:1"></span></div>
+        <p class="note">${esc(ruleText({ format: d.format, players: [] }))} ${esc(gainRule({ format: d.format, players: [], perPoint: d.perPoint }))}.</p>` : `<div class="row" style="flex-wrap:nowrap">
           <label style="flex:1">La game commence à<span class="money-in"><input id="stake" type="text" inputmode="decimal" placeholder="0" value="${esc(fmtIn(d.stake))}"><i>$</i></span></label>
           <label style="flex:1">À chaque revirement<span class="money-in"><input id="lcv" type="text" inputmode="decimal" placeholder="0" value="${esc(fmtIn(d.leadChangeValue))}"><i>$</i></span></label>
         </div>
@@ -589,7 +592,13 @@
           <span style="flex:1"></span>
         </div>`}
       </section>
-      ${d.count === 3 ? '' : `<section class="card">
+      <section class="card">
+        <div class="step">Jeu</div>
+        <div class="games">${games.map(x => `<button type="button" data-game="${x}" aria-pressed="${d.format === x}">${esc(L.FORMATS[x])}</button>`).join('')}</div>
+        ${d.format === 'wolf' ? `<p class="note">Le loup tourne dans l’ordre des joueurs : joueur 1 au trou 1, joueur 2 au trou 2, etc.</p>` : ''}
+        ${d.format === 'sixes' ? `<p class="note">Équipes : joueurs 1+2 contre 3+4 (trous 1 à 6), 1+3 contre 2+4 (7 à 12), 1+4 contre 2+3 (13 à 18).</p>` : ''}
+      </section>
+      ${!teamsUsed ? '' : `<section class="card">
         <div class="step">7 · Équipes</div>
         <div class="seg">
           <button type="button" data-tmode="auto" aria-pressed="${d.teamMode === 'auto'}"><b>Meilleur avec le moins bon</b><small>Les deux du milieu ensemble</small></button>
@@ -598,7 +607,7 @@
         ${d.teamMode === 'manual' ? `<label>Partenaire de ${esc(d.players[0].name || 'joueur 1')}<select id="partner">${[1, 2, 3].map(i => `<option value="${i}" ${d.teams && d.teams[0].includes(i) ? 'selected' : ''}>${esc(d.players[i].name || 'Joueur ' + (i + 1))}</option>`).join('')}</select></label>` : ''}
       </section>`}
       <section class="card">
-        <div class="step">${d.count === 3 ? '7 · Coups' : '8 · Coups et équipes'}</div>
+        <div class="step">${teamsUsed ? '8 · Coups et équipes' : '7 · Coups'}</div>
         <div id="pv" class="preview">${previewHtml(d)}</div>
         <p class="note" id="missingNote">${missingList(d).length ? 'Il manque ' + esc(missingList(d).join(', ')) + '.' : ''}</p>
         <button class="btn" id="create" type="button" ${missingList(d).length ? 'disabled' : ''}>Créer la carte de pointage</button>
@@ -646,7 +655,7 @@
     if (!pv || !pv.ready) return `<p class="note">Entrez les ${d.count === 3 ? 'trois' : 'quatre'} prénoms et index pour voir les coups${d.count === 3 ? '' : ' et les équipes'}.</p>`;
     return `<table><thead><tr><th>Joueur</th><th>Tertre</th><th style="text-align:right">Index</th><th style="text-align:right">Hcp</th><th style="text-align:right">Coups</th></tr></thead><tbody>
       ${pv.ps.map(p => `<tr><td>${esc(p.name)}</td><td>${esc(p.tee)}</td><td class="n">${String(p.index).replace('.', ',')}</td><td class="n">${p.courseHandicap}</td><td class="n"><b>${p.strokes}</b></td></tr>`).join('')}
-      </tbody></table>${d.count === 3 ? '' : d.teamMode ? teamsHtml(pv.ps, draftTeams(d, pv.ps)) : '<p class="note">Choisissez la formation des équipes à l\'étape 7.</p>'}<p class="note">${d.mode === 'full' ? '<b>Coups</b> : chaque joueur reçoit son handicap de parcours (Hcp).' : '<b>Coups</b> = Hcp du joueur − Hcp le plus bas du groupe. Le meilleur joue à 0.'}${coupsCalc(pv.ps, d.mode)} Les coups se placent d’abord sur les trous les plus difficiles : 7 coups, 1 par trou, pour des trous de difficulté 1 à 7. Au-delà de 18 coups, on recommence : un 2<sup>e</sup> coup sur les trous les plus difficiles.</p>`;
+      </tbody></table>${!(d.format === 'pelland' || d.format === 'bestball') ? '' : d.teamMode ? teamsHtml(pv.ps, draftTeams(d, pv.ps)) : '<p class="note">Choisissez la formation des équipes à l\'étape 7.</p>'}<p class="note">${d.mode === 'full' ? '<b>Coups</b> : chaque joueur reçoit son handicap de parcours (Hcp).' : '<b>Coups</b> = Hcp du joueur − Hcp le plus bas du groupe. Le meilleur joue à 0.'}${coupsCalc(pv.ps, d.mode)} Les coups se placent d’abord sur les trous les plus difficiles : 7 coups, 1 par trou, pour des trous de difficulté 1 à 7. Au-delà de 18 coups, on recommence : un 2<sup>e</sup> coup sur les trous les plus difficiles.</p>`;
   }
 
   // « Claude : 12 − 7 = 5 coups (trous de difficulté 1 à 5) »
@@ -685,7 +694,7 @@
     const g = S.game;
     if (!g) { $('#barTitle').textContent = 'Chargement…'; return '<p class="note">Chargement de la partie…</p>'; }
     $('#barTitle').textContent = `${g.course.name.replace(/^Club de golf /i, '')} · ${g.id}`;
-    if (isNeuf(g)) return vGameNeuf(g);
+    if (isAlt(g)) return vGameNeuf(g);
     const h = g.currentHole || 1;
     const hi = L.holeInfo(g, h, 0);
     const ev = (g.events || {})[h] || {};
@@ -805,7 +814,7 @@
       const d = new Date(g.createdAt);
       const played = Object.keys(g.scores || {}).filter(k => (g.scores[k] || []).some(v => v != null)).length;
       let res;
-      if (isNeuf(g)) { const t = L.neufTotals(g), mx = Math.max(...t); res = `9 points · ${g.players.filter((p, i) => t[i] === mx).map(p => p.name.split(' ')[0]).join(', ')} ${mx}`; }
+      if (isAlt(g)) { const t = neufGains(g), mx = Math.max(...t); res = `${L.FORMATS[L.formatOf(g)]} · ${g.players.filter((p, i) => t[i] === mx).map(p => p.name.split(' ')[0]).join(', ')} ${mx > 0 ? '+' + fmt$(mx) : ''}`; }
       else { const t = L.teamPoints(g).tot; res = t[0] === t[1] ? 'égalité' : `${L.TEAMS[t[0] > t[1] ? 0 : 1]} +${Math.abs(t[0] - t[1])}`; }
       const mine = Store.mode !== 'firebase' || !!Store.email;
       const done = g.status === 'terminée';
@@ -1164,6 +1173,7 @@
         render();
       });
       const pt = $('#partner'); if (pt) pt.onchange = () => { const j = +pt.value; d.teams = [[0, j], [1, 2, 3].filter(i => i !== j)]; refresh(); };
+      v.querySelectorAll('[data-game]').forEach(b => b.onclick = () => { d.format = b.dataset.game; render(); });
       v.querySelectorAll('[data-count]').forEach(b => b.onclick = () => {
         const n = +b.dataset.count; if (n === (d.count || 4)) return;
         d.count = n;
@@ -1178,14 +1188,14 @@
       $('#create').onclick = async () => {
         const pv = draftPreview(d);
         if (!pv || !pv.ready) { const m = 'Il manque ' + missingList(d).slice(0, 2).join(' et ') + '.'; toast(m); setReply(m); Voice.say(m); return; }
-        const neuf = syncCount(d) === 3, rIdx = filledIdx(d).indexOf(d.responsable);
+        syncCount(d); const fmtG = gamesFor(d.count).includes(d.format) ? d.format : gamesFor(d.count)[0], neuf = !(fmtG === 'pelland' || fmtG === 'bestball'), rIdx = filledIdx(d).indexOf(d.responsable);
         if (!neuf && !d.teamMode) { toast('Choisissez la formation des équipes (étape 7).'); return; }
         const names = pv.ps.map(p => L.norm(p.name));
         if (new Set(names).size < names.length) return toast('Le même joueur est choisi deux fois.');
         ls.set('pelland.lastPlayers', d.players);
         const id = await Store.newCode();
         const g = { id, createdAt: Date.now(), ownerUid: Store.uid, course: pv.c, courseId: pv.c.id, mode: d.mode, responsable: rIdx >= 0 ? rIdx : 0,
-          format: neuf ? 'neuf' : 'pelland', players: pv.ps, teams: neuf ? null : draftTeams(d, pv.ps), teamMode: neuf ? null : d.teamMode, stake: money(d.stake), leadChangeValue: money(d.leadChangeValue), perPoint: String(d.perPoint || '').trim() === '' ? 1 : money(d.perPoint), currentHole: 1, scores: {}, events: {}, status: 'en cours' };
+          format: fmtG, players: pv.ps, teams: neuf ? null : draftTeams(d, pv.ps), teamMode: neuf ? null : d.teamMode, stake: money(d.stake), leadChangeValue: money(d.leadChangeValue), perPoint: String(d.perPoint || '').trim() === '' ? 1 : money(d.perPoint), currentHole: 1, scores: {}, events: {}, status: 'en cours' };
         try { await Store.saveGame(g); S.draft = null; openGame(id); toast('Partie créée.'); }
         catch (e) { toast('Création impossible : ' + e.message); }
       };
@@ -1231,7 +1241,7 @@
         try { await Store.setPresence(g.id, k, ok); toast(b.dataset.pres === '1' ? 'Présence confirmée.' : 'Absence notée.'); }
         catch (e) { S.presenceBlocked = true; render(); }
       });
-      v.querySelectorAll('[data-hole]').forEach(b => b.onclick = () => { const h = +b.dataset.hole; if (isOwner() && isNeuf(S.game)) commit([{ type: 'goto', hole: h }], false); else if (isOwner()) holeSheet(h); else { S.game.currentHole = h; render(); } });
+      v.querySelectorAll('[data-hole]').forEach(b => b.onclick = () => { const h = +b.dataset.hole; if (isOwner() && isAlt(S.game)) commit([{ type: 'goto', hole: h }], false); else if (isOwner()) holeSheet(h); else { S.game.currentHole = h; render(); } });
     }
   };
   function commonNav(v) {
@@ -1295,9 +1305,9 @@
     S.game = next;
     // message court à l'écran
     const sc = actions.find(a => a.type === 'scores' || a.type === 'skin');
-    if (sc && !undo && isNeuf(next)) {
-      const r = L.neufPoints(next, sc.hole);
-      say = r ? `Trou ${sc.hole} · ` + next.players.map((p, i) => `${p.name.split(' ')[0]} ${fmtPts(r.pts[i])}`).join(' · ') : `Trou ${sc.hole} enregistré`;
+    if (sc && !undo && isAlt(next)) {
+      const r = L.altHoles(next)[sc.hole];
+      say = r ? `Trou ${sc.hole} · ${r.desc}` : `Trou ${sc.hole} enregistré`;
     } else if (sc && !undo) {
       const hh = sc.hole, parts = [];
       const nt = L.holeNetText(next, hh); if (nt) parts.push(`Trou ${hh} · ${nt}`); else parts.push(`Trou ${hh} enregistré`);
@@ -1306,7 +1316,7 @@
       parts.push(L.totalText(next).replace(/\.$/, ''));
       say = parts.join(' · ');
     }
-    const pr = isNeuf(next) ? null : L.nextPrompt(next);
+    const pr = isAlt(next) ? null : L.nextPrompt(next);
     S.pending = pr;
     render();
     setReply(say); if (speak) Voice.say(say);
@@ -1413,7 +1423,7 @@
   }
   // Texto aux joueurs : ouvre Messages avec les numéros et le résumé de la partie
   function smsSummary(g) {
-    if (isNeuf(g)) return smsSummaryNeuf(g);
+    if (isAlt(g)) return smsSummaryNeuf(g);
     const m = leaderMoney(g), T = L.getTeams(g);
     const played = Object.keys(g.scores || {}).filter(x => (g.scores[x] || []).some(v => v != null)).map(Number);
     const last = played.length ? Math.max(...played) : 0, done = g.status === 'terminée';
@@ -1446,47 +1456,73 @@
     (window.top || window).location.href = href;
   }
   // ---------------- Le 9 points (3 joueurs) ----------------
-  const isNeuf = g => !!g && (g.format === 'neuf' || (g.players || []).length === 3);
-  const fmtPts = x => String(Math.round(x * 10) / 10).replace('.', ',');
+  const isAlt = g => !!g && L.formatOf(g) !== 'pelland';
+  const fmtPts = x => String(Math.round(x * 10) / 10).replace('.', ',').replace('-', '−');
   const neufPP = g => g.perPoint == null || g.perPoint === '' ? 1 : money(g.perPoint);
   // Gain de chacun : différence de points avec chaque autre joueur × $ par point
-  function neufGains(g) { const t = L.neufTotals(g), pp = neufPP(g); return t.map((x, i) => t.reduce((a, y, j) => a + (j === i ? 0 : (x - y) * pp), 0)); }
+  function neufGains(g) { return L.altGains(g, neufPP(g)); }
+  const ptsLabel = g => ({ neuf: 'pts', skins: 'skins', bestball: 'trous', sixes: 'trous', wolf: 'pts' })[L.formatOf(g)] || 'pts';
+  function ruleText(g) {
+    return ({ neuf: 'Le 9 points : 5 points au meilleur net, 3 au 2e, 1 au 3e ; égalités partagées.',
+      bestball: 'Best Ball : le meilleur net de chaque équipe ; le trou gagné vaut 1 point.',
+      sixes: 'Sixes : les équipes changent aux trous 7 et 13 ; meilleur net de l’équipe, 1 point par trou ; l’équipe qui gagne le plus de trous gagne la tranche.',
+      wolf: 'Wolf : le loup tourne à chaque trou. Avec un partenaire : 1 point chacun au gagnant ; seul : 2 points par adversaire ; seul à l’aveugle : 3 points.',
+      skins: 'Skins : le seul meilleur net gagne le skin ; à égalité, il est reporté au trou suivant.' })[L.formatOf(g)] || '';
+  }
+  function gainRule(g) {
+    const pp = fmt$(neufPP(g));
+    return ({ neuf: `Gain = différence de points avec chaque autre joueur × ${pp}`, bestball: `Gain = écart de trous gagnés × ${pp} par joueur`,
+      sixes: `Gain = ${pp} par tranche de 6 trous gagnée (perdue : −${pp})`, wolf: `Gain = points × ${pp}`, skins: `Gain = skins gagnés × ${pp} payé par chaque autre joueur` })[L.formatOf(g)] || '';
+  }
+  // Texte court sous chaque trou de la carte
+  function altShort(g, r, ini) {
+    const f = L.formatOf(g);
+    if (!r) return '';
+    if (f === 'neuf') return g.players.map((p, i) => `${ini[i]} ${fmtPts(r.pts[i])}`).join(' · ');
+    if (!r.pts) return 'Loup : décision ?';
+    if (f === 'skins') return r.win.length ? `Skin ${ini[r.win[0]]}${r.units > 1 ? ' ×' + r.units : ''}` : `Report (${r.carry})`;
+    const pre = f === 'wolf' && r.wolf ? `Loup ${ini[L.wolfOf(g, r.hole || 1)]}${r.wolf.partner == null ? (r.wolf.blind ? ' seul aveugle' : ' seul') : ''} · ` : '';
+    return pre + (r.win.length ? `${r.win.map(i => ini[i]).join('+')} gagne${r.win.length > 1 ? 'nt' : ''}` : 'Égalité');
+  }
   function smsSummaryNeuf(g) {
-    const t = L.neufTotals(g), gn = neufGains(g), done = g.status === 'terminée';
+    const t = L.altTotals(g), gn = neufGains(g), done = g.status === 'terminée', f = L.formatOf(g);
     const played = Object.keys(g.scores || {}).filter(x => (g.scores[x] || []).some(v => v != null)).map(Number), last = played.length ? Math.max(...played) : 0;
     const date = new Date(g.createdAt || Date.now()).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' });
-    const rank = g.players.map((p, i) => i).sort((a, b) => t[b] - t[a]);
-    return [`La game à Pelland (9 points) – ${g.course.name.replace(/^Club de golf /i, '')}, ${date}`, done ? 'Résultat final :' : last ? `Après ${last} trou${last > 1 ? 's' : ''} :` : 'La partie commence.',
-      ...(last ? rank.map((i, r) => `${r + 1}. ${g.players[i].name} : ${fmtPts(t[i])} pts (${gn[i] >= 0 ? '+' : '−'}${fmt$(Math.abs(gn[i]))})`) : g.players.map(p => p.name)), inviteLink(g)].join('\n');
+    const rank = g.players.map((p, i) => i).sort((a, b) => gn[b] - gn[a]);
+    return [`La game à Pelland (${L.FORMATS[f]}) – ${g.course.name.replace(/^Club de golf /i, '')}, ${date}`, done ? 'Résultat final :' : last ? `Après ${last} trou${last > 1 ? 's' : ''} :` : 'La partie commence.',
+      ...(last ? rank.map((i, r) => `${r + 1}. ${g.players[i].name} : ${fmtPts(t[i])} ${ptsLabel(g)} (${gn[i] >= 0 ? '+' : '−'}${fmt$(Math.abs(gn[i]))})`) : g.players.map(p => p.name)), inviteLink(g)].join('\n');
   }
   function holeDetailNeuf(g, h) {
-    const ih = L.holeInfo(g, h, 0), r = L.neufPoints(g, h);
+    const ih = L.holeInfo(g, h, 0), r = L.altHoles(g)[h], f = L.formatOf(g);
     const rows = g.players.map((p, i) => { const s = L.getScore(g, h, i), k = L.strokesOnHole(p.strokes, ih.si);
-      return `<tr><td>${esc(p.name)}</td><td>${s == null ? '—' : s}</td><td>${k > 0 ? BALL.repeat(k) : '—'}</td><td><b>${s == null ? '—' : s - k}</b></td><td><b>${r ? fmtPts(r.pts[i]) : '—'}</b></td></tr>`; }).join('');
-    openSheet(`<h3>Trou ${h}</h3><p class="note" style="margin-top:-8px">Normale ${ih.par} · Handicap ${ih.si} · Le 9 points</p>
+      return `<tr><td>${esc(p.name)}</td><td>${s == null ? '—' : s}</td><td>${k > 0 ? BALL.repeat(k) : '—'}</td><td><b>${s == null ? '—' : s - k}</b></td><td><b>${r && r.pts ? (r.pts[i] > 0 && f !== 'neuf' ? '+' : '') + fmtPts(r.pts[i]) : '—'}</b></td></tr>`; }).join('');
+    openSheet(`<h3>Trou ${h}</h3><p class="note" style="margin-top:-8px">Normale ${ih.par} · Handicap ${ih.si} · ${esc(L.FORMATS[f])}</p>
       <table class="detail-t"><thead><tr><th>Joueur</th><th>Brut</th><th>Coups</th><th>Net</th><th>Points</th></tr></thead><tbody>${rows}</tbody></table>
-      <p class="note">5 points au meilleur net, 3 au 2e, 1 au 3e. À égalité, on partage les points (ex. 4 et 4, ou 2 et 2).</p>
+      ${r ? `<p class="detail-desc">${esc(r.desc)}</p>` : ''}<p class="note">${esc(ruleText(g))}</p>
       <div class="sheet-actions"><button class="btn" data-close type="button">Fermer</button></div>`, sh => { sh.querySelector('[data-close]').onclick = closeSheet; });
   }
   function vGameNeuf(g) {
     const h = g.currentHole || 1, hi = L.holeInfo(g, h, 0), owner = isOwner();
-    const tots = g.players.map((p, i) => L.totals(g, i)), pts = L.neufTotals(g), gn = neufGains(g), ini = L.initials(g.players);
+    const f = L.formatOf(g), fname = L.FORMATS[f], AH = L.altHoles(g);
+    const tots = g.players.map((p, i) => L.totals(g, i)), pts = L.altTotals(g), gn = neufGains(g), ini = L.initials(g.players);
+    const wolfNow = f === 'wolf' ? L.wolfOf(g, h) : -1;
+    const sixT = f === 'sixes' ? L.sixesTeams(h) : f === 'bestball' ? L.getTeams(g) : null;
     const dots = k => k > 0 ? BALL.repeat(k) : '';
     const ph = g.players.map((p, pi) => { const k = L.strokesOnHole(p.strokes, hi.si);
-      return `<${owner ? `button type="button" data-allscores="${h}"` : 'div'} class="hp"><div class="nm">${esc(p.name)}${g.responsable === pi ? ' ★' : ''}</div><div class="hp-idx">Index ${String(p.index).replace('.', ',')}</div><div class="dots">${k ? dots(k) : ''}</div><div class="hp-strk">${strokeHoles(g, p)}</div><div class="hp-tot">${tots[pi].played ? `<span>Brut <b>${tots[pi].gross}</b> · Net <b>${tots[pi].net}</b></span><span class="hp-n">${tots[pi].played} trou${tots[pi].played > 1 ? 's' : ''}</span>` : 'Aucun trou joué'}</div><div class="hp-pts"><b>${fmtPts(pts[pi])}</b> pts</div></${owner ? 'button' : 'div'}>`; });
-    const rank = g.players.map((p, i) => i).sort((a, b) => pts[b] - pts[a]);
-    const leader = `<div class="leader-box neuf"><span>Classement · 9 points</span>${rank.map((i, r) => `<div class="nf-r"><b>${r + 1}. ${esc(g.players[i].name)}</b><small>${fmtPts(pts[i])} pts</small><em class="${gn[i] > 0 ? 'pos' : gn[i] < 0 ? 'neg' : ''}">${gn[i] > 0 ? '+' : gn[i] < 0 ? '−' : ''}${fmt$(Math.abs(gn[i]))}</em></div>`).join('')}<div class="lb-detail"><span>Gain = différence de points avec chaque autre joueur × ${fmt$(neufPP(g))}</span></div></div>`;
-    const row = hole => { const ih = L.holeInfo(g, hole, 0), r = L.neufPoints(g, hole);
+      return `<${owner ? `button type="button" data-allscores="${h}"` : 'div'} class="hp"><div class="nm">${esc(p.name)}${g.responsable === pi ? ' ★' : ''}${pi === wolfNow ? ' <span class="wolf-tag">Loup</span>' : ''}</div><div class="hp-idx">Index ${String(p.index).replace('.', ',')}${sixT ? ` · <span class="pair">${sixT[0].includes(pi) ? 'Équipe A' : 'Équipe B'}</span>` : ''}</div><div class="dots">${k ? dots(k) : ''}</div><div class="hp-strk">${strokeHoles(g, p)}</div><div class="hp-tot">${tots[pi].played ? `<span>Brut <b>${tots[pi].gross}</b> · Net <b>${tots[pi].net}</b></span><span class="hp-n">${tots[pi].played} trou${tots[pi].played > 1 ? 's' : ''}</span>` : 'Aucun trou joué'}</div><div class="hp-pts"><b>${(pts[pi] > 0 && f !== 'neuf' ? '+' : '') + fmtPts(pts[pi])}</b> ${ptsLabel(g)}</div></${owner ? 'button' : 'div'}>`; });
+    const rank = g.players.map((p, i) => i).sort((a, b) => gn[b] - gn[a] || pts[b] - pts[a]);
+    const leader = `<div class="leader-box neuf"><span>Classement · ${esc(fname)}</span>${rank.map((i, r) => `<div class="nf-r"><b>${r + 1}. ${esc(g.players[i].name)}</b><small>${(pts[i] > 0 && f !== 'neuf' ? '+' : '') + fmtPts(pts[i])} ${ptsLabel(g)}</small><em class="${gn[i] > 0 ? 'pos' : gn[i] < 0 ? 'neg' : ''}">${gn[i] > 0 ? '+' : gn[i] < 0 ? '−' : ''}${fmt$(Math.abs(gn[i]))}</em></div>`).join('')}<div class="lb-detail"><span>${esc(gainRule(g))}</span></div></div>`;
+    const row = hole => { const ih = L.holeInfo(g, hole, 0), r = AH[hole] ? { ...AH[hole], hole } : null;
       const cells = g.players.map((p, pi) => { const s = L.getScore(g, hole, pi), k = L.strokesOnHole(p.strokes, ih.si), par = L.holeInfo(g, hole, pi).par;
         const cls = s == null ? '' : (s - k < par ? 'birdie' : s - k > par ? 'bogey' : '');
         return `<td class="pc"><button class="cell ${cls}" data-cell="${hole}:${pi}" ${owner ? '' : 'disabled'}><span>${s == null ? '' : s}</span>${k ? `<i class="d">${dots(k)}</i>` : ''}${s != null && k ? `<i class="nt">${s - k}</i>` : ''}</button></td>`; }).join('');
-      const sub = r ? `<tr class="calc-row ${hole === h ? 'cur' : ''}" data-detail="${hole}"><td colspan="3"></td><td colspan="3">${g.players.map((p, i) => `${esc(ini[i])} ${fmtPts(r.pts[i])}`).join(' · ')}</td></tr>` : '';
+      const sub = r ? `<tr class="calc-row ${hole === h ? 'cur' : ''}" data-detail="${hole}"><td colspan="3"></td><td colspan="${g.players.length}">${esc(altShort(g, r, ini))}</td></tr>` : '';
       return `<tr class="${hole === h ? 'cur' : ''} ${sub ? 'has-sub' : ''}"><th class="h"><button class="cell" data-hole="${hole}" style="font-size:19px">${hole}</button></th><td class="m">${ih.par}</td><td class="m">${ih.si}</td>${cells}</tr>${sub}`; };
     const sumRow = (label, from, to) => { let par = 0; for (let x = from; x <= to; x++) par += L.holeInfo(g, x, 0).par;
       return `<tr class="sum"><td colspan="2">${label}</td><td>${par}</td>${g.players.map((p, pi) => { let s = 0, any = false; for (let x = from; x <= to; x++) { const v = L.getScore(g, x, pi); if (v != null) { s += v; any = true; } } return `<td>${any ? s : ''}</td>`; }).join('')}</tr>`; };
     return `${presenceHtml(g)}
       <section class="hole-card" aria-live="polite">
-        <div class="hole-top"><div class="hole-no">${h}</div><div class="hole-meta">Normale <b>${hi.par}</b> · Handicap <b>${hi.si}</b> · <b>Le 9 points</b></div>
+        <div class="hole-top"><div class="hole-no">${h}</div><div class="hole-meta">Normale <b>${hi.par}</b> · Handicap <b>${hi.si}</b> · <b>${esc(fname)}</b>${f === 'wolf' ? ` · Loup : <b>${esc(g.players[wolfNow].name.split(' ')[0])}</b>` : ''}${f === 'sixes' ? ` · <b>${sixT[0].map(i => esc(g.players[i].name.split(' ')[0])).join(' + ')}</b> contre <b>${sixT[1].map(i => esc(g.players[i].name.split(' ')[0])).join(' + ')}</b>` : ''}</div>
           <div class="hole-nav"><button data-nav="-1" aria-label="Trou précédent">‹</button><button data-nav="1" aria-label="Trou suivant">›</button></div></div>
         ${!owner && Store.mode === 'firebase' && Store.email ? (S.confirmClaim === g.id
           ? `<div class="row game-actions"><button class="btn small" data-claim type="button">Oui, je deviens responsable</button><button class="btn ghost small" data-cancelclaim type="button">Annuler</button></div>`
@@ -1497,7 +1533,7 @@
       <div class="card-scroll"><table class="sc neuf">
         <thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${g.players.map((p, i) => `<th class="pc" title="${esc(p.name)}">${esc(ini[i])}</th>`).join('')}</tr></thead>
         <tbody>${Array.from({ length: 9 }, (_, i) => row(i + 1)).join('')}${sumRow('Aller', 1, 9)}${Array.from({ length: 9 }, (_, i) => row(i + 10)).join('')}${sumRow('Retour', 10, 18)}${sumRow('Total', 1, 18)}
-        <tr class="sum"><td colspan="3">Points</td>${pts.map(x => `<td>${fmtPts(x)}</td>`).join('')}</tr></tbody>
+        <tr class="sum"><td colspan="3">${f === 'skins' ? 'Skins' : f === 'neuf' || f === 'wolf' ? 'Points' : 'Trous'}</td>${pts.map(x => `<td>${(x > 0 && f !== 'neuf' ? '+' : '') + fmtPts(x)}</td>`).join('')}</tr></tbody>
       </table></div>
       <button class="btn sms-btn" data-sms type="button">Texto aux joueurs</button>
       ${owner ? `<div class="row game-actions bottom-actions">${g.status === 'terminée'
@@ -1506,7 +1542,7 @@
         ${S.confirmDelGame === g.id
           ? '<button class="btn small" data-delthis type="button" style="background:var(--red)">Confirmer l\'effacement</button><button class="btn ghost small" data-canceldelgame type="button">Annuler</button>'
           : '<button class="btn ghost small" data-askdelthis type="button">Effacer la partie</button>'}</div>` : ''}
-      <div class="legend"><span>★ responsable de la partie (il entre les scores)</span><span>${BALL} coup reçu · petit chiffre = net</span><span>Sous chaque trou : points du 9 points (5-3-1). Touchez la ligne pour le détail.</span><span>${g.players.map((p, i) => `<b>${esc(ini[i])}</b> ${esc(p.name)}`).join(' · ')}</span></div>`;
+      <div class="legend"><span>★ responsable de la partie (il entre les scores)</span><span>${BALL} coup reçu · petit chiffre = net</span><span>${esc(ruleText(g))} Touchez la ligne sous un trou pour le détail.</span><span>${g.players.map((p, i) => `<b>${esc(ini[i])}</b> ${esc(p.name)}`).join(' · ')}</span></div>`;
   }
   // ---------------- Présences ----------------
   const presKey = name => L.norm(name).replace(/[^a-z0-9]+/g, '-');
@@ -1515,12 +1551,12 @@
     const pr = S.presence || {}, started = Object.values(g.scores || {}).some(r => (r || []).some(v => v != null));
     if (started || g.status === 'terminée') return '';
     const mi = myIndex(g), mine = mi >= 0 ? pr[presKey(g.players[mi].name)] : null;
-    const order = isNeuf(g) ? g.players.map((_, i) => i) : [...L.getTeams(g)[1], ...L.getTeams(g)[0]];
+    const order = isAlt(g) ? g.players.map((_, i) => i) : [...L.getTeams(g)[1], ...L.getTeams(g)[0]];
     const n = order.filter(i => (pr[presKey(g.players[i].name)] || {}).ok === true).length;
     return `<section class="card presence"><h2>Présences <small>${n}/${g.players.length} confirmés</small></h2>
       <div class="pres-list">${order.map(i => { const x = pr[presKey(g.players[i].name)];
         const st = !x ? ['?', 'En attente', 'wait'] : x.ok ? ['✓', 'Présent', 'yes'] : ['✗', 'Absent', 'no'];
-        return `<div class="pres ${st[2]}"><b>${st[0]}</b><span class="${isNeuf(g) ? '' : 'tc' + teamOf(g, i)}">${esc(g.players[i].name)}</span><small>${st[1]}</small></div>`; }).join('')}</div>
+        return `<div class="pres ${st[2]}"><b>${st[0]}</b><span class="${isAlt(g) ? '' : 'tc' + teamOf(g, i)}">${esc(g.players[i].name)}</span><small>${st[1]}</small></div>`; }).join('')}</div>
       ${mi >= 0 ? `<div class="row pres-btns"><button class="btn ${mine && mine.ok ? '' : 'ghost'}" data-pres="1" type="button">Je serai là ✓</button><button class="btn ghost ${mine && mine.ok === false ? 'on-no' : ''}" data-pres="0" type="button">Je ne pourrai pas</button></div>` : ''}
       ${isOwner() ? `<button class="btn sms-btn" data-confirmsms type="button" style="margin-top:10px">Texto aux joueurs pour confirmer</button>` : ''}
       ${S.presenceBlocked ? '<div class="warn">Les présences ne peuvent pas être enregistrées : la règle « presence » n’est pas publiée dans Firebase.</div>' : ''}</section>`;
@@ -1528,7 +1564,7 @@
   // À la création d'une partie : texto aux joueurs pour confirmer leur présence
   function confirmText(g) {
     const { nums, missing } = playerNumbers(g); if (!nums.length) return;
-    const T = isNeuf(g) ? null : L.getTeams(g);
+    const T = isAlt(g) ? null : L.getTeams(g);
     const date = new Date(g.createdAt || Date.now()).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' });
     const body = [`Tu es inscrit à la game à Pelland – ${g.course.name.replace(/^Club de golf /i, '')}, ${date}.`,
       ...(T ? [`Bleus : ${T[1].map(i => g.players[i].name).join(', ')}`, `Rouges : ${T[0].map(i => g.players[i].name).join(', ')}`] : [`Le 9 points : ${g.players.map(p => p.name).join(', ')}`]),
@@ -1565,7 +1601,7 @@
   // Détail d'un trou (en touchant la ligne de calcul sous le trou)
   function holeDetail(h) {
     const g = S.game; if (!g) return;
-    if (isNeuf(g)) return holeDetailNeuf(g, h);
+    if (isAlt(g)) return holeDetailNeuf(g, h);
     const ih = L.holeInfo(g, h, 0), e = (g.events || {})[h] || {}, mult = L.holeMultiplier(g, h);
     const order = [...L.getTeams(g)[1], ...L.getTeams(g)[0]];
     const rows = order.map(pi => { const p = g.players[pi], s = L.getScore(g, h, pi), k = L.strokesOnHole(p.strokes, ih.si);
@@ -1596,13 +1632,15 @@
     const st0 = L.skinTeam(g, h);
     let skin = st0 == null ? undefined : st0; // undefined = pas encore dit ; -1 = pas de skin ; 0/1 = équipe
     let skinPlayer = ((g.events || {})[h] || {}).skinPlayer; if (skinPlayer === undefined) skinPlayer = null;
-    const neuf = isNeuf(g), T = neuf ? null : L.getTeams(g), order = neuf ? g.players.map((_, i) => i) : [...T[1], ...T[0]]; // Bleus puis Rouges
+    const neuf = isAlt(g), T = neuf ? null : L.getTeams(g), order = neuf ? g.players.map((_, i) => i) : [...T[1], ...T[0]]; // Bleus puis Rouges
+    const isWolf = L.formatOf(g) === 'wolf', wf = isWolf ? L.wolfOf(g, h) : -1;
+    let wolf = isWolf ? (((g.events || {})[h] || {}).wolf || null) : null;
     const draw = () => {
       const sheet = $('#sheet');
       // seuls les joueurs à la normale ou mieux (score brut) peuvent avoir la skin
       const eligible = order.filter(pi => vals[pi] != null && vals[pi] <= L.holeInfo(g, h, pi).par);
       if (skinPlayer != null && !eligible.includes(skinPlayer)) { skinPlayer = null; if (skin !== -1) skin = st0 == null ? undefined : st0; }
-      const needSkin = !neuf && vals.some(v => v != null) && skin === undefined;
+      const needSkin = (!neuf && vals.some(v => v != null) && skin === undefined) || (isWolf && vals.some(v => v != null) && !wolf);
       sheet.innerHTML = `<h3>Trou ${h} · normale ${L.holeInfo(g, h, 0).par}</h3>
         <div class="allscores">${order.map(pi => { const p = P[pi];
           const par = L.holeInfo(g, h, pi).par, k = L.strokesOnHole(p.strokes, g.course.holes[h - 1].si);
@@ -1612,12 +1650,14 @@
           return `<div class="as-row ${vals[pi] != null ? 'done' : ''}"><div class="as-name ${neuf ? '' : 'tc' + teamOf(g, pi)}">${esc(p.name)}${k ? ` <small class="as-k">${BALL.repeat(Math.max(0, k))}</small>` : ''}</div>
             <div class="as-opts">${opts.map(n => `<button type="button" class="as-n ${n === par ? 'par' : ''}" data-p="${pi}" data-n="${n}" aria-pressed="${vals[pi] === n}">${n}</button>`).join('')}<button type="button" class="as-n more" data-p="${pi}" data-plus="1" aria-label="Plus">+</button></div></div>`;
         }).join('')}</div>
+        ${isWolf ? `<div class="toggles"><div class="tg"><span>Le loup ${esc(P[wf].name)} joue avec…</span>${P.map((p, i) => i === wf ? '' : `<button type="button" class="pill" data-wolfp="${i}" aria-pressed="${!!wolf && wolf.partner === i}">${esc(p.name)}</button>`).join('')}<button type="button" class="pill" data-wolfp="lone" aria-pressed="${!!wolf && wolf.partner == null && !wolf.blind}">Seul (×2)</button><button type="button" class="pill" data-wolfp="blind" aria-pressed="${!!wolf && !!wolf.blind}">Seul à l’aveugle (×3)</button></div></div>` : ''}
         ${neuf ? '' : `<div class="toggles"><div class="tg"><span>Skin à… (joueurs qui ont fait la normale)</span>${eligible.length ? eligible.map(pi => `<button type="button" class="pill team-pill t${teamOf(g, pi)}" data-skinp="${pi}" aria-pressed="${skinPlayer === pi}">${esc(P[pi].name)}</button>`).join('') : `<span class="note" style="width:auto">${vals.every(v => v == null) ? 'Entrez les scores d\'abord.' : 'Personne n\'a fait la normale.'}</span>`}<button type="button" class="pill" data-skinp="-1" aria-pressed="${skin === -1}">Pas de skin</button></div>
         <p class="note">${skin === 0 || skin === 1 ? `Skin pour les ${L.TEAMS[skin]}.` : skin === -1 ? 'Pas de skin.' : 'Skin pas encore indiquée.'}</p></div>`}
-        ${needSkin ? '<p class="warn" style="margin:0">Choisissez la skin (un joueur) ou « Pas de skin » avant d’enregistrer.</p>' : ''}
+        ${needSkin ? `<p class="warn" style="margin:0">${isWolf ? 'Indiquez le choix du loup avant d’enregistrer.' : 'Choisissez la skin (un joueur) ou « Pas de skin » avant d’enregistrer.'}</p>` : ''}
         <div class="sheet-foot"><button type="button" class="btn ghost small" data-close>Annuler</button><button type="button" class="btn" data-save ${needSkin ? 'disabled' : ''}>Enregistrer</button></div>`;
       sheet.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { const pi = +b.dataset.p, n = +b.dataset.n; vals[pi] = vals[pi] === n ? null : n; draw(); });
       sheet.querySelectorAll('[data-plus]').forEach(b => b.onclick = () => { const pi = +b.dataset.p; vals[pi] = (vals[pi] || Math.max(1, L.holeInfo(g, h, pi).par - 2) + 5) + 1; draw(); });
+      sheet.querySelectorAll('[data-wolfp]').forEach(b => b.onclick = () => { const v = b.dataset.wolfp; wolf = v === 'lone' ? { lone: true } : v === 'blind' ? { lone: true, blind: true } : { partner: +v }; draw(); });
       sheet.querySelectorAll('[data-skinp]').forEach(b => b.onclick = () => {
         const v = +b.dataset.skinp;
         if (v === -1) { skin = -1; skinPlayer = null; } else { skinPlayer = v; skin = teamOf(g, v); }
@@ -1625,9 +1665,10 @@
       });
       sheet.querySelector('[data-close]').onclick = closeSheet;
       sheet.querySelector('[data-save]').onclick = () => {
-        if (needSkin) return toast('Choisissez la skin ou « Pas de skin ».');
+        if (needSkin) return toast(isWolf ? 'Indiquez le choix du loup.' : 'Choisissez la skin ou « Pas de skin ».');
         const scores = {}; vals.forEach((v, pi) => { if (v != null && v !== L.getScore(g, h, pi)) scores[pi] = v; });
         const acts = [];
+        if (isWolf && wolf) acts.unshift({ type: 'wolf', hole: h, wolf });
         if (Object.keys(scores).length) acts.push({ type: 'scores', hole: h, scores });
         if (!neuf && skin !== undefined && (skin !== st0 || skinPlayer != null)) acts.push({ type: 'skin', hole: h, team: skin, player: skin >= 0 ? skinPlayer : null });
         closeSheet();

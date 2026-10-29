@@ -570,6 +570,7 @@
     const say = [];
     const ev = h => (g.events[h] = g.events[h] || { presses: [], skins: [], skinTeam: null, reroll: false, par3Winner: null });
     actions.forEach(a => {
+      if (a.type === 'wolf') { ev(a.hole).wolf = a.wolf; }
       if (a.type === 'goto') { g.currentHole = a.hole; say.push(`Trou ${a.hole}, normale ${holeInfo(g, a.hole, 0).par}.`); }
       if (a.type === 'scores') {
         const row = g.scores[a.hole] = (g.scores[a.hole] || g.players.map(() => null)).slice(0, g.players.length);
@@ -882,6 +883,63 @@
   }
   function neufTotals(game) { const t = [0, 0, 0]; for (let h = 1; h <= 18; h++) { const r = neufPoints(game, h); if (r) r.pts.forEach((v, i) => { t[i] += v; }); } return t; }
 
-  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, TEAMS, teamFromText, makeTeams, orderTeams, getTeams, teamName, netScore, holeMultiplier, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, cabaneTeam, cabanes, calcText, par3Results, describePar3, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup, resolveName, nextPrompt, trailingTeam, pressTeamOf, initials, leadChanges, totalText, holeNetText, parseCardText, neufPoints, neufTotals };
+  // ---------- Autres jeux : Best Ball, Wolf, Sixes, Skins (et le 9 points) ----------
+  const FORMATS = { pelland: 'La game à Pelland', neuf: 'Le 9 points', bestball: 'Best Ball', wolf: 'Wolf', sixes: 'Sixes', skins: 'Skins' };
+  function formatOf(g) { return g.format || (g.players.length === 3 ? 'neuf' : 'pelland'); }
+  function netOf(g, h, i) { const s = getScore(g, h, i); return s == null ? null : s - strokesOnHole(g.players[i].strokes, g.course.holes[h - 1].si); }
+  function holeNets(g, h) { const n = g.players.map((_, i) => netOf(g, h, i)); return n.some(v => v == null) ? null : n; }
+  function sixesTeams(h) { return [[[0, 1], [2, 3]], [[0, 2], [1, 3]], [[0, 3], [1, 2]]][h <= 6 ? 0 : h <= 12 ? 1 : 2]; }
+  function wolfOf(g, h) { return (h - 1) % g.players.length; }
+  // Résultat d'un trou : pts = points de chaque joueur (somme nulle sauf le 9 points), win = gagnants, desc = phrase
+  function altHoles(g) {
+    const f = formatOf(g), P = g.players, nm = i => P[i].name, out = {}; let carry = 0;
+    for (let h = 1; h <= 18; h++) {
+      const n = holeNets(g, h); if (!n) { out[h] = null; continue; }
+      if (f === 'neuf') { const r = neufPoints(g, h); out[h] = { pts: r.pts, win: [], desc: P.map((p, i) => `${nm(i)} ${r.pts[i]}`).join(', ') }; continue; }
+      if (f === 'bestball' || f === 'sixes') {
+        const T = f === 'bestball' ? getTeams(g) : sixesTeams(h), b = T.map(t => Math.min(...t.map(i => n[i]))), pts = P.map(() => 0);
+        if (b[0] === b[1]) { out[h] = { pts, win: [], desc: `Égalité au meilleur net (${b[0]}) : trou partagé.`, teams: T }; continue; }
+        const w = b[0] < b[1] ? 0 : 1; T[w].forEach(i => { pts[i] = 1; }); T[1 - w].forEach(i => { pts[i] = -1; });
+        out[h] = { pts, win: T[w], desc: `${T[w].map(nm).join(' et ')} gagnent le trou (meilleur net ${b[w]} contre ${b[1 - w]}).`, teams: T }; continue;
+      }
+      if (f === 'wolf') {
+        const e = (g.events || {})[h] || {}, d = e.wolf, wf = wolfOf(g, h), pts = P.map(() => 0);
+        if (!d) { out[h] = { pts: null, win: [], desc: `Décision du loup (${nm(wf)}) pas encore indiquée.` }; continue; }
+        if (d.partner != null) {
+          const A = [wf, d.partner], B = P.map((_, i) => i).filter(i => !A.includes(i));
+          const a = Math.min(...A.map(i => n[i])), bb = Math.min(...B.map(i => n[i]));
+          if (a === bb) { out[h] = { pts, win: [], desc: `Loup ${nm(wf)} avec ${nm(d.partner)} : égalité (${a}), pas de points.`, wolf: d }; continue; }
+          const W = a < bb ? A : B, Lz = a < bb ? B : A; W.forEach(i => { pts[i] = 1; }); Lz.forEach(i => { pts[i] = -1; });
+          out[h] = { pts, win: W, desc: `Loup ${nm(wf)} avec ${nm(d.partner)} : ${W.map(nm).join(' et ')} gagnent (${Math.min(a, bb)} contre ${Math.max(a, bb)}), 1 point chacun.`, wolf: d }; continue;
+        }
+        const v = d.blind ? 3 : 2, others = P.map((_, i) => i).filter(i => i !== wf), bo = Math.min(...others.map(i => n[i]));
+        if (n[wf] === bo) { out[h] = { pts, win: [], desc: `Loup ${nm(wf)} seul${d.blind ? ' à l’aveugle' : ''} : égalité (${bo}), pas de points.`, wolf: d }; continue; }
+        const won = n[wf] < bo; pts[wf] = (won ? 1 : -1) * v * others.length; others.forEach(i => { pts[i] = (won ? -1 : 1) * v; });
+        out[h] = { pts, win: won ? [wf] : others, desc: `Loup ${nm(wf)} seul${d.blind ? ' à l’aveugle' : ''} (${v} points par joueur) : ${won ? 'il gagne' : 'il perd'} (${n[wf]} contre ${bo}).`, wolf: d }; continue;
+      }
+      if (f === 'skins') {
+        const mn = Math.min(...n), who = n.map((v, i) => v === mn ? i : -1).filter(i => i >= 0), units = 1 + carry, pts = P.map(() => 0);
+        if (who.length > 1) { carry = units; out[h] = { pts, win: [], desc: `Égalité au meilleur net (${mn}) : ${units} skin${units > 1 ? 's' : ''} reporté${units > 1 ? 's' : ''} au trou suivant.`, carry: units }; continue; }
+        carry = 0; const w = who[0]; pts[w] = units * (P.length - 1); P.forEach((_, i) => { if (i !== w) pts[i] = -units; });
+        out[h] = { pts, win: [w], desc: `${nm(w)} gagne ${units} skin${units > 1 ? 's' : ''} (net ${mn}).`, units }; continue;
+      }
+      out[h] = null;
+    }
+    return out;
+  }
+  function altTotals(g) { const r = altHoles(g), t = g.players.map(() => 0); for (let h = 1; h <= 18; h++) if (r[h] && r[h].pts) r[h].pts.forEach((v, i) => { t[i] += v; }); return t; }
+  // Gain de chaque joueur ($) selon le jeu
+  function altGains(g, pp) {
+    const f = formatOf(g), t = altTotals(g);
+    if (f === 'neuf') return t.map((x, i) => t.reduce((a, y, j) => a + (j === i ? 0 : (x - y) * pp), 0));
+    if (f === 'sixes') { const r = altHoles(g), gn = g.players.map(() => 0);
+      [[1, 6], [7, 12], [13, 18]].forEach(([a, b]) => { const s = g.players.map(() => 0); let any = false;
+        for (let h = a; h <= b; h++) if (r[h] && r[h].pts) { any = true; r[h].pts.forEach((v, i) => { s[i] += v; }); }
+        if (any) s.forEach((v, i) => { gn[i] += Math.sign(v) * pp; }); });
+      return gn; }
+    return t.map(x => x * pp);
+  }
+
+  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, TEAMS, teamFromText, makeTeams, orderTeams, getTeams, teamName, netScore, holeMultiplier, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, cabaneTeam, cabanes, calcText, par3Results, describePar3, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup, resolveName, nextPrompt, trailingTeam, pressTeamOf, initials, leadChanges, totalText, holeNetText, parseCardText, neufPoints, neufTotals, FORMATS, formatOf, altHoles, altTotals, altGains, sixesTeams, wolfOf };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PellandLogic = api;
 })(this);
