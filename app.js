@@ -461,7 +461,7 @@
         <button class="btn ghost small" id="oAddDate" type="button">+ Ajouter une date</button>
         <label>Date butoir pour répondre<input type="date" id="oDeadline" value="${esc(f.deadline)}"></label>
         <div class="row"><button class="btn sms-btn" id="oSend" type="button">Enregistrer et texter les joueurs</button><button class="btn ghost small" id="oCancel" type="button">Annuler</button></div></div>`
-      : canOrganize() ? `<button class="btn" id="oNew" type="button">Offrir des parties</button>` : '<p class="note">Seuls le propriétaire et les organisateurs du groupe offrent des parties.</p>';
+      : canOrganize() ? `<button class="btn" id="oNew" type="button">Offrir des parties</button>` : '<p class="note">Seuls le propriétaire et l’organisateur du groupe offrent des parties.</p>';
     return `<section class="card"><h2>Parties offertes</h2><p class="note">Proposez des dates : tous les joueurs reçoivent un texto et indiquent dans l’app les dates où ils sont disponibles, avant la date butoir.</p>${form}${list}</section>`;
   }
   function offreSms(o) {
@@ -917,7 +917,7 @@
         </section>
       ${(() => { const dups = duplicateMap(S.players); const nd = Object.keys(dups).length; return nd ? `<div class="warn">${nd} joueurs semblent en double. Vérifiez les noms marqués « Doublon ? » et retirez celui de trop.</div>` : ''; })()}
       ${!ownerId() && S.players.length ? `<div class="warn">Le groupe n’a pas encore de propriétaire (la personne qui l’administre et paie l’abonnement). <button class="linkbtn" id="claimOwner" type="button">C’est moi</button></div>` : ''}
-      ${ownerId() ? `<p class="note">Le <b>propriétaire</b> administre le groupe et paie l’abonnement. Les <b>organisateurs</b> offrent des dates et créent les parties${meId() === ownerId() ? ' : touchez « + Organisateur » pour en nommer' : ''}.</p>` : ''}
+      ${ownerId() ? `<p class="note">Le <b>propriétaire</b> administre le groupe et paie l’abonnement. Avec lui, un <b>organisateur</b> peut offrir des dates et créer les parties${meId() === ownerId() ? ' : touchez « + Organisateur » pour le nommer (un seul à la fois)' : ''}.</p>` : ''}
       ${S.players.length ? `<p class="pl-count"><b>${S.players.length}</b> joueur${S.players.length > 1 ? 's' : ''} dans le groupe</p>` : ''}
       <div class="list">${S.players.length ? (() => { const dups = duplicateMap(S.players); return S.players.map((p, n) => `<div class="item pl-row ${dups[p.id] ? 'dup' : ''}"><b><span class="pl-n">${n + 1}.</span> ${esc(p.name)}${p.id === ownerId() ? ' <span class="owner-tag">Propriétaire</span>' : !ownerId() ? '' : meId() === ownerId() ? ` <button class="role-chip ${isOrganizer(p.id) ? 'on' : ''}" data-org="${esc(p.id)}" type="button">${isOrganizer(p.id) ? 'Organisateur ✓' : '+ Organisateur'}</button>` : isOrganizer(p.id) ? ' <span class="org-tag">Organisateur</span>' : ''}${dups[p.id] ? ` <span class="dup-flag" title="Ressemble à ${esc(dups[p.id].join(', '))}">Doublon ?</span>` : ''}</b>${S.confirmDel === p.id
         ? `<span class="row"><button class="btn small" data-delp="${esc(p.id)}" type="button" style="background:var(--red)">Confirmer</button><button class="btn ghost small" data-canceldel type="button">Annuler</button></span>`
@@ -1114,8 +1114,9 @@
     },
     players(v) {
       v.querySelectorAll('[data-org]').forEach(b => b.onclick = async () => {
-        const gr = { ...curGroup() }, id = b.dataset.org, list = (gr.organizers || []).slice(), i = list.indexOf(id);
-        if (i >= 0) list.splice(i, 1); else list.push(id); gr.organizers = list;
+        // un seul organisateur (en plus du propriétaire) : en nommer un nouveau remplace l'ancien
+        const gr = { ...curGroup() }, id = b.dataset.org, cur = (gr.organizers || [])[0];
+        gr.organizers = cur === id ? [] : [id];
         try { await Store.saveGroup(gr); S.groups = await Store.listGroups(); render(); } catch (e) { toast('Impossible : ' + e.message); }
       });
       const co = $('#claimOwner'); if (co) co.onclick = async () => {
