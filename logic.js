@@ -887,7 +887,7 @@
   function neufTotals(game) { const t = [0, 0, 0]; for (let h = 1; h <= 18; h++) { const r = neufPoints(game, h); if (r) r.pts.forEach((v, i) => { t[i] += v; }); } return t; }
 
   // ---------- Autres jeux : Best Ball, Wolf, Sixes, Skins (et le 9 points) ----------
-  const FORMATS = { pelland: 'La game à Pelland', neuf: 'Le 9 points', bestball: 'Best Ball', wolf: 'Wolf', sixes: 'Sixes', skins: 'Skins', perso: 'Jeu maison' };
+  const FORMATS = { pelland: 'La game à Pelland', neuf: 'Le 9 points', bestball: 'Best Ball', nassau: 'Nassau', wolf: 'Wolf', sixes: 'Sixes', skins: 'Skins', perso: 'Jeu maison' };
   function formatOf(g) { return g.format || (g.players.length === 3 ? 'neuf' : 'pelland'); }
   function netOf(g, h, i) { const s = getScore(g, h, i); return s == null ? null : s - strokesOnHole(g.players[i].strokes, g.course.holes[h - 1].si); }
   function holeNets(g, h) { const n = g.players.map((_, i) => netOf(g, h, i)); return n.some(v => v == null) ? null : n; }
@@ -902,8 +902,8 @@
     for (let h = h0; h <= h1; h++) {
       const n = holeNets(g, h); if (!n) { out[h] = null; continue; }
       if (f === 'neuf') { const r = neufPoints(g, h); out[h] = { pts: r.pts, win: [], desc: P.map((p, i) => `${nm(i)} ${r.pts[i]}`).join(', ') }; continue; }
-      if (f === 'bestball' || f === 'sixes') {
-        const T = f === 'bestball' ? getTeams(g) : sixesTeams(h, g), b = T.map(t => Math.min(...t.map(i => n[i]))), pts = P.map(() => 0);
+      if (f === 'bestball' || f === 'nassau' || f === 'sixes') {
+        const T = f !== 'sixes' ? getTeams(g) : sixesTeams(h, g), b = T.map(t => Math.min(...t.map(i => n[i]))), pts = P.map(() => 0);
         if (b[0] === b[1]) { out[h] = { pts, win: [], desc: `Égalité au meilleur net (${b[0]}) : trou partagé.`, teams: T }; continue; }
         const w = b[0] < b[1] ? 0 : 1; T[w].forEach(i => { pts[i] = 1; }); T[1 - w].forEach(i => { pts[i] = -1; });
         out[h] = { pts, win: T[w], desc: `${T[w].map(nm).join(' et ')} gagnent le trou (meilleur net ${b[w]} contre ${b[1 - w]}).`, teams: T }; continue;
@@ -972,9 +972,18 @@
         for (let h = 1; h <= 18; h++) if (r[h] && sixesSeg(h, g) === seg) if (r[h] && r[h].pts) { any = true; r[h].pts.forEach((v, i) => { s[i] += v; }); }
         if (any) s.forEach((v, i) => { gn[i] += Math.sign(v) * pp; }); });
       return gn; }
+    if (f === 'nassau') return nassauBets(g).reduce((gn, b) => gn.map((v, i) => v + Math.sign(b.pts[i]) * pp), g.players.map(() => 0));
     return t.map(x => x * pp);
   }
+  // Nassau : 3 paris en Best Ball — l'aller (1-9), le retour (10-18) et le total ; sur 9 trous, un seul pari
+  function nassauBets(g) {
+    const r = altHoles(g), [a, b] = holeRange(g);
+    const segs = a === 1 && b === 18 ? [['L’aller', 1, 9], ['Le retour', 10, 18], ['Le total', 1, 18]] : [['La partie', a, b]];
+    return segs.map(([name, x, y]) => { const pts = g.players.map(() => 0); let played = 0;
+      for (let h = x; h <= y; h++) if (r[h] && r[h].pts) { played++; r[h].pts.forEach((v, i) => { pts[i] += v; }); }
+      return { name, from: x, to: y, pts, played, done: played === y - x + 1 }; }).filter(s => s.played);
+  }
 
-  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, TEAMS, teamFromText, makeTeams, orderTeams, getTeams, teamName, netScore, holeMultiplier, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, cabaneTeam, cabanes, calcText, par3Results, describePar3, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup, resolveName, nextPrompt, trailingTeam, pressTeamOf, initials, leadChanges, totalText, holeNetText, parseCardText, neufPoints, neufTotals, FORMATS, formatOf, altHoles, altTotals, altGains, sixesTeams, wolfOf, holeRange };
+  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, TEAMS, teamFromText, makeTeams, orderTeams, getTeams, teamName, netScore, holeMultiplier, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, cabaneTeam, cabanes, calcText, par3Results, describePar3, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup, resolveName, nextPrompt, trailingTeam, pressTeamOf, initials, leadChanges, totalText, holeNetText, parseCardText, neufPoints, neufTotals, FORMATS, formatOf, altHoles, altTotals, altGains, nassauBets, sixesTeams, wolfOf, holeRange };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PellandLogic = api;
 })(this);

@@ -469,6 +469,8 @@
       money: ['Chacun gagne ou paie la différence de points avec chaque autre joueur, × le montant par point.'] },
     { f: 'bestball', who: '4 joueurs, en équipes de deux', rules: ['Le meilleur net de chaque équipe compte.', 'L’équipe la plus basse gagne le trou ; égalité : trou partagé.'],
       money: ['Écart de trous gagnés × le montant par trou, par joueur.'] },
+    { f: 'nassau', who: '4 joueurs, en équipes de deux', rules: ['Trois paris en Best Ball : l’aller (trous 1 à 9), le retour (10 à 18) et le total des 18 trous.', 'Le meilleur net de chaque équipe gagne le trou ; l’équipe qui gagne le plus de trous gagne le pari.', 'Égalité dans un pari : personne ne gagne.', 'Sur 9 trous : un seul pari.'],
+      money: ['Chaque pari gagné vaut la mise ; perdu, −la mise. Maximum : 3 fois la mise, par joueur.'] },
     { f: 'wolf', who: '4 joueurs ; le loup tourne à chaque trou', rules: ['Joueur 1 est le loup au trou 1, joueur 2 au trou 2, et ainsi de suite.', 'Le loup choisit un partenaire : chaque gagnant fait +1, chaque perdant −1.', 'Le loup joue seul : 2 points par adversaire, gagnés ou perdus.', 'Seul à l’aveugle (avant les coups de départ) : 3 points par adversaire.'],
       money: ['Points × le montant par point.'] },
     { f: 'sixes', who: '4 joueurs ; les équipes changent', rules: ['1+2 contre 3+4, puis 1+3 contre 2+4, puis 1+4 contre 2+3 (6 trous chacun sur 18, 3 sur 9).', 'Dans chaque tranche : Best Ball, 1 point par trou gagné.'],
@@ -655,7 +657,7 @@
   // Ce qui manque avant de pouvoir créer la partie
   function validIndex(v) { const x = parseFloat(String(v).replace(',', '.')); return String(v).trim() !== '' && /^[-+]?\d+([.,]\d)?$/.test(String(v).trim()) && x >= -10 && x <= 54; }
   // 4 joueurs = la game à Pelland ; 3 joueurs (4e case vide) = le 9 points
-  const gamesFor = n => (n === 3 ? ['neuf', 'skins'] : ['pelland', 'bestball', 'wolf', 'sixes', 'skins'])
+  const gamesFor = n => (n === 3 ? ['neuf', 'skins'] : ['pelland', 'bestball', 'nassau', 'wolf', 'sixes', 'skins'])
     .concat((S.jeux || []).filter(j => j.mode === 'equipes' ? n === 4 : true).map(j => 'perso:' + j.id));
   // Jeu maison choisi dans Nouvelle partie → objet « partie » minimal pour les textes de règles
   const jeuOf = key => (S.jeux || []).find(j => 'perso:' + j.id === key);
@@ -688,7 +690,7 @@
     while (d.players.length < 4) d.players.push({ name: '', index: '', tee: (d.players[0] || {}).tee || 'II' });
     syncCount(d);
     const games = gamesFor(d.count); if (!games.includes(d.format)) d.format = games[0];
-    const teamsUsed = d.format === 'pelland' || d.format === 'bestball' || ((jeuOf(d.format) || {}).mode === 'equipes');
+    const teamsUsed = d.format === 'pelland' || d.format === 'bestball' || d.format === 'nassau' || ((jeuOf(d.format) || {}).mode === 'equipes');
     const od = d.offre ? offreDates().find(x => x.key === d.offre) : null;
     const fromOffre = od ? S.courses.find(x => x.name === od.course) : null;
     if (fromOffre) d.courseId = fromOffre.id;
@@ -724,7 +726,7 @@
       </section>
       <section class="card">
         <div class="step">Argent ${info(d.format === 'pelland' ? 'argent' : 'jeu-' + d.format)}</div>
-        ${d.format !== 'pelland' ? `<div class="row" style="flex-wrap:nowrap"><label style="flex:1">${({ neuf: 'Par point', bestball: 'Par trou gagné', wolf: 'Par point', sixes: 'Par tranche gagnée', skins: 'Par skin' })[d.format] || 'Par point'}<span class="money-in"><input id="ppt" type="text" inputmode="decimal" placeholder="1" value="${esc(fmtIn(d.perPoint))}"><i>$</i></span></label><span style="flex:1"></span></div>
+        ${d.format !== 'pelland' ? `<div class="row" style="flex-wrap:nowrap"><label style="flex:1">${({ neuf: 'Par point', bestball: 'Par trou gagné', nassau: 'Par pari', wolf: 'Par point', sixes: 'Par tranche gagnée', skins: 'Par skin' })[d.format] || 'Par point'}<span class="money-in"><input id="ppt" type="text" inputmode="decimal" placeholder="1" value="${esc(fmtIn(d.perPoint))}"><i>$</i></span></label><span style="flex:1"></span></div>
         <p class="note">${esc(ruleText(fakeG(d.format)))} ${esc(gainRule({ ...fakeG(d.format), perPoint: d.perPoint }))}.</p>` : `<div class="row" style="flex-wrap:nowrap">
           <label style="flex:1">La game commence à<span class="money-in"><input id="stake" type="text" inputmode="decimal" placeholder="0" value="${esc(fmtIn(d.stake))}"><i>$</i></span></label>
           <label style="flex:1">À chaque revirement<span class="money-in"><input id="lcv" type="text" inputmode="decimal" placeholder="0" value="${esc(fmtIn(d.leadChangeValue))}"><i>$</i></span></label>
@@ -798,7 +800,7 @@
     if (!pv || !pv.ready) return `<p class="note">Entrez les ${d.count === 3 ? 'trois' : 'quatre'} prénoms et index pour voir les coups${d.count === 3 ? '' : ' et les équipes'}.</p>`;
     return `<table><thead><tr><th>Joueur</th><th>Tertre</th><th style="text-align:right">Index</th><th style="text-align:right">Hcp</th><th style="text-align:right">Coups</th></tr></thead><tbody>
       ${pv.ps.map(p => `<tr><td>${esc(p.name)}</td><td>${esc(p.tee)}</td><td class="n">${String(p.index).replace('.', ',')}</td><td class="n">${p.courseHandicap}</td><td class="n"><b>${p.strokes}</b></td></tr>`).join('')}
-      </tbody></table>${!(d.format === 'pelland' || d.format === 'bestball' || (jeuOf(d.format) || {}).mode === 'equipes') ? '' : d.teamMode ? teamsHtml(pv.ps, draftTeams(d, pv.ps)) : '<p class="note">Choisissez la formation des équipes à l\'étape 7.</p>'}<p class="note">${d.mode === 'full' ? '<b>Coups</b> : chaque joueur reçoit son handicap de parcours (Hcp).' : '<b>Coups</b> = Hcp du joueur − Hcp le plus bas du groupe. Le meilleur joue à 0.'}${coupsCalc(pv.ps, d.mode)} Les coups se placent d’abord sur les trous les plus difficiles : 7 coups, 1 par trou, pour des trous de difficulté 1 à 7. Au-delà de 18 coups, on recommence : un 2<sup>e</sup> coup sur les trous les plus difficiles.</p>`;
+      </tbody></table>${!(d.format === 'pelland' || d.format === 'bestball' || d.format === 'nassau' || (jeuOf(d.format) || {}).mode === 'equipes') ? '' : d.teamMode ? teamsHtml(pv.ps, draftTeams(d, pv.ps)) : '<p class="note">Choisissez la formation des équipes à l\'étape 7.</p>'}<p class="note">${d.mode === 'full' ? '<b>Coups</b> : chaque joueur reçoit son handicap de parcours (Hcp).' : '<b>Coups</b> = Hcp du joueur − Hcp le plus bas du groupe. Le meilleur joue à 0.'}${coupsCalc(pv.ps, d.mode)} Les coups se placent d’abord sur les trous les plus difficiles : 7 coups, 1 par trou, pour des trous de difficulté 1 à 7. Au-delà de 18 coups, on recommence : un 2<sup>e</sup> coup sur les trous les plus difficiles.</p>`;
   }
 
   // « Claude : 12 − 7 = 5 coups (trous de difficulté 1 à 5) »
@@ -1398,7 +1400,7 @@
       $('#create').onclick = async () => {
         const pv = draftPreview(d);
         if (!pv || !pv.ready) { const m = 'Il manque ' + missingList(d).slice(0, 2).join(' et ') + '.'; toast(m); setReply(m); Voice.say(m); return; }
-        syncCount(d); const fmtG = gamesFor(d.count).includes(d.format) ? d.format : gamesFor(d.count)[0], jeu = jeuOf(fmtG), neuf = !(fmtG === 'pelland' || fmtG === 'bestball' || (jeu && jeu.mode === 'equipes')), rIdx = filledIdx(d).indexOf(d.responsable);
+        syncCount(d); const fmtG = gamesFor(d.count).includes(d.format) ? d.format : gamesFor(d.count)[0], jeu = jeuOf(fmtG), neuf = !(fmtG === 'pelland' || fmtG === 'bestball' || fmtG === 'nassau' || (jeu && jeu.mode === 'equipes')), rIdx = filledIdx(d).indexOf(d.responsable);
         if (!neuf && !d.teamMode) { toast('Choisissez la formation des équipes (étape 7).'); return; }
         const names = pv.ps.map(p => L.norm(p.name));
         if (new Set(names).size < names.length) return toast('Le même joueur est choisi deux fois.');
@@ -1677,7 +1679,7 @@
   const neufPP = g => g.perPoint == null || g.perPoint === '' ? 1 : money(g.perPoint);
   // Gain de chacun : différence de points avec chaque autre joueur × $ par point
   function neufGains(g) { return L.altGains(g, neufPP(g)); }
-  const ptsLabel = g => ({ neuf: 'pts', skins: 'skins', bestball: 'trous', sixes: 'trous', wolf: 'pts' })[L.formatOf(g)] || 'pts';
+  const ptsLabel = g => ({ neuf: 'pts', skins: 'skins', bestball: 'trous', nassau: 'trous', sixes: 'trous', wolf: 'pts' })[L.formatOf(g)] || 'pts';
   function persoLines(c) {
     c = c || {}; const L2 = [];
     if (c.mode === 'equipes') {
@@ -1699,6 +1701,7 @@
     if (L.formatOf(g) === 'perso') return persoLines(g.custom).join(' ');
     return ({ neuf: 'Le 9 points : 5 points au meilleur net, 3 au 2e, 1 au 3e ; égalités partagées.',
       bestball: 'Best Ball : le meilleur net de chaque équipe ; le trou gagné vaut 1 point.',
+      nassau: 'Nassau : trois paris en Best Ball, l’aller, le retour et le total ; l’équipe qui gagne le plus de trous gagne le pari.',
       sixes: 'Sixes : les équipes changent à chaque tiers de la partie (6 trous sur 18, 3 sur 9) ; meilleur net de l’équipe, 1 point par trou ; l’équipe qui gagne le plus de trous gagne la tranche.',
       wolf: 'Wolf : le loup tourne à chaque trou. Avec un partenaire : 1 point chacun au gagnant ; seul : 2 points par adversaire ; seul à l’aveugle : 3 points.',
       skins: 'Skins : le seul meilleur net gagne le skin ; à égalité, il est reporté au trou suivant.' })[L.formatOf(g)] || '';
@@ -1706,8 +1709,14 @@
   function gainRule(g) {
     const pp = fmt$(neufPP(g));
     if (L.formatOf(g) === 'perso') { const c = g.custom || {}; return c.mode === 'equipes' ? `Gain par joueur = écart de points × ${pp}${+c.stake ? ` + ${fmt$(+c.stake)} à l’équipe qui mène` : ''}` : `Gain = différence de points avec chaque autre joueur × ${pp}`; }
-    return ({ neuf: `Gain = différence de points avec chaque autre joueur × ${pp}`, bestball: `Gain = écart de trous gagnés × ${pp} par joueur`,
+    return ({ neuf: `Gain = différence de points avec chaque autre joueur × ${pp}`, bestball: `Gain = écart de trous gagnés × ${pp} par joueur`, nassau: `Gain = ${pp} par pari gagné (perdu : −${pp}), par joueur` + nassauText(g),
       sixes: `Gain = ${pp} par tranche gagnée (perdue : −${pp})`, wolf: `Gain = points × ${pp}`, skins: `Gain = skins gagnés × ${pp} payé par chaque autre joueur` })[L.formatOf(g)] || '';
+  }
+  // État des paris du Nassau : « L’aller : Rouges +2 · Le retour : égal »
+  function nassauText(g) {
+    if (!g.scores || !g.players || g.players.length !== 4) return '';
+    const T = L.getTeams(g), b = L.nassauBets(g); if (!b.length) return '';
+    return '. ' + b.map(x => { const v = x.pts[T[0][0]]; return `${x.name} : ${v === 0 ? 'égal' : `${L.TEAMS[v > 0 ? 0 : 1]} +${Math.abs(v)}`}${x.done ? (v ? ' (gagné)' : '') : ''}`; }).join(' · ');
   }
   // Texte court sous chaque trou de la carte
   function altShort(g, r, ini) {
@@ -1741,7 +1750,7 @@
     const f = L.formatOf(g), fname = gameName(g), AH = L.altHoles(g);
     const tots = g.players.map((p, i) => L.totals(g, i)), pts = L.altTotals(g), gn = neufGains(g), ini = L.initials(g.players);
     const wolfNow = f === 'wolf' ? L.wolfOf(g, h) : -1;
-    const sixT = f === 'sixes' ? L.sixesTeams(h, g) : f === 'bestball' ? L.getTeams(g) : null;
+    const sixT = f === 'sixes' ? L.sixesTeams(h, g) : (f === 'bestball' || f === 'nassau') ? L.getTeams(g) : null;
     const dots = k => k > 0 ? BALL.repeat(k) : '';
     const ph = g.players.map((p, pi) => { const k = L.strokesOnHole(p.strokes, hi.si);
       return `<${owner ? `button type="button" data-allscores="${h}"` : 'div'} class="hp"><div class="nm">${esc(p.name)}${g.responsable === pi ? ' ★' : ''}${pi === wolfNow ? ' <span class="wolf-tag">Loup</span>' : ''}</div><div class="hp-idx">Index ${String(p.index).replace('.', ',')}${sixT ? ` · <span class="pair">${sixT[0].includes(pi) ? 'Équipe A' : 'Équipe B'}</span>` : ''}</div><div class="dots">${k ? dots(k) : ''}</div><div class="hp-strk">${strokeHoles(g, p)}</div><div class="hp-tot">${tots[pi].played ? `<span>Brut <b>${tots[pi].gross}</b> · Net <b>${tots[pi].net}</b></span><span class="hp-n">${tots[pi].played} trou${tots[pi].played > 1 ? 's' : ''}</span>` : 'Aucun trou joué'}</div><div class="hp-pts"><b>${(pts[pi] > 0 && f !== 'neuf' ? '+' : '') + fmtPts(pts[pi])}</b> ${ptsLabel(g)}</div></${owner ? 'button' : 'div'}>`; });
