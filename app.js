@@ -53,6 +53,7 @@
     async login(player, phone) {
       const digits = String(phone || '').replace(/\D/g, '');
       if (digits.length < 7) throw new Error('Entrez votre numéro de téléphone (10 chiffres).');
+      this.setGroup(player.groupId || 'pelland');
       const auth = firebase.auth();
       if (player.authEmail) {
         try { const c = await auth.signInWithEmailAndPassword(player.authEmail, digits); this.uid = c.user.uid; this.email = c.user.email; }
@@ -118,7 +119,7 @@
       return ls.get('pelland.games', {})[id] || null;
     },
     async saveGame(g) {
-      g.updatedAt = Date.now();
+      g.updatedAt = Date.now(); if (!g.groupId) g.groupId = this.gid;
       if (this.mode === 'firebase') { await this.db.collection('games').doc(g.id).set(toDb(g)); return; }
       const all = ls.get('pelland.games', {}); all[g.id] = g; ls.set('pelland.games', all);
       this._emit(g);
@@ -135,28 +136,65 @@
       window.addEventListener('storage', onStorage);
       return () => { this._subs[id] = (this._subs[id] || []).filter(x => x !== cb); window.removeEventListener('storage', onStorage); };
     },
-    async listPlayers() {
+    // Groupes : chaque groupe a ses joueurs, parties, dates et quatuors (les terrains sont communs). Pelland = premier groupe.
+    get gid() { return ls.get('pelland.group', 'pelland') || 'pelland'; },
+    setGroup(id) { ls.set('pelland.group', id || 'pelland'); },
+    async listGroups() {
+      let list = [];
+      if (this.mode === 'firebase') { try { const sn = await this.db.collection('players').get(); list = sn.docs.filter(d => d.id.startsWith('_groupe_')).map(d => d.data()); } catch (e) { } }
+      else list = Object.values(ls.get('pelland.groups', {}));
+      if (!list.find(g => g.id === 'pelland')) list.push({ id: 'pelland', name: 'La gang à Pelland' });
+      return list.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+    },
+    async saveGroup(gr) {
+      if (this.mode === 'firebase') { await this.db.collection('players').doc('_groupe_' + gr.id).set(gr); return; }
+      const all = ls.get('pelland.groups', {}); all[gr.id] = gr; ls.set('pelland.groups', all);
+    },
+    // Nouveau groupe : crée le compte du premier membre, le groupe et le joueur
+    async createGroup(groupName, name, phone) {
+      const digits = String(phone || '').replace(/\D/g, '');
+      if (!groupName.trim()) throw new Error('Donnez un nom au groupe.');
+      if (!name.trim()) throw new Error('Entrez votre prénom et nom.');
+      if (digits.length < 7) throw new Error('Entrez votre numéro de téléphone (10 chiffres).');
+      const gr = { id: slug(groupName) + '-' + Math.random().toString(36).slice(2, 6), name: groupName.trim(), createdAt: Date.now() };
+      const pid = slug(name) + '-' + Math.random().toString(36).slice(2, 6);
+      if (this.mode === 'firebase') {
+        const email = pid.replace(/[^a-z0-9-]/gi, '') + '-' + Date.now().toString(36) + '@pelland.golf';
+        const c = await firebase.auth().createUserWithEmailAndPassword(email, digits);
+        this.uid = c.user.uid; this.email = email;
+        await this.saveGroup(gr);
+        await this.db.collection('players').doc(pid).set({ id: pid, name: name.trim(), groupId: gr.id, authEmail: email, phoneHint: digits.slice(-2), updatedAt: Date.now() });
+        await this.savePhone(pid, digits);
+      } else { await this.saveGroup(gr); const list = ls.get('pelland.players', []); list.push({ id: pid, name: name.trim(), groupId: gr.id, phone: digits, phoneHint: digits.slice(-2), authEmail: 'local' }); ls.set('pelland.players', list); }
+      this.setGroup(gr.id); this.needLogin = false; ls.set('pelland.me', name.trim());
+      await this.ensureSeed();
+      return gr;
+    },
+    async listPlayers(all) {
+      const mine = p => all || (p.groupId || 'pelland') === this.gid;
       if (this.mode === 'firebase') {
         const snap = await this.db.collection('players').get();
-        const list = snap.docs.filter(d => !d.id.startsWith('_')).map(d => ({ ...d.data(), id: d.id }));
+        const list = snap.docs.filter(d => !d.id.startsWith('_')).map(d => ({ ...d.data(), id: d.id })).filter(mine);
         if (this.email) { try { const ph = await this.db.collection('phones').get(); const m = {}; ph.docs.forEach(d => { m[d.id] = d.data().phone; }); list.forEach(p => { if (m[p.id]) p.phone = m[p.id]; }); this.phonesBlocked = false; } catch (e) { this.phonesBlocked = true; } }
         return list.sort(byName);
       }
-      return ls.get('pelland.players', []).sort(byName);
+      return ls.get('pelland.players', []).filter(mine).sort(byName);
     },
     // Quatuors (groupes de 4 joueurs) : gardés dans players/_quatuors (aucune nouvelle règle Firebase)
     async listQuatuors() {
-      if (this.mode === 'firebase') { try { const d = await this.db.collection('players').doc('_quatuors').get(); return (d.exists && d.data().list) || []; } catch (e) { return []; } }
-      return ls.get('pelland.quatuors', []);
+      if (this.mode === 'firebase') { try { const d = await this.db.collection('players').doc(this.qDoc()).get(); return (d.exists && d.data().list) || []; } catch (e) { return []; } }
+      return ls.get('pelland.quatuors.' + this.gid, this.gid === 'pelland' ? ls.get('pelland.quatuors', []) : []);
     },
     async saveQuatuors(list) {
-      if (this.mode === 'firebase') { await this.db.collection('players').doc('_quatuors').set({ list, updatedAt: Date.now() }); return; }
-      ls.set('pelland.quatuors', list);
+      if (this.mode === 'firebase') { await this.db.collection('players').doc(this.qDoc()).set({ list, updatedAt: Date.now() }); return; }
+      ls.set('pelland.quatuors.' + this.gid, list);
+    },
+    qDoc() { return this.gid === 'pelland' ? '_quatuors' : '_quatuors_' + this.gid;
     },
     // Offres de parties : players/_offre_<id> = { id, course, dates:[ms], deadline:ms, by, createdAt, rep_<joueur>: { name, dates:[ms], at } }
     async listOffres() {
-      if (this.mode === 'firebase') { try { const sn = await this.db.collection('players').get(); return sn.docs.filter(d => d.id.startsWith('_offre_')).map(d => d.data()).sort((a, b) => b.createdAt - a.createdAt); } catch (e) { return []; } }
-      return Object.values(ls.get('pelland.offres', {})).sort((a, b) => b.createdAt - a.createdAt);
+      if (this.mode === 'firebase') { try { const sn = await this.db.collection('players').get(); return sn.docs.filter(d => d.id.startsWith('_offre_')).map(d => d.data()).filter(o => (o.groupId || 'pelland') === this.gid).sort((a, b) => b.createdAt - a.createdAt); } catch (e) { return []; } }
+      return Object.values(ls.get('pelland.offres', {})).filter(o => (o.groupId || 'pelland') === this.gid).sort((a, b) => b.createdAt - a.createdAt);
     },
     async getOffre(id) {
       if (this.mode === 'firebase') { const d = await this.db.collection('players').doc('_offre_' + id).get(); return d.exists ? d.data() : null; }
@@ -171,7 +209,7 @@
       const all = ls.get('pelland.offres', {}); delete all[id]; ls.set('pelland.offres', all);
     },
     async savePlayer(name) {
-      const p = { id: slug(name) + '-' + Math.random().toString(36).slice(2, 6), name: name.trim(), updatedAt: Date.now() };
+      const p = { id: slug(name) + '-' + Math.random().toString(36).slice(2, 6), name: name.trim(), groupId: this.gid, updatedAt: Date.now() };
       if (this.mode === 'firebase') { await this.db.collection('players').doc(p.id).set(p); return p; }
       const list = ls.get('pelland.players', []); list.push(p); ls.set('pelland.players', list); return p;
     },
@@ -203,10 +241,10 @@
     },
     async listGames() {
       if (this.mode === 'firebase') {
-        const snap = await this.db.collection('games').orderBy('createdAt', 'desc').limit(100).get();
-        return snap.docs.map(d => fromDb(d.data()));
+        const snap = await this.db.collection('games').orderBy('createdAt', 'desc').limit(200).get();
+        return snap.docs.map(d => fromDb(d.data())).filter(g => (g.groupId || 'pelland') === this.gid);
       }
-      return Object.values(ls.get('pelland.games', {})).sort((a, b) => b.createdAt - a.createdAt);
+      return Object.values(ls.get('pelland.games', {})).filter(g => (g.groupId || 'pelland') === this.gid).sort((a, b) => b.createdAt - a.createdAt);
     }
   };
   // Firestore refuse les tableaux imbriqués : les équipes sont stockées comme { e1: [...], e2: [...] }.
@@ -352,14 +390,16 @@
     bind[S.view] && bind[S.view](v);
   }
 
+  const APP = 'Quatuor';
+  function groupName() { const g = (S.groups || []).find(x => x.id === Store.gid); return g ? g.name : 'La gang à Pelland'; }
   // ---------------- Accueil ----------------
   function vHome() {
-    $('#barTitle').textContent = 'Pelland';
+    $('#barTitle').textContent = APP;
     const last = ls.get('pelland.lastGame', null);
     const info = ls.get('pelland.lastGameInfo', null);
     const lastDate = info && info.id === last && info.createdAt ? new Date(info.createdAt).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' }) : null;
     return `
-      <div class="hero"><h1>La game à Pelland</h1><p>Carte de pointage pour quatre joueurs.</p></div>
+      <div class="hero"><h1>${esc(groupName())}</h1><p>${APP} · le golf entre amis</p></div>
       <div class="tiles">
         <button class="tile" data-go="courses"><span class="pin">⛳</span><div><strong>Terrains</strong><span>Ajouter ou corriger un terrain</span></div></button>
         <button class="tile" data-go="players"><span class="pin"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M15.5 2.5 9 17.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M9 17.2c-.4 1.2-1.6 2.2-3.4 2.4l-2.1.2c-.6.1-.9.7-.6 1.2.2.3.5.5.9.5h4.6c1.6 0 2.7-.9 3.1-2.2l.3-.9" fill="currentColor"/><circle cx="18.5" cy="19.5" r="1.8" fill="currentColor"/></svg></span><div><strong>Joueurs</strong><span>Ajouter ou retirer des joueurs</span></div></button>
@@ -414,7 +454,7 @@
     const me = L.norm(ls.get('pelland.me', '') || '');
     const nums = (S.players || []).filter(p => p.phone && L.norm(p.name) !== me).map(p => p.phone);
     const missing = (S.players || []).filter(p => !p.phone && L.norm(p.name) !== me).map(p => p.name);
-    const body = [`La game à Pelland – parties offertes à ${o.course.replace(/^Club de golf /i, '')} :`, ...o.dates.map(d => '• ' + fmtDate(d)),
+    const body = [`${groupName()} (${APP}) – parties offertes à ${o.course.replace(/^Club de golf /i, '')} :`, ...o.dates.map(d => '• ' + fmtDate(d)),
       `Indique tes disponibilités avant le ${fmtDay(o.deadline)} : ${location.origin + location.pathname}?offre=${o.id}`].join('\n');
     if (missing.length) toast(`Pas de numéro pour ${missing.join(', ')}.`);
     openSms(nums, body);
@@ -828,16 +868,31 @@
 
   // ---------------- Terrains ----------------
   function vLogin() {
-    $('#barTitle').textContent = 'Pelland';
+    $('#barTitle').textContent = APP;
     $('#back').hidden = true;
     const me = ls.get('pelland.me', ''), invited = new URLSearchParams(location.search).get('joueur');
-    return `<div class="hero"><h1>La game à Pelland</h1><p>Réservé aux joueurs du groupe.</p></div>
+    const groups = S.groups || [{ id: 'pelland', name: 'La gang à Pelland' }];
+    const inv = invited && S.players.find(p => p.id === invited);
+    if (!S.loginGroup) S.loginGroup = inv ? (inv.groupId || 'pelland') : Store.gid;
+    if (S.newGroupForm) return `<div class="hero"><h1>${APP}</h1><p>Le golf entre amis : pointage, jeux et parties à venir.</p></div>
+      <section class="card"><h2>Créer un groupe</h2>
+        <label>Nom du groupe<input id="ngName" type="text" placeholder="ex. Les lève-tôt du samedi"></label>
+        <label>Votre prénom et nom<input id="ngMe" type="text" autocapitalize="words"></label>
+        <label>Votre numéro de téléphone<input id="ngPhone" type="tel" inputmode="tel" placeholder="450 555-1234"></label>
+        <button class="btn" id="ngCreate" type="button">Créer le groupe</button>
+        <button class="linkbtn" id="ngBack" type="button">Retour à la connexion</button>
+        <p class="note" id="ngMsg">Vous serez le premier membre. Vous ajouterez ensuite les joueurs dans Joueurs ; ils recevront un texto d’invitation.</p>
+      </section>`;
+    const inGroup = S.players.filter(p => (p.groupId || 'pelland') === S.loginGroup);
+    return `<div class="hero"><h1>${APP}</h1><p>Le golf entre amis : pointage, jeux et parties à venir.</p></div>
       <section class="card"><h2>Connexion</h2>
-        <label>Votre nom<select id="loginName"><option value="">— Choisir —</option>${S.players.map(p => `<option value="${esc(p.id)}" ${(invited ? p.id === invited : p.name === me) ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
+        ${groups.length > 1 ? `<label>Votre groupe<select id="loginGroup">${groups.map(gr => `<option value="${esc(gr.id)}" ${gr.id === S.loginGroup ? 'selected' : ''}>${esc(gr.name)}</option>`).join('')}</select></label>` : ''}
+        <label>Votre nom<select id="loginName"><option value="">— Choisir —</option>${inGroup.map(p => `<option value="${esc(p.id)}" ${(invited ? p.id === invited : p.name === me) ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
         <label>Votre numéro de téléphone<input id="loginPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="450 555-1234"></label>
         <button class="btn" id="loginBtn" type="button">Entrer</button>
         <p class="note" id="loginMsg">Votre numéro sert de mot de passe. Seuls les joueurs du groupe peuvent le voir.</p>
-      </section>`;
+      </section>
+      <p class="note" style="text-align:center">Nouveau groupe d’amis ? <button class="linkbtn" id="newGroup" type="button">Créer un groupe</button></p>`;
   }
   function vPlayers() {
     $('#barTitle').textContent = 'Joueurs';
@@ -970,6 +1025,15 @@
         try { await Store.login(pl, ph); const q = new URLSearchParams(location.search); q.delete('joueur'); location.href = location.pathname + (q.toString() ? '?' + q : ''); }
         catch (e) { msg.textContent = e.message; $('#loginBtn').disabled = false; }
       };
+      const ng = $('#newGroup'); if (ng) ng.onclick = () => { S.newGroupForm = true; render(); };
+      const nb = $('#ngBack'); if (nb) nb.onclick = () => { S.newGroupForm = false; render(); };
+      const nc = $('#ngCreate'); if (nc) nc.onclick = async () => {
+        const msg = $('#ngMsg'); nc.disabled = true; msg.textContent = 'Création…';
+        try { await Store.createGroup($('#ngName').value, $('#ngMe').value, $('#ngPhone').value); location.href = location.pathname; }
+        catch (e) { msg.textContent = e.message && e.message.includes('auth/') ? 'Création impossible : ' + e.message : e.message; nc.disabled = false; }
+      };
+      const lg = $('#loginGroup'); if (lg) lg.onchange = e => { S.loginGroup = e.target.value; render(); };
+      if (!$('#loginBtn')) return;
       $('#loginBtn').onclick = go2;
       $('#loginPhone').onkeydown = e => { if (e.key === 'Enter') go2(); };
     },
@@ -998,7 +1062,7 @@
           const dates = f.dates.filter(Boolean).map(x => new Date(x).getTime()).filter(x => !isNaN(x)).sort((a, b) => a - b);
           if (!dates.length) return toast('Ajoutez au moins une date.');
           if (!f.deadline) return toast('Choisissez la date butoir.');
-          const o = { id: Date.now().toString(36), course: f.course, dates, deadline: new Date(f.deadline + 'T23:59:59').getTime(), by: ls.get('pelland.me', '') || '', createdAt: Date.now() };
+          const o = { id: Date.now().toString(36), course: f.course, dates, deadline: new Date(f.deadline + 'T23:59:59').getTime(), by: ls.get('pelland.me', '') || '', groupId: Store.gid, createdAt: Date.now() };
           try { await Store.saveOffre(o); S.offres = [o].concat(S.offres || []); S.newOffre = null; render(); offreSms(o); }
           catch (e) { toast('Enregistrement impossible : ' + e.message); }
         };
@@ -1254,9 +1318,9 @@
   async function invitePlayers(g) {
     const url = inviteLink(g);
     const others = g.players.filter((p, i) => i !== g.responsable).map(p => p.name.split(' ')[0]).join(', ');
-    const text = `Salut ${others} ! Suis la game à Pelland en direct (${g.course.name.replace(/^Club de golf /i, '')}) : `;
+    const text = `Salut ${others} ! Suis la partie en direct (${g.course.name.replace(/^Club de golf /i, '')}) : `;
     if (navigator.share) {
-      try { await navigator.share({ title: 'La game à Pelland', text, url }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+      try { await navigator.share({ title: APP, text, url }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
     }
     openSheet(`<h3>Inviter les joueurs</h3>
       <p class="note">Envoyez ce lien aux autres joueurs. Il ouvre directement la partie sur leur iPhone.</p>
@@ -1428,7 +1492,7 @@
     const played = Object.keys(g.scores || {}).filter(x => (g.scores[x] || []).some(v => v != null)).map(Number);
     const last = played.length ? Math.max(...played) : 0, done = g.status === 'terminée';
     const date = new Date(g.createdAt || Date.now()).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' });
-    const lines = [`La game à Pelland – ${g.course.name.replace(/^Club de golf /i, '')}, ${date}`];
+    const lines = [`${groupName()} – ${L.FORMATS[L.formatOf(g)]} – ${g.course.name.replace(/^Club de golf /i, '')}, ${date}`];
     lines.push(done ? 'Résultat final :' : last ? `Après ${last} trou${last > 1 ? 's' : ''} :` : 'La partie commence.');
     if (last) {
       if (m.tie) lines.push(`Égalité, ${m.t[0]} points chacun.`);
@@ -1449,7 +1513,7 @@
   }
   function inviteSms(name, d, id) {
     const url = location.origin + location.pathname + (id ? '?joueur=' + encodeURIComponent(id) : '');
-    const body = `Salut ${name.split(' ')[0]} ! Tu as été invité à te joindre à la game à Pelland. Ouvre l’app : ${url} — ton nom est déjà choisi, entre seulement ton numéro de téléphone (${fmtPhone(d)}) pour te connecter. Sur iPhone : bouton Partager, puis « Sur l’écran d’accueil ».`;
+    const body = `Salut ${name.split(' ')[0]} ! Tu as été invité à te joindre au groupe « ${groupName()} » sur ${APP}, l’app de golf entre amis. Ouvre l’app : ${url} — ton nom est déjà choisi, entre seulement ton numéro de téléphone (${fmtPhone(d)}) pour te connecter. Sur iPhone : bouton Partager, puis « Sur l’écran d’accueil ».`;
     const ios = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
     const href = ios ? `sms:/open?addresses=${d}&body=${encodeURIComponent(body)}` : `sms:${d}?body=${encodeURIComponent(body)}`;
     window.__lastSms = href;
@@ -1489,7 +1553,7 @@
     const played = Object.keys(g.scores || {}).filter(x => (g.scores[x] || []).some(v => v != null)).map(Number), last = played.length ? Math.max(...played) : 0;
     const date = new Date(g.createdAt || Date.now()).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' });
     const rank = g.players.map((p, i) => i).sort((a, b) => gn[b] - gn[a]);
-    return [`La game à Pelland (${L.FORMATS[f]}) – ${g.course.name.replace(/^Club de golf /i, '')}, ${date}`, done ? 'Résultat final :' : last ? `Après ${last} trou${last > 1 ? 's' : ''} :` : 'La partie commence.',
+    return [`${groupName()} – ${L.FORMATS[f]} – ${g.course.name.replace(/^Club de golf /i, '')}, ${date}`, done ? 'Résultat final :' : last ? `Après ${last} trou${last > 1 ? 's' : ''} :` : 'La partie commence.',
       ...(last ? rank.map((i, r) => `${r + 1}. ${g.players[i].name} : ${fmtPts(t[i])} ${ptsLabel(g)} (${gn[i] >= 0 ? '+' : '−'}${fmt$(Math.abs(gn[i]))})`) : g.players.map(p => p.name)), inviteLink(g)].join('\n');
   }
   function holeDetailNeuf(g, h) {
@@ -1566,7 +1630,7 @@
     const { nums, missing } = playerNumbers(g); if (!nums.length) return;
     const T = isAlt(g) ? null : L.getTeams(g);
     const date = new Date(g.createdAt || Date.now()).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' });
-    const body = [`Tu es inscrit à la game à Pelland – ${g.course.name.replace(/^Club de golf /i, '')}, ${date}.`,
+    const body = [`Tu es inscrit à une partie (${L.FORMATS[L.formatOf(g)]}) – ${g.course.name.replace(/^Club de golf /i, '')}, ${date}.`,
       ...(T ? [`Bleus : ${T[1].map(i => g.players[i].name).join(', ')}`, `Rouges : ${T[0].map(i => g.players[i].name).join(', ')}`] : [`Le 9 points : ${g.players.map(p => p.name).join(', ')}`]),
       !T ? '' : g.stake ? `La game commence à ${fmt$(money(g.stake))}.` : '',
       `Confirme ta présence : ouvre ${inviteLink(g)} et touche « Je serai là ».`].filter(Boolean).join('\n');
@@ -1736,16 +1800,18 @@
     $('#view').innerHTML = '<p class="note">Démarrage…</p>';
     await Store.init();
     if (Store.needLogin) {
-      try { S.players = await Store.listPlayers(); } catch (e) { S.players = []; }
+      try { S.players = await Store.listPlayers(true); } catch (e) { S.players = []; }
+      try { S.groups = await Store.listGroups(); } catch (e) { S.groups = []; }
       S.view = 'login'; render(); return;
     }
     // Lien d'invitation (?joueur=…) ouvert par quelqu'un d'autre que la personne connectée : écran de connexion
     const inv = new URLSearchParams(location.search).get('joueur');
     if (inv && Store.mode === 'firebase') {
-      let pl = []; try { pl = await Store.listPlayers(); } catch (e) { }
+      let pl = []; try { pl = await Store.listPlayers(true); } catch (e) { }
       const target = pl.find(x => x.id === inv);
       if (target && L.norm(target.name) !== L.norm(ls.get('pelland.me', '') || '')) {
         try { await firebase.auth().signOut(); } catch (e) { }
+        try { S.groups = await Store.listGroups(); } catch (e) { S.groups = []; }
         Store.email = null; Store.uid = null; Store.needLogin = true; S.players = pl; S.view = 'login'; render(); return;
       }
       if (target) history.replaceState(null, '', location.pathname);
@@ -1753,6 +1819,7 @@
     try { S.courses = await Store.listCourses(); } catch (e) { S.courses = [L.PINEGROVE]; }
     try { S.players = await Store.listPlayers(); } catch (e) { S.players = []; }
     try { S.quatuors = await Store.listQuatuors(); } catch (e) { S.quatuors = []; }
+    try { S.groups = await Store.listGroups(); } catch (e) { S.groups = []; }
     const params = new URLSearchParams(location.search);
     const code = (params.get('partie') || params.get('code') || '').toUpperCase();
     const offreId = params.get('offre');
