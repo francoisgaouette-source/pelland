@@ -599,3 +599,8 @@ label.check { display: flex; align-items: center; gap: 10px; font-size: 16px; co
 label.check input { width: 22px; height: 22px; }
 .offre-h .place { color: var(--ink); font-size: 14px; }
 .pl-n { color: var(--muted); font-weight: 600; margin-right: 2px; } .pl-count { margin: 0; color: var(--muted); } .pl-count b { color: var(--ink); font-size: 18px; }
+.owner-tag { font-size: 12px; font-weight: 600; background: var(--flag); color: #1b1b1b; border-radius: 99px; padding: 1px 8px; vertical-align: middle; }
+.role-chip { font-size: 12px; font-weight: 600; border: 1px solid var(--line); background: var(--bg); color: var(--muted); border-radius: 99px; padding: 2px 8px; vertical-align: middle; cursor: pointer; }
+.role-chip.on, .org-tag { border: 1px solid #2fb36b; color: #1f8a50; background: transparent; }
+.org-tag { font-size: 12px; font-weight: 600; border-radius: 99px; padding: 1px 8px; vertical-align: middle; }
+.pl-row b { overflow: visible; } .pl-row b .owner-tag, .pl-row b .org-tag, .pl-row b .role-chip { display: inline-block; white-space: nowrap; margin-top: 4px; }

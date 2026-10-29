@@ -161,8 +161,8 @@
       if (!groupName.trim()) throw new Error('Donnez un nom au groupe.');
       if (!name.trim()) throw new Error('Entrez votre prénom et nom.');
       if (digits.length < 7) throw new Error('Entrez votre numéro de téléphone (10 chiffres).');
-      const gr = { id: slug(groupName) + '-' + Math.random().toString(36).slice(2, 6), name: groupName.trim(), createdAt: Date.now() };
       const pid = slug(name) + '-' + Math.random().toString(36).slice(2, 6);
+      const gr = { id: slug(groupName) + '-' + Math.random().toString(36).slice(2, 6), name: groupName.trim(), owner: pid, createdAt: Date.now() };
       if (this.mode === 'firebase') {
         const email = pid.replace(/[^a-z0-9-]/gi, '') + '-' + Date.now().toString(36) + '@pelland.golf';
         const c = await firebase.auth().createUserWithEmailAndPassword(email, digits);
@@ -397,7 +397,13 @@
   }
 
   const APP = 'Quatuor';
-  function groupName() { const g = (S.groups || []).find(x => x.id === Store.gid); return g ? g.name : 'La gang à Pelland'; }
+  function curGroup() { return (S.groups || []).find(x => x.id === Store.gid) || { id: Store.gid, name: 'La gang à Pelland' }; }
+  function groupName() { return curGroup().name; }
+  const ownerId = () => curGroup().owner || null;
+  const meId = () => ((S.players || []).find(p => L.norm(p.name) === L.norm(ls.get('pelland.me', '') || '')) || {}).id;
+  const isOrganizer = id => !ownerId() || id === ownerId() || (curGroup().organizers || []).includes(id);
+  // Qui peut organiser : le propriétaire et les organisateurs qu'il nomme (tout le monde tant qu'il n'y a pas de propriétaire)
+  const canOrganize = () => isOrganizer(meId());
   // ---------------- Accueil ----------------
   function vHome() {
     $('#barTitle').textContent = APP;
@@ -410,7 +416,7 @@
         <button class="tile" data-go="courses"><span class="pin">⛳</span><div><strong>Terrains</strong><span>Ajouter ou corriger un terrain</span></div></button>
         <button class="tile" data-go="players"><span class="pin"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M15.5 2.5 9 17.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M9 17.2c-.4 1.2-1.6 2.2-3.4 2.4l-2.1.2c-.6.1-.9.7-.6 1.2.2.3.5.5.9.5h4.6c1.6 0 2.7-.9 3.1-2.2l.3-.9" fill="currentColor"/><circle cx="18.5" cy="19.5" r="1.8" fill="currentColor"/></svg></span><div><strong>Joueurs</strong><span>Ajouter ou retirer des joueurs</span></div></button>
         <button class="tile" data-go="quatuors"><span class="pin" style="font-family:var(--display);font-weight:700">4</span><div><strong>Parties à venir</strong><span>Dates offertes, disponibilités et groupes de 4</span></div></button>
-        <button class="tile" data-go="setup"><span class="pin">+</span><div><strong>Nouvelle partie</strong><span>Terrain, joueurs, index, tertres, handicap</span></div></button>
+        ${canOrganize() ? '' : '<!--'}<button class="tile" data-go="setup"><span class="pin">+</span><div><strong>Nouvelle partie</strong><span>Terrain, joueurs, index, tertres, handicap</span></div></button>${canOrganize() ? '' : '-->'}
         <button class="tile" data-go="live"><span class="pin">⏵</span><div><strong>Parties en cours</strong><span>Les parties qui ont lieu en ce moment</span></div></button>
         <button class="tile" data-go="history"><span class="pin">≡</span><div><strong>Parties jouées</strong><span>Les parties terminées</span></div></button>
       </div>
@@ -431,7 +437,7 @@
           <div><b>${esc(x.name || x.players.join(', '))}</b>${x.name ? `<span>${esc(x.players.join(', '))}</span>` : ''}</div>
           <span class="row" style="flex-wrap:nowrap;flex:none">${S.confirmDelQ === x.id
             ? `<button class="btn small" data-qdel="${esc(x.id)}" type="button" style="background:var(--red)">Retirer</button><button class="btn ghost small" data-qcancel type="button">Annuler</button>`
-            : `<button class="btn small" data-qplay="${esc(x.id)}" type="button">Jouer</button><button class="btn ghost small" data-qask="${esc(x.id)}" type="button">Retirer</button>`}</span></div>`).join('')
+            : canOrganize() ? `<button class="btn small" data-qplay="${esc(x.id)}" type="button">Jouer</button><button class="btn ghost small" data-qask="${esc(x.id)}" type="button">Retirer</button>` : ''}</span></div>`).join('')
         : ''}</div>`;
   }
   // ---------------- Offres de parties ----------------
@@ -444,8 +450,8 @@
       const reps = offreReps(o), past = Date.now() > o.deadline;
       return `<div class="offre"><div class="offre-h"><b>${esc(o.course)}</b>${o.place ? `<span class="place">${esc(o.place)}</span>` : ''}<small>${past ? 'Réponses fermées' : 'Réponses avant le ' + esc(fmtDay(o.deadline))} · ${reps.length} réponse${reps.length > 1 ? 's' : ''}</small></div>
         ${o.dates.map(dt => { const yes = reps.filter(r => (r.dates || []).includes(dt)).map(r => r.name);
-          return `<div class="offre-d"><div><b>${esc(fmtDate(dt))}</b><span>${yes.length ? esc(yes.join(', ')) : 'Personne pour l’instant'}</span>${yes.length ? `<span class="grp">${esc(groupsText(yes.length))}</span>` : ''}</div><span class="cnt ${yes.length >= 4 ? 'ok' : ''}">${yes.length}</span></div>${yes.length >= 3 ? `<div class="row offre-acts"><button class="btn small" data-oauto="${esc(o.id)}|${dt}" type="button">Quatuors automatiques</button><button class="btn ghost small" data-oquat="${esc(o.id)}|${dt}" type="button">Manuel</button></div>` : ''}`; }).join('')}
-        <div class="row"><button class="btn ghost small" data-osms="${esc(o.id)}" type="button">Renvoyer le texto</button><button class="btn ghost small" data-odel="${esc(o.id)}" type="button">${S.confirmDelO === o.id ? 'Confirmer' : 'Retirer'}</button></div></div>`; }).join('');
+          return `<div class="offre-d"><div><b>${esc(fmtDate(dt))}</b><span>${yes.length ? esc(yes.join(', ')) : 'Personne pour l’instant'}</span>${yes.length ? `<span class="grp">${esc(groupsText(yes.length))}</span>` : ''}</div><span class="cnt ${yes.length >= 4 ? 'ok' : ''}">${yes.length}</span></div>${yes.length >= 3 && canOrganize() ? `<div class="row offre-acts"><button class="btn small" data-oauto="${esc(o.id)}|${dt}" type="button">Quatuors automatiques</button><button class="btn ghost small" data-oquat="${esc(o.id)}|${dt}" type="button">Manuel</button></div>` : ''}`; }).join('')}
+        ${canOrganize() ? '' : '<!--'}<div class="row"><button class="btn ghost small" data-osms="${esc(o.id)}" type="button">Renvoyer le texto</button><button class="btn ghost small" data-odel="${esc(o.id)}" type="button">${S.confirmDelO === o.id ? 'Confirmer' : 'Retirer'}</button></div>${canOrganize() ? '' : '-->'}</div>`; }).join('');
     const form = f ? `<div class="offre-form">
         <label>Terrain<select id="oCourse">${S.courses.map(c => `<option value="${esc(c.name)}" ${c.name === f.course ? 'selected' : ''}>${esc(c.name)}${c.sim ? ' (simulateur)' : ''}</option>`).join('')}</select></label>
         <label>Lieu (facultatif)<input id="oPlace" type="text" value="${esc(f.place || '')}" placeholder="ex. Golf Simulateur Laval, baies 2 et 3"></label>
@@ -454,7 +460,7 @@
         <button class="btn ghost small" id="oAddDate" type="button">+ Ajouter une date</button>
         <label>Date butoir pour répondre<input type="date" id="oDeadline" value="${esc(f.deadline)}"></label>
         <div class="row"><button class="btn sms-btn" id="oSend" type="button">Enregistrer et texter les joueurs</button><button class="btn ghost small" id="oCancel" type="button">Annuler</button></div></div>`
-      : `<button class="btn" id="oNew" type="button">Offrir des parties</button>`;
+      : canOrganize() ? `<button class="btn" id="oNew" type="button">Offrir des parties</button>` : '<p class="note">Seuls le propriétaire et les organisateurs du groupe offrent des parties.</p>';
     return `<section class="card"><h2>Parties offertes</h2><p class="note">Proposez des dates : tous les joueurs reçoivent un texto et indiquent dans l’app les dates où ils sont disponibles, avant la date butoir.</p>${form}${list}</section>`;
   }
   function offreSms(o) {
@@ -909,10 +915,12 @@
         <div class="row" style="flex-wrap:nowrap"><input id="newPhone" type="tel" inputmode="tel" placeholder="Téléphone (sert de mot de passe)" style="flex:1;min-width:0"><button class="btn small" id="addPlayer" type="button">Ajouter</button></div>
         </section>
       ${(() => { const dups = duplicateMap(S.players); const nd = Object.keys(dups).length; return nd ? `<div class="warn">${nd} joueurs semblent en double. Vérifiez les noms marqués « Doublon ? » et retirez celui de trop.</div>` : ''; })()}
+      ${!ownerId() && S.players.length ? `<div class="warn">Le groupe n’a pas encore de propriétaire (la personne qui l’administre et paie l’abonnement). <button class="linkbtn" id="claimOwner" type="button">C’est moi</button></div>` : ''}
+      ${ownerId() ? `<p class="note">Le <b>propriétaire</b> administre le groupe et paie l’abonnement. Les <b>organisateurs</b> offrent des dates et créent les parties${meId() === ownerId() ? ' : touchez « + Organisateur » pour en nommer' : ''}.</p>` : ''}
       ${S.players.length ? `<p class="pl-count"><b>${S.players.length}</b> joueur${S.players.length > 1 ? 's' : ''} dans le groupe</p>` : ''}
-      <div class="list">${S.players.length ? (() => { const dups = duplicateMap(S.players); return S.players.map((p, n) => `<div class="item pl-row ${dups[p.id] ? 'dup' : ''}"><b><span class="pl-n">${n + 1}.</span> ${esc(p.name)}${dups[p.id] ? ` <span class="dup-flag" title="Ressemble à ${esc(dups[p.id].join(', '))}">Doublon ?</span>` : ''}</b>${S.confirmDel === p.id
+      <div class="list">${S.players.length ? (() => { const dups = duplicateMap(S.players); return S.players.map((p, n) => `<div class="item pl-row ${dups[p.id] ? 'dup' : ''}"><b><span class="pl-n">${n + 1}.</span> ${esc(p.name)}${p.id === ownerId() ? ' <span class="owner-tag">Propriétaire</span>' : !ownerId() ? '' : meId() === ownerId() ? ` <button class="role-chip ${isOrganizer(p.id) ? 'on' : ''}" data-org="${esc(p.id)}" type="button">${isOrganizer(p.id) ? 'Organisateur ✓' : '+ Organisateur'}</button>` : isOrganizer(p.id) ? ' <span class="org-tag">Organisateur</span>' : ''}${dups[p.id] ? ` <span class="dup-flag" title="Ressemble à ${esc(dups[p.id].join(', '))}">Doublon ?</span>` : ''}</b>${S.confirmDel === p.id
         ? `<span class="row"><button class="btn small" data-delp="${esc(p.id)}" type="button" style="background:var(--red)">Confirmer</button><button class="btn ghost small" data-canceldel type="button">Annuler</button></span>`
-        : `<span class="row" style="flex-wrap:nowrap;flex:none"><button class="btn ghost small" data-phone="${esc(p.id)}" type="button">${p.phone ? '☎ ' + esc(fmtPhone(p.phone)) : p.authEmail ? '☎ ••' + esc(p.phoneHint || '') : '+ Téléphone'}</button><button class="btn ghost small" data-askdel="${esc(p.id)}" type="button">Retirer</button></span>`}</div>`).join(''); })() : '<p class="note">Aucun joueur pour l\'instant.</p>'}</div>`;
+        : `<span class="row" style="flex-wrap:nowrap;flex:none"><button class="btn ghost small" data-phone="${esc(p.id)}" type="button">${p.phone ? '☎ ' + esc(fmtPhone(p.phone)) : p.authEmail ? '☎ ••' + esc(p.phoneHint || '') : '+ Téléphone'}</button>${p.id === ownerId() ? '' : `<button class="btn ghost small" data-askdel="${esc(p.id)}" type="button">Retirer</button>`}</span>`}</div>`).join(''); })() : '<p class="note">Aucun joueur pour l\'instant.</p>'}</div>`;
   }
   function vCourses() {
     $('#barTitle').textContent = 'Terrains';
@@ -1104,6 +1112,17 @@
       });
     },
     players(v) {
+      v.querySelectorAll('[data-org]').forEach(b => b.onclick = async () => {
+        const gr = { ...curGroup() }, id = b.dataset.org, list = (gr.organizers || []).slice(), i = list.indexOf(id);
+        if (i >= 0) list.splice(i, 1); else list.push(id); gr.organizers = list;
+        try { await Store.saveGroup(gr); S.groups = await Store.listGroups(); render(); } catch (e) { toast('Impossible : ' + e.message); }
+      });
+      const co = $('#claimOwner'); if (co) co.onclick = async () => {
+        const me = S.players.find(p => L.norm(p.name) === L.norm(ls.get('pelland.me', '') || ''));
+        if (!me) return toast('Connectez-vous d’abord.');
+        const gr = { ...curGroup(), owner: me.id };
+        try { await Store.saveGroup(gr); S.groups = await Store.listGroups(); render(); } catch (e) { toast('Impossible : ' + e.message); }
+      };
       const add = async () => {
         const n = $('#newPlayer').value.trim(); if (!n) return;
         if (S.players.some(p => L.norm(p.name) === L.norm(n))) return toast(`${n} est déjà dans la liste.`);
