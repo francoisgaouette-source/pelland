@@ -392,7 +392,7 @@
     const showDock = false; // plus d'interface vocale
     document.body.classList.toggle('view-game', S.view === 'game');
     $('#dock').hidden = !showDock; document.body.classList.toggle('no-dock', !showDock);
-    const R = { home: vHome, quatuors: vQuatuors, offre: vOffre, setup: vSetup, game: vGame, join: vJoin, history: vHistory, live: vHistory, courses: vCourses, course: vCourse, players: vPlayers, login: vLogin }[S.view];
+    const R = { home: vHome, jeux: vJeux, quatuors: vQuatuors, offre: vOffre, setup: vSetup, game: vGame, join: vJoin, history: vHistory, live: vHistory, courses: vCourses, course: vCourse, players: vPlayers, login: vLogin }[S.view];
     v.innerHTML = R();
     bind[S.view] && bind[S.view](v);
   }
@@ -416,6 +416,7 @@
       <div class="tiles">
         <button class="tile" data-go="courses"><span class="pin">⛳</span><div><strong>Terrains</strong><span>Ajouter ou corriger un terrain</span></div></button>
         <button class="tile" data-go="players"><span class="pin"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M15.5 2.5 9 17.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M9 17.2c-.4 1.2-1.6 2.2-3.4 2.4l-2.1.2c-.6.1-.9.7-.6 1.2.2.3.5.5.9.5h4.6c1.6 0 2.7-.9 3.1-2.2l.3-.9" fill="currentColor"/><circle cx="18.5" cy="19.5" r="1.8" fill="currentColor"/></svg></span><div><strong>Joueurs</strong><span>Ajouter ou retirer des joueurs</span></div></button>
+        <button class="tile" data-go="jeux"><span class="pin" style="font-family:var(--display);font-weight:700">$</span><div><strong>Les jeux</strong><span>Les règles de chaque jeu et comment l’argent se compte</span></div></button>
         <button class="tile" data-go="quatuors"><span class="pin" style="font-family:var(--display);font-weight:700">4</span><div><strong>Parties à venir</strong><span>Dates offertes, disponibilités et groupes de 4</span></div></button>
         ${canOrganize() ? '' : '<!--'}<button class="tile" data-go="setup"><span class="pin">+</span><div><strong>Nouvelle partie</strong><span>Terrain, joueurs, index, tertres, handicap</span></div></button>${canOrganize() ? '' : '-->'}
         <button class="tile" data-go="live"><span class="pin">⏵</span><div><strong>Parties en cours</strong><span>Les parties qui ont lieu en ce moment</span></div></button>
@@ -426,6 +427,34 @@
       ${Store.mode === 'local' && Store.error ? `<div class="warn"><b>Pourquoi le mode local :</b> ${esc(Store.error)}</div>` : ''}`;
   }
 
+  // ---------------- Les jeux (règles) ----------------
+  const GAMES_INFO = [
+    { f: 'pelland', who: '4 joueurs, en équipes de deux (Rouges et Bleus)', rules: [
+      'À chaque trou, le joueur au plus bas score net gagne 2 points pour son équipe.',
+      'Le joueur au plus haut score net donne 2 points à l’équipe adverse.',
+      'Égalité entre deux équipes : pas de points ; dans la même équipe : 2 points une seule fois.',
+      'Skin : 1 point à l’équipe du joueur qui l’obtient, choisi parmi ceux qui ont fait la normale ou mieux (au brut).',
+      'Cabane : oiselet brut + skin + plus haut net chez l’adversaire = 12 points pour le trou.',
+      'Press : l’équipe en déficit double les points du trou ; l’autre peut répondre par un reroll (×4).'],
+      money: ['La game : montant de départ gagné par l’équipe qui mène à la fin.', 'Chaque revirement (changement de meneur) ajoute un montant.', 'Normales 3 : la skin + la normale gagne 5 $, sinon reporté à la normale 3 suivante.', 'Chaque point net d’écart vaut le montant par point.', 'Montants par joueur.'] },
+    { f: 'neuf', who: '3 joueurs, chacun pour soi', rules: ['À chaque trou : 5 points au meilleur net, 3 au deuxième, 1 au troisième.', 'Égalité : on partage (4-4-1, 5-2-2 ou 3-3-3).'],
+      money: ['Chacun gagne ou paie la différence de points avec chaque autre joueur, × le montant par point.'] },
+    { f: 'bestball', who: '4 joueurs, en équipes de deux', rules: ['Le meilleur net de chaque équipe compte.', 'L’équipe la plus basse gagne le trou ; égalité : trou partagé.'],
+      money: ['Écart de trous gagnés × le montant par trou, par joueur.'] },
+    { f: 'wolf', who: '4 joueurs ; le loup tourne à chaque trou', rules: ['Joueur 1 est le loup au trou 1, joueur 2 au trou 2, et ainsi de suite.', 'Le loup choisit un partenaire : chaque gagnant fait +1, chaque perdant −1.', 'Le loup joue seul : 2 points par adversaire, gagnés ou perdus.', 'Seul à l’aveugle (avant les coups de départ) : 3 points par adversaire.'],
+      money: ['Points × le montant par point.'] },
+    { f: 'sixes', who: '4 joueurs ; les équipes changent', rules: ['1+2 contre 3+4, puis 1+3 contre 2+4, puis 1+4 contre 2+3 (6 trous chacun sur 18, 3 sur 9).', 'Dans chaque tranche : Best Ball, 1 point par trou gagné.'],
+      money: ['La tranche gagnée vaut la mise ; perdue, −la mise.'] },
+    { f: 'skins', who: '3 ou 4 joueurs, chacun pour soi', rules: ['Le seul meilleur net du trou gagne le skin.', 'Égalité : le skin est reporté et s’ajoute au trou suivant.'],
+      money: ['Chaque autre joueur paie le montant par skin au gagnant.'] },
+  ];
+  function vJeux() {
+    $('#barTitle').textContent = 'Les jeux';
+    return `<p class="note">Le jeu se choisit en créant la partie. Tout se compte au net, avec les coups de handicap de chacun.</p>
+      <div class="jeux">${GAMES_INFO.map(x => `<details class="card jeu"><summary><b>${esc(L.FORMATS[x.f])}</b><span>${esc(x.who)}</span></summary>
+        <h3>Règles</h3><ul>${x.rules.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
+        <h3>L’argent</h3><ul>${x.money.map(r => `<li>${esc(r)}</li>`).join('')}</ul></details>`).join('')}</div>`;
+  }
   // ---------------- Quatuors ----------------
   function vQuatuors() {
     $('#barTitle').textContent = 'Parties à venir';
