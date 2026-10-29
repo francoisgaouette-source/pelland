@@ -488,11 +488,11 @@
       <div class="jeux">${(S.jeux || []).map(j => `<details class="card jeu"><summary><b>${esc(j.name)}</b><span>${j.mode === 'equipes' ? '4 joueurs, en équipes de deux' : '3 ou 4 joueurs, chacun pour soi'}</span></summary>
         <ul>${persoLines(j).map(r => `<li>${esc(r)}</li>`).join('')}<li>${esc(gainRule({ format: 'perso', custom: j, players: [], perPoint: j.pp }))}.</li></ul>
         ${canOrganize() ? `<div class="row" style="margin-top:10px"><button class="btn small" data-jedit="${esc(j.id)}" type="button">Modifier</button><button class="btn ghost small" data-jdel="${esc(j.id)}" type="button">${S.confirmDelJ === j.id ? 'Confirmer' : 'Retirer'}</button></div>` : ''}</details>`).join('') || '<p class="note">Aucun jeu maison pour l’instant.</p>'}</div>
-      ${canOrganize() ? '<button class="btn" data-jnew type="button">Créer un jeu maison</button>' : ''}`;
+      ${canOrganize() ? '<button class="btn" data-jnew type="button">Ajouter un jeu</button>' : ''}`;
   }
   function vJeuEdit() {
     const j = S.editJeu || (S.editJeu = { name: '', mode: 'equipes', low: 2, high: 2, team: 0, birdie: 0, stake: 0, ranks: '5, 3, 1, 0', skin: 0, pp: 1 });
-    $('#barTitle').textContent = j.id ? 'Modifier le jeu' : 'Nouveau jeu maison';
+    $('#barTitle').textContent = j.id ? 'Modifier le jeu' : 'Ajouter un jeu';
     const numIn = (k, label, help) => `<label>${label}<input data-jf="${k}" type="text" inputmode="decimal" value="${esc(j[k] ?? '')}"></label>${help ? `<p class="note" style="margin-top:-4px">${help}</p>` : ''}`;
     return `<section class="card">
         <label>Nom du jeu<input data-jf="name" type="text" value="${esc(j.name)}" placeholder="ex. La game du mardi"></label>
