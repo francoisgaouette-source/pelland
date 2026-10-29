@@ -593,3 +593,8 @@ table.sc.neuf thead th.pc { width: 15%; }
 .wolf-tag { font-size: 12px; background: var(--flag); color: #1b1b1b; border-radius: 99px; padding: 1px 8px; vertical-align: middle; }
 .pair { color: var(--flag); }
 .detail-desc { font-size: 16px; line-height: 1.4; margin: 4px 0; }
+.bar-badge.offline { color: #1b1b1b; background: var(--flag); padding: 2px 8px; border-radius: 99px; }
+.holes-seg { grid-template-columns: 1fr 1fr 1fr; margin-bottom: 8px; } .holes-seg button { min-height: 44px; text-align: center; } .holes-seg b { font-size: 15px; }
+label.check { display: flex; align-items: center; gap: 10px; font-size: 16px; color: var(--ink); }
+label.check input { width: 22px; height: 22px; }
+.offre-h .place { color: var(--ink); font-size: 14px; }

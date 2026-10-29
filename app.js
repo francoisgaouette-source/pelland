@@ -110,7 +110,8 @@
       const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
       for (let n = 0; n < 20; n++) {
         const code = Array.from({ length: 4 }, () => A[Math.floor(Math.random() * A.length)]).join('');
-        if (!(await this.getGame(code))) return code;
+        let used = null; try { used = await this.getGame(code); } catch (e) { return code; }
+        if (!used) return code;
       }
       return 'P' + Date.now().toString(36).toUpperCase().slice(-5);
     },
@@ -120,7 +121,11 @@
     },
     async saveGame(g) {
       g.updatedAt = Date.now(); if (!g.groupId) g.groupId = this.gid;
-      if (this.mode === 'firebase') { await this.db.collection('games').doc(g.id).set(toDb(g)); return; }
+      if (this.mode === 'firebase') {
+        // hors ligne : Firebase garde l'écriture et l'envoie au retour du réseau ; on n'attend pas sa confirmation
+        const p = this.db.collection('games').doc(g.id).set(toDb(g)); p.catch(e => toast('Non enregistré : ' + e.message));
+        await Promise.race([p, new Promise(r => setTimeout(r, navigator.onLine ? 5000 : 0))]); return;
+      }
       const all = ls.get('pelland.games', {}); all[g.id] = g; ls.set('pelland.games', all);
       this._emit(g);
     },
@@ -381,7 +386,8 @@
   function render() {
     const v = $('#view');
     $('#back').hidden = S.view === 'home' || S.view === 'login';
-    $('#dbBadge').textContent = Store.mode === 'firebase' ? 'Partagé' : 'Local';
+    $('#dbBadge').textContent = !navigator.onLine ? 'Hors ligne' : Store.mode === 'firebase' ? 'Partagé' : 'Local';
+    $('#dbBadge').classList.toggle('offline', !navigator.onLine);
     const showDock = false; // plus d'interface vocale
     document.body.classList.toggle('view-game', S.view === 'game');
     $('#dock').hidden = !showDock; document.body.classList.toggle('no-dock', !showDock);
@@ -436,12 +442,13 @@
     const f = S.newOffre;
     const list = (S.offres || []).map(o => {
       const reps = offreReps(o), past = Date.now() > o.deadline;
-      return `<div class="offre"><div class="offre-h"><b>${esc(o.course)}</b><small>${past ? 'Réponses fermées' : 'Réponses avant le ' + esc(fmtDay(o.deadline))} · ${reps.length} réponse${reps.length > 1 ? 's' : ''}</small></div>
+      return `<div class="offre"><div class="offre-h"><b>${esc(o.course)}</b>${o.place ? `<span class="place">${esc(o.place)}</span>` : ''}<small>${past ? 'Réponses fermées' : 'Réponses avant le ' + esc(fmtDay(o.deadline))} · ${reps.length} réponse${reps.length > 1 ? 's' : ''}</small></div>
         ${o.dates.map(dt => { const yes = reps.filter(r => (r.dates || []).includes(dt)).map(r => r.name);
           return `<div class="offre-d"><div><b>${esc(fmtDate(dt))}</b><span>${yes.length ? esc(yes.join(', ')) : 'Personne pour l’instant'}</span>${yes.length ? `<span class="grp">${esc(groupsText(yes.length))}</span>` : ''}</div><span class="cnt ${yes.length >= 4 ? 'ok' : ''}">${yes.length}</span></div>${yes.length >= 3 ? `<div class="row offre-acts"><button class="btn small" data-oauto="${esc(o.id)}|${dt}" type="button">Quatuors automatiques</button><button class="btn ghost small" data-oquat="${esc(o.id)}|${dt}" type="button">Manuel</button></div>` : ''}`; }).join('')}
         <div class="row"><button class="btn ghost small" data-osms="${esc(o.id)}" type="button">Renvoyer le texto</button><button class="btn ghost small" data-odel="${esc(o.id)}" type="button">${S.confirmDelO === o.id ? 'Confirmer' : 'Retirer'}</button></div></div>`; }).join('');
     const form = f ? `<div class="offre-form">
-        <label>Terrain<select id="oCourse">${S.courses.map(c => `<option value="${esc(c.name)}" ${c.name === f.course ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
+        <label>Terrain<select id="oCourse">${S.courses.map(c => `<option value="${esc(c.name)}" ${c.name === f.course ? 'selected' : ''}>${esc(c.name)}${c.sim ? ' (simulateur)' : ''}</option>`).join('')}</select></label>
+        <label>Lieu (facultatif)<input id="oPlace" type="text" value="${esc(f.place || '')}" placeholder="ex. Golf Simulateur Laval, baies 2 et 3"></label>
         <div class="lbl">Dates offertes</div>
         ${f.dates.map((d, i) => `<div class="row" style="flex-wrap:nowrap"><input type="datetime-local" data-od="${i}" value="${esc(d)}" style="flex:1;min-width:0"><button class="x" type="button" data-odx="${i}" aria-label="Retirer">×</button></div>`).join('')}
         <button class="btn ghost small" id="oAddDate" type="button">+ Ajouter une date</button>
@@ -454,7 +461,7 @@
     const me = L.norm(ls.get('pelland.me', '') || '');
     const nums = (S.players || []).filter(p => p.phone && L.norm(p.name) !== me).map(p => p.phone);
     const missing = (S.players || []).filter(p => !p.phone && L.norm(p.name) !== me).map(p => p.name);
-    const body = [`${groupName()} (${APP}) – parties offertes à ${o.course.replace(/^Club de golf /i, '')} :`, ...o.dates.map(d => '• ' + fmtDate(d)),
+    const body = [`${groupName()} (${APP}) – parties offertes à ${o.course.replace(/^Club de golf /i, '')}${o.place ? ' – ' + o.place : ''} :`, ...o.dates.map(d => '• ' + fmtDate(d)),
       `Indique tes disponibilités avant le ${fmtDay(o.deadline)} : ${location.origin + location.pathname}?offre=${o.id}`].join('\n');
     if (missing.length) toast(`Pas de numéro pour ${missing.join(', ')}.`);
     openSms(nums, body);
@@ -466,7 +473,7 @@
     if (!o) return '<section class="card"><h2>Offre introuvable</h2><p class="note">Elle a peut-être été retirée.</p></section>';
     const me = ls.get('pelland.me', '') || '', key = 'rep_' + presKey(me), mine = (o[key] || {}).dates || [], past = Date.now() > o.deadline;
     const sel = S.offreSel || (S.offreSel = mine.slice());
-    return `<section class="card"><h2>${esc(o.course)}</h2>
+    return `<section class="card"><h2>${esc(o.course)}</h2>${o.place ? `<p class="note" style="margin-top:-6px">${esc(o.place)}</p>` : ''}
       <p class="note">${past ? 'La date butoir est passée : les réponses sont fermées.' : `Cochez les dates où vous êtes disponible, avant le <b>${esc(fmtDay(o.deadline))}</b>.`}</p>
       <div class="dispo">${o.dates.map(dt => `<button type="button" class="dispo-d" data-dispo="${dt}" aria-pressed="${sel.includes(dt)}" ${past ? 'disabled' : ''}><b>${sel.includes(dt) ? '✓' : ''}</b><span>${esc(fmtDate(dt))}</span></button>`).join('')}</div>
       <div class="row dispo-btns">${past ? '' : `<button class="btn" id="dispoSave" type="button">Enregistrer</button>`}<button class="btn ghost" id="dispoCancel" type="button">${past ? 'Retour' : 'Annuler'}</button></div>
@@ -622,7 +629,7 @@
       </section>
       <section class="card">
         <div class="step">Argent</div>
-        ${d.format !== 'pelland' ? `<div class="row" style="flex-wrap:nowrap"><label style="flex:1">${({ neuf: 'Par point', bestball: 'Par trou gagné', wolf: 'Par point', sixes: 'Par tranche de 6 trous', skins: 'Par skin' })[d.format]}<span class="money-in"><input id="ppt" type="text" inputmode="decimal" placeholder="1" value="${esc(fmtIn(d.perPoint))}"><i>$</i></span></label><span style="flex:1"></span></div>
+        ${d.format !== 'pelland' ? `<div class="row" style="flex-wrap:nowrap"><label style="flex:1">${({ neuf: 'Par point', bestball: 'Par trou gagné', wolf: 'Par point', sixes: 'Par tranche gagnée', skins: 'Par skin' })[d.format]}<span class="money-in"><input id="ppt" type="text" inputmode="decimal" placeholder="1" value="${esc(fmtIn(d.perPoint))}"><i>$</i></span></label><span style="flex:1"></span></div>
         <p class="note">${esc(ruleText({ format: d.format, players: [] }))} ${esc(gainRule({ format: d.format, players: [], perPoint: d.perPoint }))}.</p>` : `<div class="row" style="flex-wrap:nowrap">
           <label style="flex:1">La game commence à<span class="money-in"><input id="stake" type="text" inputmode="decimal" placeholder="0" value="${esc(fmtIn(d.stake))}"><i>$</i></span></label>
           <label style="flex:1">À chaque revirement<span class="money-in"><input id="lcv" type="text" inputmode="decimal" placeholder="0" value="${esc(fmtIn(d.leadChangeValue))}"><i>$</i></span></label>
@@ -634,9 +641,10 @@
       </section>
       <section class="card">
         <div class="step">Jeu</div>
+        <div class="seg holes-seg">${[['18', '18 trous'], ['front', 'Aller (1 à 9)'], ['back', 'Retour (10 à 18)']].map(([k, t]) => `<button type="button" data-holes="${k}" aria-pressed="${(d.holes || '18') === k}"><b>${t}</b></button>`).join('')}</div>
         <div class="games">${games.map(x => `<button type="button" data-game="${x}" aria-pressed="${d.format === x}">${esc(L.FORMATS[x])}</button>`).join('')}</div>
         ${d.format === 'wolf' ? `<p class="note">Le loup tourne dans l’ordre des joueurs : joueur 1 au trou 1, joueur 2 au trou 2, etc.</p>` : ''}
-        ${d.format === 'sixes' ? `<p class="note">Équipes : joueurs 1+2 contre 3+4 (trous 1 à 6), 1+3 contre 2+4 (7 à 12), 1+4 contre 2+3 (13 à 18).</p>` : ''}
+        ${d.format === 'sixes' ? `<p class="note">Équipes : joueurs 1+2 contre 3+4 (trous 1 à 6), 1+3 contre 2+4 (7 à 12), 1+4 contre 2+3 (13 à 18) ; sur 9 trous, on change aux 3 trous.</p>` : ''}
       </section>
       ${!teamsUsed ? '' : `<section class="card">
         <div class="step">7 · Équipes</div>
@@ -828,7 +836,7 @@
           <div class="lb-detail">${parts.map(([v, l]) => `<span>${v < 0 ? '−' : '+'} ${fmt$(Math.abs(v))} <i>${l}</i></span>`).join('')}</div></div>`; })()}
       <div class="card-scroll"><table class="sc">
         <thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${colOrder.map(i => { const p = g.players[i]; return `<th class="pc tc${teamOf(g, i)}" title="${esc(p.name)}">${esc(ini[i])}</th>`; }).join('')}<th class="col-wide">Statut</th><th class="col-wide">Calcul</th><th class="tc0">Rouge</th><th class="tc1">Bleu</th></tr></thead>
-        <tbody>${Array.from({ length: 9 }, (_, i) => row(i + 1)).join('')}${sumRow('Aller', 1, 9)}${Array.from({ length: 9 }, (_, i) => row(i + 10)).join('')}${sumRow('Retour', 10, 18)}${sumRow('Total', 1, 18, true)}</tbody>
+        <tbody>${scoreRows(g, row, sumRow)}</tbody>
       </table></div>
       <button class="btn sms-btn" data-sms type="button">Texto aux joueurs</button>
         ${owner ? `<div class="row game-actions bottom-actions">${g.status === 'terminée'
@@ -907,7 +915,7 @@
   }
   function vCourses() {
     $('#barTitle').textContent = 'Terrains';
-    return `<div class="list">${S.courses.map(c => `<button class="item" data-edit="${esc(c.id)}"><b>${esc(c.name)}</b><span>Normale ${L.teePar(c, c.tees[0])} · ${c.tees.length} tertres${c.city ? ' · ' + esc(c.city) : ''}</span></button>`).join('')}</div>
+    return `<div class="list">${S.courses.map(c => `<button class="item" data-edit="${esc(c.id)}"><b>${esc(c.name)}</b><span>${c.sim ? 'Simulateur · ' : ''}Normale ${L.teePar(c, c.tees[0])} · ${c.tees.length} tertres${c.city ? ' · ' + esc(c.city) : ''}</span></button>`).join('')}</div>
       <button class="btn" data-go="course" data-new="1" type="button">Ajouter un terrain</button>
       <p class="note">Les terrains sont gardés dans la base de données et réutilisés aux parties suivantes.</p>`;
   }
@@ -927,6 +935,7 @@
       <section class="card">
         <label>Nom du terrain<input id="cname" type="text" value="${esc(c.name)}" placeholder="Club de golf …"></label>
         <label>Ville<input id="ccity" type="text" value="${esc(c.city || '')}"></label>
+        <label class="check"><input id="csim" type="checkbox" ${c.sim ? 'checked' : ''}> Terrain virtuel (simulateur)</label>
       </section>
       <section class="card">
         <h2>Tertres</h2><p class="note">Évaluation et slope, inscrits au verso de la carte de pointage.</p>
@@ -1053,7 +1062,7 @@
       const f = S.newOffre;
       const on = $('#oNew'); if (on) on.onclick = () => { const dl = new Date(Date.now() + 3 * 864e5); S.newOffre = { course: (S.courses[0] || {}).name || '', dates: [''], deadline: dl.toISOString().slice(0, 10) }; render(); };
       if (f) {
-        const syncO = () => { f.course = $('#oCourse').value; f.deadline = $('#oDeadline').value; v.querySelectorAll('[data-od]').forEach(i => { f.dates[+i.dataset.od] = i.value; }); };
+        const syncO = () => { f.place = $('#oPlace').value.trim(); f.course = $('#oCourse').value; f.deadline = $('#oDeadline').value; v.querySelectorAll('[data-od]').forEach(i => { f.dates[+i.dataset.od] = i.value; }); };
         $('#oAddDate').onclick = () => { syncO(); f.dates.push(''); render(); };
         v.querySelectorAll('[data-odx]').forEach(b => b.onclick = () => { syncO(); f.dates.splice(+b.dataset.odx, 1); if (!f.dates.length) f.dates.push(''); render(); });
         $('#oCancel').onclick = () => { S.newOffre = null; render(); };
@@ -1062,7 +1071,7 @@
           const dates = f.dates.filter(Boolean).map(x => new Date(x).getTime()).filter(x => !isNaN(x)).sort((a, b) => a - b);
           if (!dates.length) return toast('Ajoutez au moins une date.');
           if (!f.deadline) return toast('Choisissez la date butoir.');
-          const o = { id: Date.now().toString(36), course: f.course, dates, deadline: new Date(f.deadline + 'T23:59:59').getTime(), by: ls.get('pelland.me', '') || '', groupId: Store.gid, createdAt: Date.now() };
+          const o = { id: Date.now().toString(36), course: f.course, place: f.place || '', dates, deadline: new Date(f.deadline + 'T23:59:59').getTime(), by: ls.get('pelland.me', '') || '', groupId: Store.gid, createdAt: Date.now() };
           try { await Store.saveOffre(o); S.offres = [o].concat(S.offres || []); S.newOffre = null; render(); offreSms(o); }
           catch (e) { toast('Enregistrement impossible : ' + e.message); }
         };
@@ -1149,7 +1158,7 @@
     course(v) {
       const c = S.editCourse;
       const sync = () => {
-        c.name = $('#cname').value; c.city = $('#ccity').value;
+        c.name = $('#cname').value; c.city = $('#ccity').value; c.sim = $('#csim').checked;
         v.querySelectorAll('[data-tee]').forEach(i => { const [k, f] = i.dataset.tee.split(':'); c.tees[k][f] = i.value; });
         v.querySelectorAll('[data-hole]').forEach(i => { const [k, f] = i.dataset.hole.split(':'); c.holes[k][f] = i.value; });
       };
@@ -1238,6 +1247,7 @@
       });
       const pt = $('#partner'); if (pt) pt.onchange = () => { const j = +pt.value; d.teams = [[0, j], [1, 2, 3].filter(i => i !== j)]; refresh(); };
       v.querySelectorAll('[data-game]').forEach(b => b.onclick = () => { d.format = b.dataset.game; render(); });
+      v.querySelectorAll('[data-holes]').forEach(b => b.onclick = () => { d.holes = b.dataset.holes; render(); });
       v.querySelectorAll('[data-count]').forEach(b => b.onclick = () => {
         const n = +b.dataset.count; if (n === (d.count || 4)) return;
         d.count = n;
@@ -1259,7 +1269,7 @@
         ls.set('pelland.lastPlayers', d.players);
         const id = await Store.newCode();
         const g = { id, createdAt: Date.now(), ownerUid: Store.uid, course: pv.c, courseId: pv.c.id, mode: d.mode, responsable: rIdx >= 0 ? rIdx : 0,
-          format: fmtG, players: pv.ps, teams: neuf ? null : draftTeams(d, pv.ps), teamMode: neuf ? null : d.teamMode, stake: money(d.stake), leadChangeValue: money(d.leadChangeValue), perPoint: String(d.perPoint || '').trim() === '' ? 1 : money(d.perPoint), currentHole: 1, scores: {}, events: {}, status: 'en cours' };
+          format: fmtG, players: pv.ps, teams: neuf ? null : draftTeams(d, pv.ps), teamMode: neuf ? null : d.teamMode, stake: money(d.stake), leadChangeValue: money(d.leadChangeValue), perPoint: String(d.perPoint || '').trim() === '' ? 1 : money(d.perPoint), currentHole: d.holes === 'back' ? 10 : 1, firstHole: d.holes === 'back' ? 10 : 1, lastHole: d.holes === 'front' ? 9 : 18, scores: {}, events: {}, status: 'en cours' };
         try { await Store.saveGame(g); S.draft = null; openGame(id); toast('Partie créée.'); }
         catch (e) { toast('Création impossible : ' + e.message); }
       };
@@ -1267,7 +1277,7 @@
     game(v) {
       if (!S.game) return;
       v.querySelectorAll('[data-nav]').forEach(b => b.onclick = () => {
-        const h = Math.min(18, Math.max(1, (S.game.currentHole || 1) + +b.dataset.nav));
+        const [h0, h1] = L.holeRange(S.game), h = Math.min(h1, Math.max(h0, (S.game.currentHole || 1) + +b.dataset.nav));
         if (isOwner()) commit([{ type: 'goto', hole: h }], false); else { S.game.currentHole = h; render(); }
       });
       v.querySelectorAll('[data-cell]').forEach(b => b.onclick = () => { const [h] = b.dataset.cell.split(':').map(Number); allScoresSheet(h); });
@@ -1519,6 +1529,12 @@
     window.__lastSms = href;
     (window.top || window).location.href = href;
   }
+  // Lignes de la carte selon les trous joués (18, aller ou retour)
+  function scoreRows(g, row, sumRow) {
+    const [h0, h1] = L.holeRange(g), rows = a => Array.from({ length: 9 }, (_, i) => row(a + i)).join('');
+    if (h0 === 1 && h1 === 18) return rows(1) + sumRow('Aller', 1, 9) + rows(10) + sumRow('Retour', 10, 18) + sumRow('Total', 1, 18, true);
+    return rows(h0) + sumRow('Total', h0, h1, true);
+  }
   // ---------------- Le 9 points (3 joueurs) ----------------
   const isAlt = g => !!g && L.formatOf(g) !== 'pelland';
   const fmtPts = x => String(Math.round(x * 10) / 10).replace('.', ',').replace('-', '−');
@@ -1529,14 +1545,14 @@
   function ruleText(g) {
     return ({ neuf: 'Le 9 points : 5 points au meilleur net, 3 au 2e, 1 au 3e ; égalités partagées.',
       bestball: 'Best Ball : le meilleur net de chaque équipe ; le trou gagné vaut 1 point.',
-      sixes: 'Sixes : les équipes changent aux trous 7 et 13 ; meilleur net de l’équipe, 1 point par trou ; l’équipe qui gagne le plus de trous gagne la tranche.',
+      sixes: 'Sixes : les équipes changent à chaque tiers de la partie (6 trous sur 18, 3 sur 9) ; meilleur net de l’équipe, 1 point par trou ; l’équipe qui gagne le plus de trous gagne la tranche.',
       wolf: 'Wolf : le loup tourne à chaque trou. Avec un partenaire : 1 point chacun au gagnant ; seul : 2 points par adversaire ; seul à l’aveugle : 3 points.',
       skins: 'Skins : le seul meilleur net gagne le skin ; à égalité, il est reporté au trou suivant.' })[L.formatOf(g)] || '';
   }
   function gainRule(g) {
     const pp = fmt$(neufPP(g));
     return ({ neuf: `Gain = différence de points avec chaque autre joueur × ${pp}`, bestball: `Gain = écart de trous gagnés × ${pp} par joueur`,
-      sixes: `Gain = ${pp} par tranche de 6 trous gagnée (perdue : −${pp})`, wolf: `Gain = points × ${pp}`, skins: `Gain = skins gagnés × ${pp} payé par chaque autre joueur` })[L.formatOf(g)] || '';
+      sixes: `Gain = ${pp} par tranche gagnée (perdue : −${pp})`, wolf: `Gain = points × ${pp}`, skins: `Gain = skins gagnés × ${pp} payé par chaque autre joueur` })[L.formatOf(g)] || '';
   }
   // Texte court sous chaque trou de la carte
   function altShort(g, r, ini) {
@@ -1570,7 +1586,7 @@
     const f = L.formatOf(g), fname = L.FORMATS[f], AH = L.altHoles(g);
     const tots = g.players.map((p, i) => L.totals(g, i)), pts = L.altTotals(g), gn = neufGains(g), ini = L.initials(g.players);
     const wolfNow = f === 'wolf' ? L.wolfOf(g, h) : -1;
-    const sixT = f === 'sixes' ? L.sixesTeams(h) : f === 'bestball' ? L.getTeams(g) : null;
+    const sixT = f === 'sixes' ? L.sixesTeams(h, g) : f === 'bestball' ? L.getTeams(g) : null;
     const dots = k => k > 0 ? BALL.repeat(k) : '';
     const ph = g.players.map((p, pi) => { const k = L.strokesOnHole(p.strokes, hi.si);
       return `<${owner ? `button type="button" data-allscores="${h}"` : 'div'} class="hp"><div class="nm">${esc(p.name)}${g.responsable === pi ? ' ★' : ''}${pi === wolfNow ? ' <span class="wolf-tag">Loup</span>' : ''}</div><div class="hp-idx">Index ${String(p.index).replace('.', ',')}${sixT ? ` · <span class="pair">${sixT[0].includes(pi) ? 'Équipe A' : 'Équipe B'}</span>` : ''}</div><div class="dots">${k ? dots(k) : ''}</div><div class="hp-strk">${strokeHoles(g, p)}</div><div class="hp-tot">${tots[pi].played ? `<span>Brut <b>${tots[pi].gross}</b> · Net <b>${tots[pi].net}</b></span><span class="hp-n">${tots[pi].played} trou${tots[pi].played > 1 ? 's' : ''}</span>` : 'Aucun trou joué'}</div><div class="hp-pts"><b>${(pts[pi] > 0 && f !== 'neuf' ? '+' : '') + fmtPts(pts[pi])}</b> ${ptsLabel(g)}</div></${owner ? 'button' : 'div'}>`; });
@@ -1596,7 +1612,7 @@
       ${leader}
       <div class="card-scroll"><table class="sc neuf">
         <thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${g.players.map((p, i) => `<th class="pc" title="${esc(p.name)}">${esc(ini[i])}</th>`).join('')}</tr></thead>
-        <tbody>${Array.from({ length: 9 }, (_, i) => row(i + 1)).join('')}${sumRow('Aller', 1, 9)}${Array.from({ length: 9 }, (_, i) => row(i + 10)).join('')}${sumRow('Retour', 10, 18)}${sumRow('Total', 1, 18)}
+        <tbody>${scoreRows(g, row, sumRow)}
         <tr class="sum"><td colspan="3">${f === 'skins' ? 'Skins' : f === 'neuf' || f === 'wolf' ? 'Points' : 'Trous'}</td>${pts.map(x => `<td>${(x > 0 && f !== 'neuf' ? '+' : '') + fmtPts(x)}</td>`).join('')}</tr></tbody>
       </table></div>
       <button class="btn sms-btn" data-sms type="button">Texto aux joueurs</button>
@@ -1796,6 +1812,9 @@
   Voice.onText = text => handle(text);
   if ('speechSynthesis' in window) speechSynthesis.getVoices();
 
+  // Réseau perdu / retrouvé : on l'indique, Firebase envoie les scores en attente tout seul
+  window.addEventListener('offline', () => { render(); toast('Hors ligne : les scores sont gardés et seront envoyés au retour du réseau.'); });
+  window.addEventListener('online', () => { render(); toast('Réseau retrouvé : scores envoyés.'); });
   (async function start() {
     $('#view').innerHTML = '<p class="note">Démarrage…</p>';
     await Store.init();

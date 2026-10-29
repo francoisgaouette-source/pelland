@@ -181,9 +181,12 @@
   // Normales 3 : l'équipe qui a la skin ET dont un joueur fait la normale (score brut ≤ normale) gagne 5 $.
   // Sinon les 5 $ sont reportés et ajoutés à la prochaine normale 3.
   const PAR3_DOLLARS = 5;
+  // Trous joués : 1-18, aller (1-9) ou retour (10-18)
+  function holeRange(g) { return [g.firstHole || 1, g.lastHole || 18]; }
   function par3Results(game) {
     let pot = 0; const results = []; const money = [0, 0]; let blocked = false; let next = null;
-    for (let h = 1; h <= 18; h++) {
+    const [h0, h1] = holeRange(game);
+    for (let h = h0; h <= h1; h++) {
       if (game.course.holes[h - 1].par !== 3) continue;
       const value = pot + PAR3_DOLLARS;
       const row = (game.scores || {})[h];
@@ -582,7 +585,7 @@
           const d = describeHolePoints(g, a.hole); if (d) say.push(d);
           say.push(totalText(g));
         }
-        if (row.every(v => v != null) && a.hole === (g.currentHole || 1) && a.hole < 18) { g.currentHole = a.hole + 1; say.push(`On passe au ${a.hole + 1}.`); }
+        if (row.every(v => v != null) && a.hole === (g.currentHole || 1) && a.hole < (g.lastHole || 18)) { g.currentHole = a.hole + 1; say.push(`On passe au ${a.hole + 1}.`); }
       }
       if (a.type === 'nopress') { const e = ev(a.hole); e.presses = []; e.noPress = true; e.reroll = false; e.rerollSet = true; say.push(`Pas de press au ${a.hole}.`); }
       if (a.type === 'unpress') { const e = ev(a.hole); e.presses = []; e.pressTeam = null; e.noPress = false; e.reroll = false; e.rerollSet = false; say.push(`Press retirée au ${a.hole}.`); }
@@ -888,16 +891,19 @@
   function formatOf(g) { return g.format || (g.players.length === 3 ? 'neuf' : 'pelland'); }
   function netOf(g, h, i) { const s = getScore(g, h, i); return s == null ? null : s - strokesOnHole(g.players[i].strokes, g.course.holes[h - 1].si); }
   function holeNets(g, h) { const n = g.players.map((_, i) => netOf(g, h, i)); return n.some(v => v == null) ? null : n; }
-  function sixesTeams(h) { return [[[0, 1], [2, 3]], [[0, 2], [1, 3]], [[0, 3], [1, 2]]][h <= 6 ? 0 : h <= 12 ? 1 : 2]; }
+  // Sixes : 3 tranches égales des trous joués (6-6-6 sur 18, 3-3-3 sur 9)
+  function sixesSeg(h, g) { const [a, b] = g ? holeRange(g) : [1, 18], len = (b - a + 1) / 3; return Math.min(2, Math.floor((h - a) / len)); }
+  function sixesTeams(h, g) { return [[[0, 1], [2, 3]], [[0, 2], [1, 3]], [[0, 3], [1, 2]]][sixesSeg(h, g)]; }
   function wolfOf(g, h) { return (h - 1) % g.players.length; }
   // Résultat d'un trou : pts = points de chaque joueur (somme nulle sauf le 9 points), win = gagnants, desc = phrase
   function altHoles(g) {
     const f = formatOf(g), P = g.players, nm = i => P[i].name, out = {}; let carry = 0;
-    for (let h = 1; h <= 18; h++) {
+    const [h0, h1] = holeRange(g);
+    for (let h = h0; h <= h1; h++) {
       const n = holeNets(g, h); if (!n) { out[h] = null; continue; }
       if (f === 'neuf') { const r = neufPoints(g, h); out[h] = { pts: r.pts, win: [], desc: P.map((p, i) => `${nm(i)} ${r.pts[i]}`).join(', ') }; continue; }
       if (f === 'bestball' || f === 'sixes') {
-        const T = f === 'bestball' ? getTeams(g) : sixesTeams(h), b = T.map(t => Math.min(...t.map(i => n[i]))), pts = P.map(() => 0);
+        const T = f === 'bestball' ? getTeams(g) : sixesTeams(h, g), b = T.map(t => Math.min(...t.map(i => n[i]))), pts = P.map(() => 0);
         if (b[0] === b[1]) { out[h] = { pts, win: [], desc: `Égalité au meilleur net (${b[0]}) : trou partagé.`, teams: T }; continue; }
         const w = b[0] < b[1] ? 0 : 1; T[w].forEach(i => { pts[i] = 1; }); T[1 - w].forEach(i => { pts[i] = -1; });
         out[h] = { pts, win: T[w], desc: `${T[w].map(nm).join(' et ')} gagnent le trou (meilleur net ${b[w]} contre ${b[1 - w]}).`, teams: T }; continue;
@@ -933,13 +939,13 @@
     const f = formatOf(g), t = altTotals(g);
     if (f === 'neuf') return t.map((x, i) => t.reduce((a, y, j) => a + (j === i ? 0 : (x - y) * pp), 0));
     if (f === 'sixes') { const r = altHoles(g), gn = g.players.map(() => 0);
-      [[1, 6], [7, 12], [13, 18]].forEach(([a, b]) => { const s = g.players.map(() => 0); let any = false;
-        for (let h = a; h <= b; h++) if (r[h] && r[h].pts) { any = true; r[h].pts.forEach((v, i) => { s[i] += v; }); }
+      [0, 1, 2].forEach(seg => { const s = g.players.map(() => 0); let any = false;
+        for (let h = 1; h <= 18; h++) if (r[h] && sixesSeg(h, g) === seg) if (r[h] && r[h].pts) { any = true; r[h].pts.forEach((v, i) => { s[i] += v; }); }
         if (any) s.forEach((v, i) => { gn[i] += Math.sign(v) * pp; }); });
       return gn; }
     return t.map(x => x * pp);
   }
 
-  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, TEAMS, teamFromText, makeTeams, orderTeams, getTeams, teamName, netScore, holeMultiplier, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, cabaneTeam, cabanes, calcText, par3Results, describePar3, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup, resolveName, nextPrompt, trailingTeam, pressTeamOf, initials, leadChanges, totalText, holeNetText, parseCardText, neufPoints, neufTotals, FORMATS, formatOf, altHoles, altTotals, altGains, sixesTeams, wolfOf };
+  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, TEAMS, teamFromText, makeTeams, orderTeams, getTeams, teamName, netScore, holeMultiplier, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, cabaneTeam, cabanes, calcText, par3Results, describePar3, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup, resolveName, nextPrompt, trailingTeam, pressTeamOf, initials, leadChanges, totalText, holeNetText, parseCardText, neufPoints, neufTotals, FORMATS, formatOf, altHoles, altTotals, altGains, sixesTeams, wolfOf, holeRange };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PellandLogic = api;
 })(this);
