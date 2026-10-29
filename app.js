@@ -93,11 +93,12 @@
       if (!list.find(c => c.id === L.PINEGROVE.id)) await this.saveCourse(L.PINEGROVE);
     },
     async listCourses() {
-      if (this.mode === 'firebase') {
-        const snap = await this.db.collection('courses').get();
-        return snap.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => a.name.localeCompare(b.name));
-      }
-      return ls.get('pelland.courses', []).sort((a, b) => a.name.localeCompare(b.name));
+      let list;
+      if (this.mode === 'firebase') { const snap = await this.db.collection('courses').get(); list = snap.docs.map(d => ({ ...d.data(), id: d.id })); }
+      else list = ls.get('pelland.courses', []);
+      // Catalogue des terrains du Québec : ajouté s'il n'est pas déjà dans la base (une copie modifiée l'emporte)
+      (window.QC_COURSES || []).forEach(c => { if (!list.some(x => x.id === c.id)) list.push(c); });
+      return list.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
     },
     async saveCourse(c) {
       c = JSON.parse(JSON.stringify(c));
@@ -924,9 +925,9 @@
   }
   function vCourses() {
     $('#barTitle').textContent = 'Terrains';
-    return `<div class="list">${S.courses.map(c => `<button class="item" data-edit="${esc(c.id)}"><b>${esc(c.name)}</b><span>${c.sim ? 'Simulateur · ' : ''}Normale ${L.teePar(c, c.tees[0])} · ${c.tees.length} tertres${c.city ? ' · ' + esc(c.city) : ''}</span></button>`).join('')}</div>
+    return `<div class="list">${S.courses.map(c => `<button class="item" data-edit="${esc(c.id)}"><b>${esc(c.name)}</b><span>${c.sim ? 'Simulateur · ' : ''}${c.catalog ? 'Catalogue Québec · ' : ''}Normale ${L.teePar(c, c.tees[0])} · ${c.tees.length} tertres${c.city ? ' · ' + esc(c.city) : ''}</span></button>`).join('')}</div>
       <button class="btn" data-go="course" data-new="1" type="button">Ajouter un terrain</button>
-      <p class="note">Les terrains sont gardés dans la base de données et réutilisés aux parties suivantes.</p>`;
+      <p class="note">Les terrains sont communs à tous les groupes. Ceux marqués « Catalogue Québec » viennent de cartes de pointage publiques : vérifiez les normales, handicaps et tertres avec la carte du club, et corrigez au besoin (la correction est gardée).</p>`;
   }
   function vCourse() {
     const c = S.editCourse || (S.editCourse = { name: '', city: '', holes: Array.from({ length: 18 }, () => ({ par: 4, si: '' })), tees: [{ name: 'Blanc', rating: '', slope: '' }] });
@@ -1212,7 +1213,7 @@
       $('#saveCourse').onclick = async () => {
         sync();
         const num = x => parseFloat(String(x).replace(',', '.'));
-        const out = { ...c, name: c.name.trim(), holes: c.holes.map(h => ({ par: parseInt(h.par, 10), si: parseInt(h.si, 10) })),
+        const out = { ...c, catalog: false, name: c.name.trim(), holes: c.holes.map(h => ({ par: parseInt(h.par, 10), si: parseInt(h.si, 10) })),
           tees: c.tees.filter(t => String(t.name).trim()).map(t => ({ ...t, name: String(t.name).trim(), rating: num(t.rating), slope: parseInt(t.slope, 10) })) };
         const sis = out.holes.map(h => h.si).sort((a, b) => a - b).join(',');
         if (!out.name) return toast('Donnez un nom au terrain.');
