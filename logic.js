@@ -604,7 +604,7 @@
         const tt = trailingTeam(g, a.hole);
         const team = a.player != null ? getTeams(g).findIndex(x => x.includes(a.player)) : (a.team != null ? a.team : tt);
         // Correction après coup (scores déjà entrés) : on accepte la press telle qu'elle a été jouée
-        const fix = ((g.scores || {})[a.hole] || []).some(v => v != null);
+        const fix = a.force || ((g.scores || {})[a.hole] || []).some(v => v != null);
         if (!fix && tt == null) { say.push('Égalité : personne ne peut presser.'); return; }
         if (!fix && team !== tt) { say.push(`Seuls ${tl(tt)} peuvent presser, ils sont en déficit.`); return; }
         if ((ev(a.hole).presses || []).length) { say.push(`Le ${a.hole} est déjà pressé.`); return; }

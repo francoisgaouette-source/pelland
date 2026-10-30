@@ -2033,19 +2033,22 @@
     openSheet(`<h3>Trou ${h}</h3>
       <div class="toggles">
         <div class="tg"><span>Aller à ce trou</span><button class="pill" data-goto>Trou courant</button></div>
-        <div class="tg"><span>Pressé par</span>${P.map((p, i) => `<button class="pill" data-press="${i}">${esc(p.name)}</button>`).join('')}<button class="pill" data-press="">Sans nom</button><button class="pill" data-nopress aria-pressed="${!!e.noPress}">Pas de press</button>
-          ${(e.presses || []).length ? `<button class="pill" data-clearpress>Retirer les pressés (${e.presses.length})</button>` : ''}</div>
-        <div class="tg"><span>Reroll</span><button class="pill" data-reroll="1" aria-pressed="${!!e.reroll}">Oui</button><button class="pill" data-reroll="0" aria-pressed="${!!e.rerollSet && !e.reroll}">Non</button></div>
+        <div class="tg"><span>Statut du trou</span>${(() => { const pt = L.pressTeamOf(g, h), st = e.reroll ? 'reroll' : (e.presses || []).length ? 'press' + (pt != null ? pt : '') : 'normal';
+          return `<button class="pill" data-status="normal" aria-pressed="${st === 'normal'}">Normal</button>` + [0, 1].map(k => `<button class="pill team-pill t${k}" data-status="press${k}" aria-pressed="${st === 'press' + k}">Pressé par les ${L.TEAMS[k]} (×2)</button>`).join('') + `<button class="pill" data-status="reroll" aria-pressed="${st === 'reroll'}" ${(e.presses || []).length ? '' : 'disabled'}>Reroll (×4)</button>`; })()}
+          <span class="note" style="width:auto">Le reroll se choisit après la press.</span></div>
         ${isPar3 ? `<div class="tg"><span>Normale 3</span><span class="note" style="width:auto">Calculée automatiquement : l'équipe qui a la skin et fait la normale gagne l'argent.</span></div>` : ''}
         <div class="tg"><span>Skin (1 point à l'équipe, multiplié par la press)</span>${[0, 1].map(k => `<button class="pill team-pill t${k}" data-skin="${k}" aria-pressed="${L.skinTeam(g, h) === k}">${L.TEAMS[k]} · ${esc(L.teamName(g, k))}</button>`).join('')}<button class="pill" data-skin="-1" aria-pressed="${L.skinTeam(g, h) === -1}">Pas de skin</button></div>
       </div>
       <button class="btn ghost small" data-close>Fermer</button>`, s => {
       const done = acts => { closeSheet(); commit(acts, false); };
       s.querySelector('[data-goto]').onclick = () => done([{ type: 'goto', hole: h }]);
-      s.querySelectorAll('[data-press]').forEach(b => b.onclick = () => done([{ type: 'press', hole: h, player: b.dataset.press === '' ? null : +b.dataset.press }]));
-      const cp = s.querySelector('[data-clearpress]'); if (cp) cp.onclick = () => { closeSheet(); S.undo.push(JSON.parse(JSON.stringify(g))); const ng = JSON.parse(JSON.stringify(g)); ng.events[h].presses = []; S.game = ng; render(); Store.saveGame(ng); };
-      s.querySelectorAll('[data-reroll]').forEach(b => b.onclick = () => done([{ type: 'reroll', hole: h, on: b.dataset.reroll === '1' }]));
-      s.querySelector('[data-nopress]').onclick = () => done([{ type: 'nopress', hole: h }]);
+      s.querySelectorAll('[data-status]').forEach(b => b.onclick = () => {
+        const v = b.dataset.status;
+        if (v === 'normal') return done([{ type: 'unpress', hole: h }]);
+        if (v === 'reroll') return done([{ type: 'reroll', hole: h, on: true }]);
+        const k = +v.slice(5); // press0 / press1 : on remplace la press existante
+        done([{ type: 'unpress', hole: h }, { type: 'press', hole: h, team: k, player: null, force: true }]);
+      });
       s.querySelectorAll('[data-skin]').forEach(b => b.onclick = () => {
         done([{ type: 'skin', hole: h, team: +b.dataset.skin }]);
       });
