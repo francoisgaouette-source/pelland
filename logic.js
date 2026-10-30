@@ -144,8 +144,10 @@
     for (let h = 1; h <= 18; h++) {
       const ht = holeTotal(game, h); if (!ht) continue;
       t[0] += ht[0]; t[1] += ht[1];
+      // Revirement : l'équipe qui menait perd son avance, soit en revenant à égalité (à zéro), soit en passant derrière
       const lead = t[0] === t[1] ? null : (t[0] > t[1] ? 0 : 1);
-      if (lead != null) { if (last != null && lead !== last) n++; last = lead; }
+      if (last != null && lead !== last) n++;
+      last = lead;
     }
     return n;
   }
