@@ -375,7 +375,7 @@
   // Responsable : celui qui a créé ou réclamé la partie ; après une passation, le joueur désigné (ownerUid vide)
   const myIdx = g => g.players.findIndex(p => L.norm(p.name) === L.norm(ls.get('pelland.me', '') || ''));
   const isOwner = () => !!S.game && (S.game.ownerUid === Store.uid || (!S.game.ownerUid && S.game.responsable != null && myIdx(S.game) === S.game.responsable));
-  const handoffBtn = (g, owner) => owner && g.status !== 'terminée' ? `<div class="row handoff-row"><span class="note">Responsable : <b>${esc((g.players[g.responsable] || {}).name || '')}</b> ★</span><button class="btn ghost small" data-handoff type="button">Changer de responsable</button></div>` : '';
+  const handoffBtn = (g, owner) => owner && g.status !== 'terminée' ? `<div class="row handoff-row"><span class="note">Responsable : <b>${esc((g.players[g.responsable] || {}).name || '')}</b> ★</span><span class="row" style="gap:8px"><button class="btn ghost small" data-editmoney type="button">Modifier les montants</button><button class="btn ghost small" data-handoff type="button">Changer de responsable</button></span></div>` : '';
   function respActions(g, owner, note) {
     if (owner) return '';
     if (!(Store.mode === 'firebase' && Store.email)) return '';
@@ -1483,6 +1483,26 @@
         const ng = JSON.parse(JSON.stringify(S.game)); ng.ownerUid = Store.uid; const mi = myIdx(ng); if (mi >= 0) ng.responsable = mi;
         try { await Store.saveGame(ng); S.game = ng; S.confirmClaim = null; toast('Vous êtes maintenant le responsable de cette partie.'); render(); }
         catch (e) { toast('Impossible : publiez les nouvelles règles Firestore. (' + e.message + ')'); }
+      };
+      const em = v.querySelector('[data-editmoney]'); if (em) em.onclick = () => {
+        const g = S.game, f = L.formatOf(g), c = g.custom || {};
+        const inp = (id, label, val, ph) => `<label style="flex:1">${label}<span class="money-in"><input id="${id}" type="text" inputmode="decimal" placeholder="${ph}" value="${esc(val == null || val === '' ? '' : fmtIn(val))}"><i>$</i></span></label>`;
+        const ppLabel = f === 'pelland' ? 'Par point net' : (f === 'perso' ? 'Par point' : ({ neuf: 'Par point', bestball: 'Par trou gagné', nassau: 'Par pari', wolf: 'Par point', sixes: 'Par tranche gagnée', skins: 'Par skin' })[f] || 'Par point');
+        const fields = f === 'pelland'
+          ? `<div class="row" style="flex-wrap:nowrap">${inp('emStake', 'La game commence à', g.stake, '0')}${inp('emLcv', 'À chaque revirement', g.leadChangeValue, '0')}</div><div class="row" style="flex-wrap:nowrap">${inp('emPp', ppLabel, g.perPoint, '1')}${inp('emP3', 'Chaque normale 3', g.par3Value == null ? 5 : g.par3Value, '5')}</div>`
+          : `<div class="row" style="flex-wrap:nowrap">${inp('emPp', ppLabel, g.perPoint, '1')}${f === 'perso' && c.mode === 'equipes' ? inp('emCs', 'Mise à l’équipe qui mène', c.stake, '0') : '<span style="flex:1"></span>'}</div>`;
+        openSheet(`<h3>Modifier les montants</h3>${fields}<p class="note">Tous les montants sont par joueur. Les gains sont recalculés pour toute la partie, y compris les trous déjà joués.</p>
+          <div class="row"><button class="btn small" id="emSave" type="button">Enregistrer</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`, sh => {
+          sh.querySelector('[data-close]').onclick = closeSheet;
+          sh.querySelector('#emSave').onclick = async () => {
+            const val = (id, def) => { const el = sh.querySelector('#' + id); if (!el) return undefined; return String(el.value).trim() === '' ? def : money(el.value); };
+            const ng = JSON.parse(JSON.stringify(S.game));
+            if (f === 'pelland') { ng.stake = val('emStake', 0); ng.leadChangeValue = val('emLcv', 0); ng.par3Value = val('emP3', 5); }
+            ng.perPoint = val('emPp', 1);
+            if (sh.querySelector('#emCs')) { ng.custom = { ...(ng.custom || {}), stake: val('emCs', 0) }; }
+            try { await Store.saveGame(ng); S.game = ng; closeSheet(); toast('Montants modifiés.'); render(); } catch (e) { toast('Impossible : ' + e.message); }
+          };
+        });
       };
       const ho = v.querySelector('[data-handoff]'); if (ho) ho.onclick = () => {
         const g = S.game, cur = g.responsable;
