@@ -441,7 +441,7 @@
         <button class="tile" data-go="courses"><span class="pin">⛳</span><div><strong>Terrains</strong><span>Ajouter ou corriger un terrain</span></div></button>
         <button class="tile" data-go="players"><span class="pin"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M15.5 2.5 9 17.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M9 17.2c-.4 1.2-1.6 2.2-3.4 2.4l-2.1.2c-.6.1-.9.7-.6 1.2.2.3.5.5.9.5h4.6c1.6 0 2.7-.9 3.1-2.2l.3-.9" fill="currentColor"/><circle cx="18.5" cy="19.5" r="1.8" fill="currentColor"/></svg></span><div><strong>Joueurs</strong><span>Ajouter ou retirer des joueurs</span></div></button>
         <button class="tile" data-go="jeux"><span class="pin" style="font-family:var(--display);font-weight:700">$</span><div><strong>Les jeux</strong><span>Les règles de chaque jeu et comment l’argent se compte</span></div></button>
-        <button class="tile" data-go="quatuors"><span class="pin" style="font-family:var(--display);font-weight:700">4</span><div><strong>Parties à venir</strong><span>Dates offertes, disponibilités et groupes de 4</span></div></button>
+        <button class="tile" data-go="quatuors"><span class="pin" style="font-family:var(--display);font-weight:700">4</span><div><strong>Parties à préparer</strong><span>Dates offertes, disponibilités et groupes de 4</span></div></button>
         ${canOrganize() ? '' : '<!--'}<button class="tile" data-go="setup"><span class="pin">+</span><div><strong>Nouvelle partie</strong><span>Terrain, joueurs, index, tertres, handicap</span></div></button>${canOrganize() ? '' : '-->'}
         <button class="tile" data-go="live"><span class="pin">⏵</span><div><strong>Parties en cours</strong><span>Les parties qui ont lieu en ce moment</span></div></button>
         <button class="tile" data-go="history"><span class="pin">≡</span><div><strong>Parties jouées</strong><span>Les parties terminées</span></div></button>
@@ -528,7 +528,7 @@
   }
   // ---------------- Quatuors ----------------
   function vQuatuors() {
-    $('#barTitle').textContent = 'Parties à venir';
+    $('#barTitle').textContent = 'Parties à préparer';
     const q = S.quatuors || [], nq = S.newQuat || (S.newQuat = { name: '', players: ['', '', '', ''] });
     const opts = i => { const taken = nq.players.filter((x, j) => j !== i && x).map(L.norm);
       return `<option value="">— Joueur ${i + 1} —</option>` + S.players.filter(p => !taken.includes(L.norm(p.name))).map(p => `<option value="${esc(p.name)}" ${p.name === nq.players[i] ? 'selected' : ''}>${esc(p.name)}</option>`).join(''); };
@@ -647,7 +647,7 @@
       });
     draw();
   }
-  // Dates offertes (Parties à venir) avec les joueurs qui se sont dits disponibles
+  // Dates offertes (Parties à préparer) avec les joueurs qui se sont dits disponibles
   function offreDates() {
     const out = [];
     (S.offres || []).forEach(o => o.dates.forEach(dt => { if (dt < Date.now() - 864e5) return;
@@ -717,7 +717,7 @@
       ${d.players.map((_, i) => `<datalist id="playerList${i}">${listOptions(d, i)}</datalist>`).join('')}
       <section class="card">
         <div class="step">1 · Terrain</div>
-        ${fromOffre ? `<p class="fixed-course"><b>${esc(fromOffre.name)}</b><span class="note">Choisi dans Parties à venir</span></p>` : `<select id="course">${S.courses.map(x => `<option value="${esc(x.id)}" ${x.id === d.courseId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
+        ${fromOffre ? `<p class="fixed-course"><b>${esc(fromOffre.name)}</b><span class="note">Choisi dans Parties à préparer</span></p>` : `<select id="course">${S.courses.map(x => `<option value="${esc(x.id)}" ${x.id === d.courseId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
         <p class="note">Le terrain n'est pas dans la liste ? Ajoutez-le d'abord dans <b>Terrains</b>, à l'accueil.</p>`}
       </section>
       <section class="card">
