@@ -375,8 +375,9 @@
   // Responsable : celui qui a créé ou réclamé la partie ; après une passation, le joueur désigné (ownerUid vide)
   const myIdx = g => g.players.findIndex(p => L.norm(p.name) === L.norm(ls.get('pelland.me', '') || ''));
   const isOwner = () => !!S.game && (S.game.ownerUid === Store.uid || (!S.game.ownerUid && S.game.responsable != null && myIdx(S.game) === S.game.responsable));
+  const handoffBtn = (g, owner) => owner && g.status !== 'terminée' ? `<div class="row handoff-row"><span class="note">Responsable : <b>${esc((g.players[g.responsable] || {}).name || '')}</b> ★</span><button class="btn ghost small" data-handoff type="button">Changer de responsable</button></div>` : '';
   function respActions(g, owner, note) {
-    if (owner) return g.status === 'terminée' ? '' : `<div class="row game-actions"><button class="btn ghost small light" data-handoff type="button">Changer de responsable</button></div>`;
+    if (owner) return '';
     if (!(Store.mode === 'firebase' && Store.email)) return '';
     const r = g.players[g.responsable];
     return S.confirmClaim === g.id
@@ -944,6 +945,7 @@
         return `<div class="leader-box t${k}"><span>Meneurs ${info('meneurs')}</span><div><b class="tc${k}">${L.TEAMS[k]}</b><small>+${d} point${d > 1 ? 's' : ''} net${d > 1 ? 's' : ''}</small></div>${pts}
           <div class="lb-money"><span>Gain par joueur des ${L.TEAMS[k]} en ce moment</span><b class="tc${k}">${fmt$(tot)}</b></div>
           <div class="lb-detail">${parts.map(([v, l]) => `<span>${v < 0 ? '−' : '+'} ${fmt$(Math.abs(v))} <i>${l}</i></span>`).join('')}</div></div>`; })()}
+      ${handoffBtn(g, owner)}
       <div class="card-scroll"><table class="sc">
         <thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${colOrder.map(i => { const p = g.players[i]; return `<th class="pc tc${teamOf(g, i)}" title="${esc(p.name)}">${esc(ini[i])}</th>`; }).join('')}<th class="col-wide">Statut</th><th class="col-wide">Calcul</th><th class="tc0">Rouge</th><th class="tc1">Bleu</th></tr></thead>
         <tbody>${scoreRows(g, row, sumRow)}</tbody>
@@ -1838,6 +1840,7 @@
         <div class="team-blocks"><div class="team-block neuf"><div class="tb-grid two">${ph.join('')}</div></div></div>
       </section>
       ${leader}
+      ${handoffBtn(g, owner)}
       <div class="card-scroll"><table class="sc neuf">
         <thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${g.players.map((p, i) => `<th class="pc" title="${esc(p.name)}">${esc(ini[i])}</th>`).join('')}</tr></thead>
         <tbody>${scoreRows(g, row, sumRow)}

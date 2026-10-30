@@ -622,3 +622,5 @@ label.check input { width: 22px; height: 22px; }
 .jeux-h { font-family: var(--display); font-size: 24px; margin: 18px 0 8px; }
 .name-btn { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; text-align: left; }
 .hero-edit { vertical-align: middle; margin-left: 8px; background: none; border: 1px solid currentColor; border-radius: 999px; padding: 3px 10px; font: 600 13px var(--body, inherit); color: inherit; opacity: .75; cursor: pointer; }
+.handoff-row { justify-content: space-between; align-items: center; margin: 14px 0 8px; gap: 10px; }
+.handoff-row .note { margin: 0; }
