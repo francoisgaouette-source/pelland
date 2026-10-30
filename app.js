@@ -922,7 +922,7 @@
         ${respActions(g, owner, true)}
         <div class="money-boxes">
           <div class="mbox green"><span>La game commence à ${info('game')}</span><b>${g.stake ? fmt$(money(g.stake)) : '—'}</b></div>
-          <div class="mbox green"><span>À chaque revirement ${info('revirement')}</span><b>${g.leadChangeValue ? fmt$(money(g.leadChangeValue)) : '—'}</b>${g.leadChangeValue ? (n => `<small class="mbox-sub">${n} revirement${n > 1 ? 's' : ''}</small>`)(L.leadChanges(g)) : ''}</div>
+          <div class="mbox green"><span>À chaque revirement ${info('revirement')}</span><b>${g.leadChangeValue ? fmt$(money(g.leadChangeValue)) : '—'}</b>${g.leadChangeValue ? (n => `<small class="mbox-sub">${n} revirement${n > 1 ? 's' : ''}${n ? ' = ' + fmt$(n * money(g.leadChangeValue)) : ''}</small>`)(L.leadChanges(g)) : ''}</div>
           ${(r => `<div class="mbox yellow"><span>Les pars 3 sont à ${info('par3now')}</span><b>${r.next ? fmt$(r.nextValue) : '—'}</b>${r.next ? `<small class="mbox-sub">au trou ${r.next}</small>` : ''}</div>`)(L.par3Results(g))}
         </div>
         <div class="team-blocks">${[1, 0].map(k => { const tm = L.getTeams(g)[k], teamPts = L.teamPoints(g).tot;
