@@ -478,8 +478,9 @@
       'Le joueur au plus haut score net donne 2 points à l’équipe adverse.',
       'Égalité entre deux équipes : pas de points ; dans la même équipe : 2 points une seule fois.',
       'Skin : 1 point à l’équipe du joueur qui l’obtient, choisi parmi ceux qui ont fait la normale ou mieux (au brut).',
+      'Oiselet (au brut) : 1 point à l’équipe du joueur, pour chaque oiselet.',
       'Cabane : oiselet brut + skin + plus haut net chez l’adversaire = 12 points pour le trou.',
-      'Press : l’équipe en déficit double les points du trou ; l’autre peut répondre par un reroll (×4).'],
+      'Press : l’équipe en déficit double les points du trou, skin et oiselets compris ; l’autre peut répondre par un reroll (×4).'],
       money: ['La game : montant de départ gagné par l’équipe qui mène à la fin.', 'Chaque revirement (l’équipe qui mène perd son avance : retour à égalité ou l’autre passe devant) ajoute un montant.', 'Normales 3 : la skin + la normale gagne le montant choisi (5 $ par défaut), sinon reporté à la normale 3 suivante.', 'Chaque point net d’écart vaut le montant par point.', 'Montants par joueur.'] },
     { f: 'neuf', who: '3 joueurs, chacun pour soi', rules: ['À chaque trou : 5 points au meilleur net, 3 au deuxième, 1 au troisième.', 'Égalité : on partage (4-4-1, 5-2-2 ou 3-3-3).'],
       money: ['Chacun gagne ou paie la différence de points avec chaque autre joueur, × le montant par point.'] },
@@ -959,7 +960,7 @@
           ${S.confirmDelGame === g.id
             ? '<button class="btn small" data-delthis type="button" style="background:var(--red)">Confirmer l\'effacement</button><button class="btn ghost small" data-canceldelgame type="button">Annuler</button>'
             : '<button class="btn ghost small" data-askdelthis type="button">Effacer la partie</button>'}</div>` : ''}
-      <div class="legend"><span>★ responsable de la partie (il entre les scores)</span><span>${BALL} coup reçu · petit chiffre = net</span><span>Calcul : ↓ plus bas net · ↑ plus haut net · R/B équipe qui reçoit · ×2 press · ×4 reroll · S skin · C cabane · $ normale 3 · = résultat net</span><span>Noms à la couleur de l'équipe : <b class="tc1">Bleus</b> · <b class="tc0">Rouges</b></span><span>${g.players.map((p, i) => `<b class="tc${teamOf(g, i)}">${esc(ini[i])}</b> ${esc(p.name)}`).join(' · ')}</span><span class="narrow-only">Sous chaque trou : statut (Normal, Press, Reroll) et calcul des points</span></div>`;
+      <div class="legend"><span>★ responsable de la partie (il entre les scores)</span><span>${BALL} coup reçu · petit chiffre = net</span><span>Calcul : ↓ plus bas net · ↑ plus haut net · R/B équipe qui reçoit · ×2 press · ×4 reroll · S skin · O oiselet · C cabane · $ normale 3 · = résultat net</span><span>Noms à la couleur de l'équipe : <b class="tc1">Bleus</b> · <b class="tc0">Rouges</b></span><span>${g.players.map((p, i) => `<b class="tc${teamOf(g, i)}">${esc(ini[i])}</b> ${esc(p.name)}`).join(' · ')}</span><span class="narrow-only">Sous chaque trou : statut (Normal, Press, Reroll) et calcul des points</span></div>`;
   }
 
   // ---------------- Historique ----------------
@@ -2036,7 +2037,7 @@
           ${(e.presses || []).length ? `<button class="pill" data-clearpress>Retirer les pressés (${e.presses.length})</button>` : ''}</div>
         <div class="tg"><span>Reroll</span><button class="pill" data-reroll="1" aria-pressed="${!!e.reroll}">Oui</button><button class="pill" data-reroll="0" aria-pressed="${!!e.rerollSet && !e.reroll}">Non</button></div>
         ${isPar3 ? `<div class="tg"><span>Normale 3</span><span class="note" style="width:auto">Calculée automatiquement : l'équipe qui a la skin et fait la normale gagne l'argent.</span></div>` : ''}
-        <div class="tg"><span>Skin (1 point à l'équipe)</span>${[0, 1].map(k => `<button class="pill team-pill t${k}" data-skin="${k}" aria-pressed="${L.skinTeam(g, h) === k}">${L.TEAMS[k]} · ${esc(L.teamName(g, k))}</button>`).join('')}<button class="pill" data-skin="-1" aria-pressed="${L.skinTeam(g, h) === -1}">Pas de skin</button></div>
+        <div class="tg"><span>Skin (1 point à l'équipe, multiplié par la press)</span>${[0, 1].map(k => `<button class="pill team-pill t${k}" data-skin="${k}" aria-pressed="${L.skinTeam(g, h) === k}">${L.TEAMS[k]} · ${esc(L.teamName(g, k))}</button>`).join('')}<button class="pill" data-skin="-1" aria-pressed="${L.skinTeam(g, h) === -1}">Pas de skin</button></div>
       </div>
       <button class="btn ghost small" data-close>Fermer</button>`, s => {
       const done = acts => { closeSheet(); commit(acts, false); };

@@ -91,7 +91,7 @@
     const s = getScore(game, hole, pi); if (s == null) return null;
     return s - strokesOnHole(game.players[pi].strokes, game.course.holes[hole - 1].si);
   }
-  // Pressé : points du trou × 2. Reroll : points du trou × 4. (La skin reste à 1 point.)
+  // Pressé : points du trou × 2. Reroll : points du trou × 4. La skin est multipliée aussi (2 ou 4 points).
   function holeMultiplier(game, hole) {
     const e = (game.events || {})[hole] || {};
     if (e.reroll) return 4;
@@ -117,7 +117,13 @@
     return { pts, low, high, nets, mult };
   }
   // Skin : l'équipe qui a la skin gagne 1 point. skinTeam : 0 ou 1 = équipe, -1 = pas de skin, null = pas encore dit.
-  const SKIN_POINTS = 1;
+  const SKIN_POINTS = 1, BIRDIE_POINTS = 1;
+  // Nombre d'oiselets (ou mieux, au brut) de chaque équipe sur le trou
+  function birdiesByTeam(game, hole) {
+    const T = getTeams(game), c = [0, 0];
+    game.players.forEach((p, pi) => { const sc = getScore(game, hole, pi); if (sc != null && sc < holeInfo(game, hole, pi).par) { const t = T.findIndex(x => x.includes(pi)); if (t >= 0) c[t]++; } });
+    return c;
+  }
   function skinTeam(game, hole) {
     const e = (game.events || {})[hole];
     if (!e) return null;
@@ -133,7 +139,9 @@
     const cab = cabaneTeam(game, hole);
     if (cab != null) { const pts = [0, 0]; pts[cab] = CABANE_POINTS; return pts; }
     const pts = r ? r.pts.slice() : [0, 0];
-    if (st === 0 || st === 1) pts[st] += SKIN_POINTS;
+    if (st === 0 || st === 1) pts[st] += SKIN_POINTS * holeMultiplier(game, hole);
+    // Oiselet (au brut) : 1 point à l'équipe du joueur, multiplié par la press ou le reroll
+    const bd = birdiesByTeam(game, hole); pts[0] += bd[0] * BIRDIE_POINTS * holeMultiplier(game, hole); pts[1] += bd[1] * BIRDIE_POINTS * holeMultiplier(game, hole);
     // Les points sont au net : seule la différence compte (Rouges 3, Bleus 2 → Rouges +1).
     const d = pts[0] - pts[1];
     return d >= 0 ? [d, 0] : [0, -d];
@@ -233,7 +241,8 @@
     parts.push(r.low.team != null ? `↓${nm(r.low.players)} ${RB(r.low.team)}${v}` : '↓=');
     if (r.low.net !== r.high.net) parts.push(r.high.team != null ? `↑${nm(r.high.players)} ${RB(1 - r.high.team)}${v}` : '↑=');
     if (r.mult > 1) parts.push('×' + r.mult);
-    if (st === 0 || st === 1) parts.push(`S ${RB(st)}`);
+    if (st === 0 || st === 1) parts.push(r.mult > 1 ? `S ${RB(st)}${SKIN_POINTS * r.mult}` : `S ${RB(st)}`);
+    const bd = birdiesByTeam(game, hole); [0, 1].forEach(t => { if (bd[t]) parts.push(`O ${RB(t)}${bd[t] * BIRDIE_POINTS * r.mult}`); });
     const ht = holeTotal(game, hole);
     if (ht) parts.push(ht[0] === ht[1] ? '= 0' : ht[0] > ht[1] ? `= R+${ht[0]}` : `= B+${ht[1]}`);
     return parts.map(x => x.replace(/ /g, '\u00a0')).join(' ');
@@ -241,7 +250,7 @@
   function describeSkin(game, hole) {
     const st = skinTeam(game, hole);
     if ((st === 0 || st === 1) && cabaneTeam(game, hole) != null) return `Skin pour ${tl(st)} et cabane : ${CABANE_POINTS} points pour le trou.`;
-    if (st === 0 || st === 1) return `Skin pour ${tl(st)}, 1 point.`;
+    if (st === 0 || st === 1) { const n = SKIN_POINTS * holeMultiplier(game, hole); return `Skin pour ${tl(st)}, ${n} point${n > 1 ? 's' : ''}${n > 1 ? ' (multipliée)' : ''}.`; }
     if (st === -1) return 'Pas de skin.';
     return 'Skin pas encore indiquée.';
   }
@@ -986,6 +995,6 @@
       return { name, from: x, to: y, pts, played, done: played === y - x + 1 }; }).filter(s => s.played);
   }
 
-  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, TEAMS, teamFromText, makeTeams, orderTeams, getTeams, teamName, netScore, holeMultiplier, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, cabaneTeam, cabanes, calcText, par3Results, describePar3, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup, resolveName, nextPrompt, trailingTeam, pressTeamOf, initials, leadChanges, totalText, holeNetText, parseCardText, neufPoints, neufTotals, FORMATS, formatOf, altHoles, altTotals, altGains, nassauBets, sixesTeams, wolfOf, holeRange };
+  const api = { PINEGROVE, teePar, holePar, courseHandicap, allocateStrokes, strokesOnHole, buildPlayers, TEAMS, teamFromText, makeTeams, orderTeams, getTeams, teamName, netScore, holeMultiplier, holePoints, teamPoints, describeHolePoints, skinTeam, holeTotal, describeSkin, cabaneTeam, cabanes, birdiesByTeam, calcText, par3Results, describePar3, holeInfo, getScore, totals, norm, matchPlayer, afterWake, parse, answer, apply, parseSetup, resolveName, nextPrompt, trailingTeam, pressTeamOf, initials, leadChanges, totalText, holeNetText, parseCardText, neufPoints, neufTotals, FORMATS, formatOf, altHoles, altTotals, altGains, nassauBets, sixesTeams, wolfOf, holeRange };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PellandLogic = api;
 })(this);
