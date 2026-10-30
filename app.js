@@ -1987,7 +1987,7 @@
         }).join('')}</div>
         ${isWolf ? `<div class="toggles"><div class="tg"><span>Le loup ${esc(P[wf].name)} joue avec…</span>${P.map((p, i) => i === wf ? '' : `<button type="button" class="pill" data-wolfp="${i}" aria-pressed="${!!wolf && wolf.partner === i}">${esc(p.name)}</button>`).join('')}<button type="button" class="pill" data-wolfp="lone" aria-pressed="${!!wolf && wolf.partner == null && !wolf.blind}">Seul (×2)</button><button type="button" class="pill" data-wolfp="blind" aria-pressed="${!!wolf && !!wolf.blind}">Seul à l’aveugle (×3)</button></div></div>` : ''}
         ${neuf ? '' : `<div class="toggles"><div class="tg"><span>Skin à… (joueurs qui ont fait la normale)</span>${eligible.length ? eligible.map(pi => `<button type="button" class="pill team-pill t${teamOf(g, pi)}" data-skinp="${pi}" aria-pressed="${skinPlayer === pi}">${esc(P[pi].name)}</button>`).join('') : `<span class="note" style="width:auto">${vals.every(v => v == null) ? 'Entrez les scores d\'abord.' : 'Personne n\'a fait la normale.'}</span>`}<button type="button" class="pill" data-skinp="-1" aria-pressed="${skin === -1}">Pas de skin</button></div>
-        <p class="note">${skin === 0 || skin === 1 ? `Skin pour les ${L.TEAMS[skin]}.` : skin === -1 ? 'Pas de skin.' : 'Skin pas encore indiquée.'}</p></div>`}
+        <p class="note">${skin === 0 || skin === 1 ? (skinPlayer != null ? `Skin à ${esc(P[skinPlayer].name)} (${L.TEAMS[skin]}).` : `Skin pour les ${L.TEAMS[skin]}.`) : skin === -1 ? 'Pas de skin.' : 'Skin pas encore indiquée.'}</p></div>`}
         ${needSkin ? `<p class="warn" style="margin:0">${isWolf ? 'Indiquez le choix du loup avant d’enregistrer.' : 'Choisissez la skin (un joueur) ou « Pas de skin » avant d’enregistrer.'}</p>` : ''}
         <div class="sheet-foot"><button type="button" class="btn ghost small" data-close>Annuler</button><button type="button" class="btn" data-save ${needSkin ? 'disabled' : ''}>Enregistrer</button></div>`;
       sheet.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { const pi = +b.dataset.p, n = +b.dataset.n; vals[pi] = vals[pi] === n ? null : n; draw(); });
@@ -2037,7 +2037,8 @@
           return `<button class="pill" data-status="normal" aria-pressed="${st === 'normal'}">Normal</button>` + [0, 1].map(k => `<button class="pill team-pill t${k}" data-status="press${k}" aria-pressed="${st === 'press' + k}">Pressé par les ${L.TEAMS[k]} (×2)</button>`).join('') + `<button class="pill" data-status="reroll" aria-pressed="${st === 'reroll'}" ${(e.presses || []).length ? '' : 'disabled'}>Reroll (×4)</button>`; })()}
           <span class="note" style="width:auto">Le reroll se choisit après la press.</span></div>
         ${isPar3 ? `<div class="tg"><span>Normale 3</span><span class="note" style="width:auto">Calculée automatiquement : l'équipe qui a la skin et fait la normale gagne l'argent.</span></div>` : ''}
-        <div class="tg"><span>Skin (1 point à l'équipe, multiplié par la press)</span>${[0, 1].map(k => `<button class="pill team-pill t${k}" data-skin="${k}" aria-pressed="${L.skinTeam(g, h) === k}">${L.TEAMS[k]} · ${esc(L.teamName(g, k))}</button>`).join('')}<button class="pill" data-skin="-1" aria-pressed="${L.skinTeam(g, h) === -1}">Pas de skin</button></div>
+        <div class="tg"><span>Skin à… (1 point, multiplié par la press)</span>${(() => { const sp = e.skinPlayer, stt = L.skinTeam(g, h), el = P.map((p, i) => i).filter(i => { const sc = L.getScore(g, h, i); return sc != null && sc <= L.holeInfo(g, h, i).par; });
+          return (el.length ? el.map(i => `<button class="pill team-pill t${teamOf(g, i)}" data-skinpl="${i}" aria-pressed="${sp === i}">${esc(P[i].name)}</button>`).join('') : [0, 1].map(k => `<button class="pill team-pill t${k}" data-skin="${k}" aria-pressed="${stt === k}">${L.TEAMS[k]}</button>`).join('')) + `<button class="pill" data-skin="-1" aria-pressed="${stt === -1}">Pas de skin</button>`; })()}</div>
       </div>
       <button class="btn ghost small" data-close>Fermer</button>`, s => {
       const done = acts => { closeSheet(); commit(acts, false); };
@@ -2049,6 +2050,7 @@
         const k = +v.slice(5); // press0 / press1 : on remplace la press existante
         done([{ type: 'unpress', hole: h }, { type: 'press', hole: h, team: k, player: null, force: true }]);
       });
+      s.querySelectorAll('[data-skinpl]').forEach(b => b.onclick = () => { const pi = +b.dataset.skinpl; done([{ type: 'skin', hole: h, team: teamOf(g, pi), player: pi }]); });
       s.querySelectorAll('[data-skin]').forEach(b => b.onclick = () => {
         done([{ type: 'skin', hole: h, team: +b.dataset.skin }]);
       });

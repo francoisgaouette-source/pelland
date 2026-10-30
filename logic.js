@@ -236,12 +236,13 @@
     const st = skinTeam(game, hole);
     // Notation courte : ↓ plus bas net, ↑ plus haut net, R/B équipe qui reçoit, ×2 press, ×4 reroll, S skin, C cabane, = résultat net
     const RB = t => t === 0 ? 'R' : 'B';
-    if (cab != null) return `C\u00a0${RB(cab)}${CABANE_POINTS}`;
+    if (cab != null) { const sp0 = ((game.events || {})[hole] || {}).skinPlayer; return `C\u00a0${sp0 != null && P[sp0] ? ini[sp0] + '\u00a0' : ''}${RB(cab)}${CABANE_POINTS}`; }
     const v = POINTS * r.mult, parts = [];
     parts.push(r.low.team != null ? `↓${nm(r.low.players)} ${RB(r.low.team)}${v}` : '↓=');
     if (r.low.net !== r.high.net) parts.push(r.high.team != null ? `↑${nm(r.high.players)} ${RB(1 - r.high.team)}${v}` : '↑=');
     if (r.mult > 1) parts.push('×' + r.mult);
-    if (st === 0 || st === 1) parts.push(r.mult > 1 ? `S ${RB(st)}${SKIN_POINTS * r.mult}` : `S ${RB(st)}`);
+    const sp = ((game.events || {})[hole] || {}).skinPlayer;
+    if (st === 0 || st === 1) parts.push(`S ${sp != null && P[sp] ? ini[sp] + ' ' : ''}${RB(st)}${r.mult > 1 ? SKIN_POINTS * r.mult : ''}`);
     const bd = birdiesByTeam(game, hole); [0, 1].forEach(t => { if (bd[t]) parts.push(`O ${RB(t)}${bd[t] * BIRDIE_POINTS * r.mult}`); });
     const ht = holeTotal(game, hole);
     if (ht) parts.push(ht[0] === ht[1] ? '= 0' : ht[0] > ht[1] ? `= R+${ht[0]}` : `= B+${ht[1]}`);
@@ -250,7 +251,7 @@
   function describeSkin(game, hole) {
     const st = skinTeam(game, hole);
     if ((st === 0 || st === 1) && cabaneTeam(game, hole) != null) return `Skin pour ${tl(st)} et cabane : ${CABANE_POINTS} points pour le trou.`;
-    if (st === 0 || st === 1) { const n = SKIN_POINTS * holeMultiplier(game, hole); return `Skin pour ${tl(st)}, ${n} point${n > 1 ? 's' : ''}${n > 1 ? ' (multipliée)' : ''}.`; }
+    if (st === 0 || st === 1) { const n = SKIN_POINTS * holeMultiplier(game, hole), sp = ((game.events || {})[hole] || {}).skinPlayer, who = sp != null && game.players[sp] ? `${game.players[sp].name} (${tl(st)})` : tl(st); return `Skin à ${who}, ${n} point${n > 1 ? 's' : ''}${n > 1 ? ' (multipliée)' : ''}.`; }
     if (st === -1) return 'Pas de skin.';
     return 'Skin pas encore indiquée.';
   }
