@@ -920,7 +920,7 @@
           <div class="hole-nav"><button data-nav="-1" aria-label="Trou précédent">‹</button><button data-nav="1" aria-label="Trou suivant">›</button></div>
         </div>
         ${respActions(g, owner, true)}
-        <div class="money-boxes">
+        <div class="money-boxes${owner && g.status !== 'terminée' ? ' editable' : ''}"${owner && g.status !== 'terminée' ? ' data-editmoney role="button" tabindex="0" title="Toucher pour modifier les montants"' : ''}>
           <div class="mbox green"><span>La game commence à ${info('game')}</span><b>${g.stake ? fmt$(money(g.stake)) : '—'}</b></div>
           <div class="mbox green"><span>À chaque revirement ${info('revirement')}</span><b>${g.leadChangeValue ? fmt$(money(g.leadChangeValue)) : '—'}</b>${g.leadChangeValue ? (n => `<small class="mbox-sub">${n} revirement${n > 1 ? 's' : ''}${n ? ' = ' + fmt$(n * money(g.leadChangeValue)) : ''}</small>`)(L.leadChanges(g)) : ''}</div>
           ${(r => `<div class="mbox yellow"><span>Les pars 3 sont à ${info('par3now')}</span><b>${r.next ? fmt$(r.nextValue) : '—'}</b>${r.next ? `<small class="mbox-sub">au trou ${r.next}</small>` : ''}</div>`)(L.par3Results(g))}
@@ -1484,7 +1484,8 @@
         try { await Store.saveGame(ng); S.game = ng; S.confirmClaim = null; toast('Vous êtes maintenant le responsable de cette partie.'); render(); }
         catch (e) { toast('Impossible : publiez les nouvelles règles Firestore. (' + e.message + ')'); }
       };
-      const em = v.querySelector('[data-editmoney]'); if (em) em.onclick = () => {
+      v.querySelectorAll('[data-editmoney]').forEach(em => em.onclick = ev => {
+        if (ev && ev.target.closest && ev.target.closest('[data-info]')) return;
         const g = S.game, f = L.formatOf(g), c = g.custom || {};
         const inp = (id, label, val, ph) => `<label style="flex:1">${label}<span class="money-in"><input id="${id}" type="text" inputmode="decimal" placeholder="${ph}" value="${esc(val == null || val === '' ? '' : fmtIn(val))}"><i>$</i></span></label>`;
         const ppLabel = f === 'pelland' ? 'Par point net' : (f === 'perso' ? 'Par point' : ({ neuf: 'Par point', bestball: 'Par trou gagné', nassau: 'Par pari', wolf: 'Par point', sixes: 'Par tranche gagnée', skins: 'Par skin' })[f] || 'Par point');
@@ -1503,7 +1504,7 @@
             try { await Store.saveGame(ng); S.game = ng; closeSheet(); toast('Montants modifiés.'); render(); } catch (e) { toast('Impossible : ' + e.message); }
           };
         });
-      };
+      });
       const ho = v.querySelector('[data-handoff]'); if (ho) ho.onclick = () => {
         const g = S.game, cur = g.responsable;
         openSheet(`<h3>Changer de responsable</h3><p class="note">Le responsable entre les scores, termine ou efface la partie. Choisissez qui prend la relève :</p>
