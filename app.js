@@ -228,6 +228,10 @@
       if (this.mode === 'firebase') { await this.db.collection('players').doc(p.id).set(p); return p; }
       const list = ls.get('pelland.players', []); list.push(p); ls.set('pelland.players', list); return p;
     },
+    async renamePlayer(id, name) {
+      if (this.mode === 'firebase') { await this.db.collection('players').doc(id).set({ name: name.trim(), updatedAt: Date.now() }, { merge: true }); return; }
+      ls.set('pelland.players', ls.get('pelland.players', []).map(x => x.id === id ? { ...x, name: name.trim() } : x));
+    },
     async deletePlayer(id) {
       if (this.mode === 'firebase') { await this.db.collection('players').doc(id).delete(); try { await this.db.collection('phones').doc(id).delete(); } catch (e) { } return; }
       ls.set('pelland.players', ls.get('pelland.players', []).filter(x => x.id !== id));
@@ -1010,7 +1014,7 @@
       ${!ownerId() && S.players.length ? `<div class="warn">Le groupe n’a pas encore de propriétaire (la personne qui l’administre et paie l’abonnement). <button class="linkbtn" id="claimOwner" type="button">C’est moi</button></div>` : ''}
       ${ownerId() ? `<p class="note">Le <b>propriétaire</b> administre le groupe et paie l’abonnement. Avec lui, un <b>organisateur</b> peut offrir des dates et créer les parties${meId() === ownerId() ? ' : touchez « + Organisateur » pour le nommer (un seul à la fois)' : ''}.</p>` : ''}
       ${S.players.length ? `<p class="pl-count"><b>${S.players.length}</b> joueur${S.players.length > 1 ? 's' : ''} dans le groupe</p>` : ''}
-      <div class="list">${S.players.length ? (() => { const dups = duplicateMap(S.players); return S.players.map((p, n) => `<div class="item pl-row ${dups[p.id] ? 'dup' : ''}"><b><span class="pl-n">${n + 1}.</span> ${esc(p.name)}${p.id === ownerId() ? ' <span class="owner-tag">Propriétaire</span>' : !ownerId() ? '' : meId() === ownerId() ? ` <button class="role-chip ${isOrganizer(p.id) ? 'on' : ''}" data-org="${esc(p.id)}" type="button">${isOrganizer(p.id) ? 'Organisateur ✓' : '+ Organisateur'}</button>` : isOrganizer(p.id) ? ' <span class="org-tag">Organisateur</span>' : ''}${dups[p.id] ? ` <span class="dup-flag" title="Ressemble à ${esc(dups[p.id].join(', '))}">Doublon ?</span>` : ''}</b>${S.confirmDel === p.id
+      <div class="list">${S.players.length ? (() => { const dups = duplicateMap(S.players); return S.players.map((p, n) => `<div class="item pl-row ${dups[p.id] ? 'dup' : ''}"><b><span class="pl-n">${n + 1}.</span> ${canOrganize() || p.id === meId() ? `<button class="name-btn" data-rename="${esc(p.id)}" type="button">${esc(p.name)}</button>` : esc(p.name)}${p.id === ownerId() ? ' <span class="owner-tag">Propriétaire</span>' : !ownerId() ? '' : meId() === ownerId() ? ` <button class="role-chip ${isOrganizer(p.id) ? 'on' : ''}" data-org="${esc(p.id)}" type="button">${isOrganizer(p.id) ? 'Organisateur ✓' : '+ Organisateur'}</button>` : isOrganizer(p.id) ? ' <span class="org-tag">Organisateur</span>' : ''}${dups[p.id] ? ` <span class="dup-flag" title="Ressemble à ${esc(dups[p.id].join(', '))}">Doublon ?</span>` : ''}</b>${S.confirmDel === p.id
         ? `<span class="row"><button class="btn small" data-delp="${esc(p.id)}" type="button" style="background:var(--red)">Confirmer</button><button class="btn ghost small" data-canceldel type="button">Annuler</button></span>`
         : `<span class="row" style="flex-wrap:nowrap;flex:none"><button class="btn ghost small" data-phone="${esc(p.id)}" type="button">${p.phone ? '☎ ' + esc(fmtPhone(p.phone)) : p.authEmail ? '☎ ••' + esc(p.phoneHint || '') : '+ Téléphone'}</button>${p.id === ownerId() ? '' : `<button class="btn ghost small" data-askdel="${esc(p.id)}" type="button">Retirer</button>`}</span>`}</div>`).join(''); })() : '<p class="note">Aucun joueur pour l\'instant.</p>'}</div>`;
   }
@@ -1267,6 +1271,23 @@
             catch (e) { toast(e.message.includes('auth/') ? 'Impossible : vérifiez que Email/Password est activé dans Firebase.' : e.message); }
           };
           setTimeout(() => { const i = sh.querySelector('#phIn'); if (i) { i.focus(); i.select(); } }, 50);
+        });
+      });
+      v.querySelectorAll('[data-rename]').forEach(b => b.onclick = () => {
+        const pl = S.players.find(x => x.id === b.dataset.rename);
+        openSheet(`<h3>Modifier le nom</h3>
+          <label>Prénom et nom<input id="rnIn" type="text" autocapitalize="words" value="${esc(pl.name)}"></label>
+          <p class="note">Les parties déjà jouées gardent l’ancien nom.</p>
+          <div class="row"><button class="btn small" id="rnSave" type="button">Enregistrer</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`, sh => {
+          sh.querySelector('[data-close]').onclick = closeSheet;
+          sh.querySelector('#rnSave').onclick = async () => {
+            const nm = sh.querySelector('#rnIn').value.trim().replace(/\s+/g, ' ');
+            if (!nm) return toast('Entrez un nom.');
+            if (S.players.some(x => x.id !== pl.id && L.norm(x.name) === L.norm(nm))) return toast('Ce nom est déjà dans le groupe.');
+            try { const self = pl.id === meId(); await Store.renamePlayer(pl.id, nm); if (self) ls.set('pelland.me', nm); closeSheet(); S.players = await Store.listPlayers(); toast('Nom modifié.'); render(); }
+            catch (e) { toast('Impossible : ' + e.message); }
+          };
+          setTimeout(() => { const i = sh.querySelector('#rnIn'); if (i) { i.focus(); i.select(); } }, 50);
         });
       });
       v.querySelectorAll('[data-canceldel]').forEach(b => b.onclick = () => { S.confirmDel = null; render(); });
