@@ -1452,13 +1452,20 @@
         const id = await Store.newCode();
         const g = { id, createdAt: Date.now(), ownerUid: Store.uid, course: pv.c, courseId: pv.c.id, mode: d.mode, responsable: rIdx >= 0 ? rIdx : 0,
           format: jeu ? 'perso' : fmtG, custom: jeu ? JSON.parse(JSON.stringify(jeu)) : null, players: pv.ps, teams: neuf ? null : draftTeams(d, pv.ps), teamMode: neuf ? null : d.teamMode, stake: money(d.stake), leadChangeValue: money(d.leadChangeValue), perPoint: String(d.perPoint || '').trim() === '' ? 1 : money(d.perPoint), par3Value: String(d.par3Value ?? '').trim() === '' ? 5 : money(d.par3Value), currentHole: d.holes === 'back' ? 10 : 1, firstHole: d.holes === 'back' ? 10 : 1, lastHole: d.holes === 'front' ? 9 : 18, scores: {}, events: {}, status: 'en cours' };
-        try { await Store.saveGame(g); S.draft = null; openGame(id); toast('Partie créée.'); }
+        try {
+          await Store.saveGame(g);
+          // Responsable choisi = un autre joueur que moi : la partie lui est confiée (il la prend en l'ouvrant)
+          const mi = myIdx(g); if (Store.uid && g.responsable !== mi) { g.ownerUid = ''; await Store.saveGame(g); }
+          S.draft = null; openGame(id); toast(g.ownerUid ? 'Partie créée.' : `Partie créée : ${g.players[g.responsable].name} est le responsable.`);
+        }
         catch (e) { toast('Création impossible : ' + e.message); }
       };
     },
     game(v) {
       if (!S.game) return;
       // Désigné responsable par l'ancien responsable : on prend la partie à son compte dès l'ouverture
+      // Je suis responsable mais l'étoile est sur un autre joueur (parties créées avant la correction) : on la remet sur moi
+      if (S.game.ownerUid === Store.uid && !S.claiming) { const mi = myIdx(S.game); if (mi >= 0 && mi !== S.game.responsable) { S.claiming = true; const ng = JSON.parse(JSON.stringify(S.game)); ng.responsable = mi; S.game = ng; Store.saveGame(ng).catch(() => { }).finally(() => { S.claiming = false; }); setTimeout(render, 0); } }
       if (!S.game.ownerUid && isOwner() && Store.uid && !S.claiming) { S.claiming = true; const ng = JSON.parse(JSON.stringify(S.game)); ng.ownerUid = Store.uid; S.game = ng; Store.saveGame(ng).catch(() => { }).finally(() => { S.claiming = false; }); }
       v.querySelectorAll('[data-nav]').forEach(b => b.onclick = () => {
         const [h0, h1] = L.holeRange(S.game), h = Math.min(h1, Math.max(h0, (S.game.currentHole || 1) + +b.dataset.nav));
@@ -1474,7 +1481,7 @@
         catch (e) { toast('Impossible : publiez les nouvelles règles Firestore. (' + e.message + ')'); }
       };
       const ho = v.querySelector('[data-handoff]'); if (ho) ho.onclick = () => {
-        const g = S.game, cur = g.ownerUid === Store.uid ? myIdx(g) : g.responsable;
+        const g = S.game, cur = g.responsable;
         openSheet(`<h3>Changer de responsable</h3><p class="note">Le responsable entre les scores, termine ou efface la partie. Choisissez qui prend la relève :</p>
           <div class="list">${g.players.map((p, i) => i === cur ? '' : `<button class="item" data-newresp="${i}" type="button"><b>${esc(p.name)}</b><span>Il ouvre la partie sur son téléphone et continue là où vous êtes.</span></button>`).join('')}</div>
           <div class="row"><button class="btn ghost small" data-close type="button">Annuler</button></div>`, sh => {
