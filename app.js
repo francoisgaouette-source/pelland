@@ -461,7 +461,7 @@
     par3now: ['Les pars 3 sont à', ['Le montant en jeu à la prochaine normale 3, par joueur.', 'L’équipe qui a la skin et fait la normale le gagne. Sinon, il est reporté et s’ajoute à la normale 3 suivante.']],
     revirement: ['À chaque revirement', ['Un revirement, c’est quand l’équipe qui mène perd son avance : quand les points reviennent à égalité (à zéro) ou quand l’autre équipe passe devant. Chaque revirement ajoute ce montant à la game, par joueur.', 'La case montre le montant par revirement et le nombre de revirements jusqu’ici.']],
     meneurs: ['Meneurs', ['L’équipe en avance et son écart en points nets.', 'Gain par joueur en ce moment = la game + les revirements + les normales 3 (gagnées moins perdues) + l’écart × le montant par point.']],
-    press: ['Press et reroll', ['Avant le départ d’un trou, l’équipe en déficit peut presser : les points du trou comptent double.', 'L’autre équipe peut alors répondre par un reroll : les points comptent quatre fois.', 'Le responsable touche le bouton avant d’entrer les scores du trou.']],
+    press: ['Press et reroll', ['Avant le départ d’un trou, l’équipe en déficit peut presser : les points du trou comptent double.', 'L’autre équipe peut alors répondre par un reroll : les points comptent quatre fois.', 'Le responsable touche le bouton Press du trou. Oublié ? On peut le toucher après les scores : revenez au trou avec ‹ et touchez Press, ou retirez-la avec Pressé ✓.']],
   };
   function showInfo(key) {
     let t, lines;
@@ -929,9 +929,9 @@
         <div class="team-blocks">${[1, 0].map(k => { const tm = L.getTeams(g)[k], teamPts = L.teamPoints(g).tot;
           const tt = L.trailingTeam(g, h), pt = L.pressTeamOf(g, h), started = ((g.scores || {})[h] || []).some(v => v != null);
           let btn = '';
-          if (owner && !started && tt === k && !(ev.presses || []).length) btn = `<button type="button" class="tb-btn t${k}" data-press-team="${k}">Press</button>`;
-          else if (owner && pt === k) btn = `<button type="button" class="tb-btn t${k} on" data-unpress="1" ${started ? 'disabled' : ''}>Pressé ✓</button>`;
-          else if (owner && pt != null && pt !== k) btn = `<button type="button" class="tb-btn t${k} ${ev.reroll ? 'on' : ''}" data-reroll-team="${ev.reroll ? 0 : 1}" ${started ? 'disabled' : ''}>${ev.reroll ? 'Reroll ✓' : 'Reroll'}</button>`;
+          if (owner && tt === k && !(ev.presses || []).length) btn = `<button type="button" class="tb-btn t${k}" data-press-team="${k}">Press</button>`;
+          else if (owner && pt === k) btn = `<button type="button" class="tb-btn t${k} on" data-unpress="1">Pressé ✓</button>`;
+          else if (owner && pt != null && pt !== k) btn = `<button type="button" class="tb-btn t${k} ${ev.reroll ? 'on' : ''}" data-reroll-team="${ev.reroll ? 0 : 1}">${ev.reroll ? 'Reroll ✓' : 'Reroll'}</button>`;
           else if (!owner && pt === k) btn = `<span class="tb-btn t${k} on">Pressé</span>`;
           else if (!owner && pt != null && ev.reroll) btn = `<span class="tb-btn t${k} on">Reroll</span>`;
           const ph = tm.map(pi => { const p = g.players[pi]; const k = L.strokesOnHole(p.strokes, hi.si); const s = L.getScore(g, h, pi); return `<${owner ? `button type="button" data-allscores="${h}"` : 'div'} class="hp"><div class="nm tc${teamOf(g, pi)}">${esc(p.name)}${g.responsable === pi ? ' ★' : ''}</div><div class="hp-idx">Index ${String(p.index).replace('.', ',')}</div><div class="hp-strk">${strokeHoles(g, p)}</div><div class="dots">${k ? dots(k) + (k < 0 ? ' redonne' : '') : ''}</div><div class="hp-tot">${tots[pi].played ? `<span>Brut <b>${tots[pi].gross}</b> · Net <b>${tots[pi].net}</b></span><span class="hp-n">${tots[pi].played} trou${tots[pi].played > 1 ? 's' : ''}</span>` : 'Aucun trou joué'}</div></${owner ? 'button' : 'div'}>`; });
