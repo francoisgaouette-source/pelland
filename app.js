@@ -410,7 +410,7 @@
     bind[S.view] && bind[S.view](v);
   }
 
-  const APP = 'Quatuor';
+  const APP = 'Fanion Game';
   function curGroup() { return (S.groups || []).find(x => x.id === Store.gid) || { id: Store.gid, name: 'La gang à Pelland' }; }
   function groupName() { return curGroup().name; }
   const ownerId = () => curGroup().owner || null;

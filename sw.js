@@ -1,5 +1,5 @@
-/* Quatuor — garde l'app sur le téléphone pour qu'elle s'ouvre sans réseau. */
-const V = 'quatuor-v1';
+/* Fanion Game — garde l'app sur le téléphone pour qu'elle s'ouvre sans réseau. */
+const V = 'fanion-v1';
 self.addEventListener('install', e => {
   self.skipWaiting();
   e.waitUntil(caches.open(V).then(c => c.addAll(['./', './manifest.webmanifest', './icon-180.png', './icon-192.png']).catch(() => {})));

@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Quatuor</title>
+<title>Fanion Game</title>
 <meta name="theme-color" content="#14231b">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Quatuor">
+<meta name="apple-mobile-web-app-title" content="Fanion Game">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -21,7 +21,7 @@
   window.PELLAND_FRAMED = true;
   var q = location.search ? location.search + '&cadre=1' : '?cadre=1';
   document.addEventListener('DOMContentLoaded', function () {
-    document.body.innerHTML = '<div class="phone-frame"><iframe src="' + location.pathname + q + location.hash + '" title="Quatuor"></iframe></div>';
+    document.body.innerHTML = '<div class="phone-frame"><iframe src="' + location.pathname + q + location.hash + '" title="Fanion Game"></iframe></div>';
     document.body.className = 'framed';
   });
 })();
@@ -31,12 +31,12 @@ body.framed { margin: 0; min-height: 100vh; display: flex; align-items: center; 
 .phone-frame { width: 402px; height: min(874px, calc(100vh - 32px)); border-radius: 44px; padding: 12px; background: #000; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
 .phone-frame iframe { width: 100%; height: 100%; border: 0; border-radius: 34px; background: #fff; display: block; }
 </style>
-<link rel="stylesheet" href="styles.css?v=20261029p">
+<link rel="stylesheet" href="styles.css?v=20261030a">
 </head>
 <body>
 <header class="bar">
   <button class="bar-back" id="back" hidden aria-label="Retour">‹</button>
-  <div class="bar-title" id="barTitle">Quatuor</div>
+  <div class="bar-title" id="barTitle">Fanion Game</div>
   <div class="bar-badge" id="dbBadge"></div>
 </header>
 <main id="view"></main>
@@ -65,9 +65,9 @@ body.framed { margin: 0; min-height: 100vh; display: flex; align-items: center; 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js?v=20261029e"></script>
-<script src="logic.js?v=20261029p"></script>
+<script src="logic.js?v=20261030a"></script>
 <script src="terrains-qc.js?v=20261029f"></script>
-<script src="app.js?v=20261029p"></script>
+<script src="app.js?v=20261030a"></script>
 <script>if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});</script>
 </body>
 </html>
