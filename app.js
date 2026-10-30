@@ -1959,7 +1959,7 @@
       <table class="detail-t"><thead><tr><th>Joueur</th><th>Brut</th><th>Coups</th><th>Net</th></tr></thead><tbody>${rows}</tbody></table>
       <div class="detail-lines">${lines.map(l => `<p>${l}</p>`).join('')}</div>
       <p class="note">Calcul abrégé : ${esc(L.calcText(g, h).replace(/^ · /, ''))}</p>
-      <div class="sheet-actions"><button class="btn" data-close type="button">Fermer</button></div>`, sh => { sh.querySelector('[data-close]').onclick = closeSheet; });
+      <div class="sheet-actions">${isOwner() ? '<button class="btn ghost" data-edithole type="button">Modifier le trou (press, reroll, skin)</button>' : ''}<button class="btn" data-close type="button">Fermer</button></div>`, sh => { sh.querySelector('[data-close]').onclick = closeSheet; const eh = sh.querySelector('[data-edithole]'); if (eh) eh.onclick = () => { closeSheet(); setTimeout(() => holeSheet(h), 50); }; });
   }
   function allScoresSheet(h) {
     const g = S.game, P = g.players;
