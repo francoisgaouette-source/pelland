@@ -372,7 +372,17 @@
   // =====================================================================
   const BALL = '<span class="ydot" aria-label="coup">●</span>';
   const S = { players: [], confirmDel: null, view: 'home', game: null, unwatch: null, undo: [], courses: [], draft: null, editCourse: null };
-  const isOwner = () => S.game && S.game.ownerUid === Store.uid;
+  // Responsable : celui qui a créé ou réclamé la partie ; après une passation, le joueur désigné (ownerUid vide)
+  const myIdx = g => g.players.findIndex(p => L.norm(p.name) === L.norm(ls.get('pelland.me', '') || ''));
+  const isOwner = () => !!S.game && (S.game.ownerUid === Store.uid || (!S.game.ownerUid && S.game.responsable != null && myIdx(S.game) === S.game.responsable));
+  function respActions(g, owner, note) {
+    if (owner) return g.status === 'terminée' ? '' : `<div class="row game-actions"><button class="btn ghost small light" data-handoff type="button">Changer de responsable</button></div>`;
+    if (!(Store.mode === 'firebase' && Store.email)) return '';
+    const r = g.players[g.responsable];
+    return S.confirmClaim === g.id
+      ? `<div class="row game-actions"><button class="btn small" data-claim type="button">Oui, je deviens responsable</button><button class="btn ghost small" data-cancelclaim type="button">Annuler</button></div>`
+      : `<div class="row game-actions"><button class="btn ghost small light" data-askclaim type="button">Devenir responsable de cette partie</button>${note ? `<span class="note light">${r ? 'Responsable : ' + esc(r.name) + '. ' : ''}pour entrer les scores, la terminer ou l'effacer</span>` : ''}</div>`;
+  }
 
   function toast(msg) {
     const t = $('#toast'); t.textContent = msg; t.hidden = false;
@@ -907,9 +917,7 @@
           <div class="hole-meta">Normale <b>${hi.par}</b> · Handicap <b>${hi.si}</b>${meta.map(m => ` · <b>${m}</b>`).join('')}</div>
           <div class="hole-nav"><button data-nav="-1" aria-label="Trou précédent">‹</button><button data-nav="1" aria-label="Trou suivant">›</button></div>
         </div>
-        ${!owner && Store.mode === 'firebase' && Store.email ? (S.confirmClaim === g.id
-          ? `<div class="row game-actions"><button class="btn small" data-claim type="button">Oui, je deviens responsable</button><button class="btn ghost small" data-cancelclaim type="button">Annuler</button></div>`
-          : `<div class="row game-actions"><button class="btn ghost small light" data-askclaim type="button">Devenir responsable de cette partie</button><span class="note light">pour entrer les scores, la terminer ou l'effacer</span></div>`) : ''}
+        ${respActions(g, owner, true)}
         <div class="money-boxes">
           <div class="mbox green"><span>La game commence à ${info('game')}</span><b>${g.stake ? fmt$(money(g.stake)) : '—'}</b></div>
           <div class="mbox green"><span>À chaque revirement ${info('revirement')}</span><b>${g.leadChangeValue ? fmt$(L.leadChanges(g) * money(g.leadChangeValue)) : '—'}</b></div>
@@ -1450,6 +1458,8 @@
     },
     game(v) {
       if (!S.game) return;
+      // Désigné responsable par l'ancien responsable : on prend la partie à son compte dès l'ouverture
+      if (!S.game.ownerUid && isOwner() && Store.uid && !S.claiming) { S.claiming = true; const ng = JSON.parse(JSON.stringify(S.game)); ng.ownerUid = Store.uid; S.game = ng; Store.saveGame(ng).catch(() => { }).finally(() => { S.claiming = false; }); }
       v.querySelectorAll('[data-nav]').forEach(b => b.onclick = () => {
         const [h0, h1] = L.holeRange(S.game), h = Math.min(h1, Math.max(h0, (S.game.currentHole || 1) + +b.dataset.nav));
         if (isOwner()) commit([{ type: 'goto', hole: h }], false); else { S.game.currentHole = h; render(); }
@@ -1459,9 +1469,22 @@
       const ac = v.querySelector('[data-askclaim]'); if (ac) ac.onclick = () => { S.confirmClaim = S.game.id; render(); };
       const cc = v.querySelector('[data-cancelclaim]'); if (cc) cc.onclick = () => { S.confirmClaim = null; render(); };
       const cl = v.querySelector('[data-claim]'); if (cl) cl.onclick = async () => {
-        const ng = JSON.parse(JSON.stringify(S.game)); ng.ownerUid = Store.uid;
+        const ng = JSON.parse(JSON.stringify(S.game)); ng.ownerUid = Store.uid; const mi = myIdx(ng); if (mi >= 0) ng.responsable = mi;
         try { await Store.saveGame(ng); S.game = ng; S.confirmClaim = null; toast('Vous êtes maintenant le responsable de cette partie.'); render(); }
         catch (e) { toast('Impossible : publiez les nouvelles règles Firestore. (' + e.message + ')'); }
+      };
+      const ho = v.querySelector('[data-handoff]'); if (ho) ho.onclick = () => {
+        const g = S.game, cur = g.ownerUid === Store.uid ? myIdx(g) : g.responsable;
+        openSheet(`<h3>Changer de responsable</h3><p class="note">Le responsable entre les scores, termine ou efface la partie. Choisissez qui prend la relève :</p>
+          <div class="list">${g.players.map((p, i) => i === cur ? '' : `<button class="item" data-newresp="${i}" type="button"><b>${esc(p.name)}</b><span>Il ouvre la partie sur son téléphone et continue là où vous êtes.</span></button>`).join('')}</div>
+          <div class="row"><button class="btn ghost small" data-close type="button">Annuler</button></div>`, sh => {
+          sh.querySelector('[data-close]').onclick = closeSheet;
+          sh.querySelectorAll('[data-newresp]').forEach(b => b.onclick = async () => {
+            const i = +b.dataset.newresp, ng = JSON.parse(JSON.stringify(S.game)); ng.responsable = i; ng.ownerUid = '';
+            try { await Store.saveGame(ng); S.game = ng; closeSheet(); toast(`${ng.players[i].name} est maintenant responsable de la partie.`); render(); }
+            catch (e) { toast('Impossible : ' + e.message); }
+          });
+        });
       };
       const inv = v.querySelector('[data-invite]'); if (inv) inv.onclick = () => invitePlayers(S.game);
       const fin = v.querySelector('[data-finish]'); if (fin) fin.onclick = async () => {
@@ -1804,9 +1827,7 @@
       <section class="hole-card" aria-live="polite">
         <div class="hole-top"><div class="hole-no">${h}</div><div class="hole-meta">Normale <b>${hi.par}</b> · Handicap <b>${hi.si}</b> · <b>${esc(fname)}</b>${f === 'wolf' ? ` · Loup : <b>${esc(g.players[wolfNow].name.split(' ')[0])}</b>` : ''}${f === 'sixes' ? ` · <b>${sixT[0].map(i => esc(g.players[i].name.split(' ')[0])).join(' + ')}</b> contre <b>${sixT[1].map(i => esc(g.players[i].name.split(' ')[0])).join(' + ')}</b>` : ''}</div>
           <div class="hole-nav"><button data-nav="-1" aria-label="Trou précédent">‹</button><button data-nav="1" aria-label="Trou suivant">›</button></div></div>
-        ${!owner && Store.mode === 'firebase' && Store.email ? (S.confirmClaim === g.id
-          ? `<div class="row game-actions"><button class="btn small" data-claim type="button">Oui, je deviens responsable</button><button class="btn ghost small" data-cancelclaim type="button">Annuler</button></div>`
-          : `<div class="row game-actions"><button class="btn ghost small light" data-askclaim type="button">Devenir responsable de cette partie</button></div>`) : ''}
+        ${respActions(g, owner, false)}
         <div class="team-blocks"><div class="team-block neuf"><div class="tb-grid two">${ph.join('')}</div></div></div>
       </section>
       ${leader}
