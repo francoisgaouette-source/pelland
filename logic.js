@@ -188,7 +188,7 @@
     const [h0, h1] = holeRange(game);
     for (let h = h0; h <= h1; h++) {
       if (game.course.holes[h - 1].par !== 3) continue;
-      const value = pot + PAR3_DOLLARS;
+      const value = pot + (game.par3Value == null || game.par3Value === '' || isNaN(+game.par3Value) ? PAR3_DOLLARS : +game.par3Value);
       const row = (game.scores || {})[h];
       const complete = row && row.length === game.players.length && row.every(v => v != null);
       const st = skinTeam(game, h);

@@ -444,7 +444,7 @@
   const info = key => `<button type="button" class="info" data-info="${key}" aria-label="Explication">i</button>`;
   const HELP = {
     handicap: ['Handicap', ['Hcp de parcours = index × slope ÷ 113 + (évaluation − normale), arrondi. Il dépend du tertre choisi.', 'Bas handicap : le meilleur joue à 0 et les autres reçoivent la différence (ex. 12 − 7 = 5 coups).', 'Full handicap : chacun reçoit son Hcp au complet.', 'Les coups se placent d’abord sur les trous les plus difficiles (handicap 1, 2, 3…). Au-delà de 18, un 2e coup.']],
-    argent: ['L’argent de la game à Pelland', ['La game commence à : le montant de départ, gagné par l’équipe qui mène à la fin.', 'À chaque revirement : ajouté chaque fois que le meneur change.', 'Par point net : multiplié par l’écart de points à la fin.', 'Tous les montants sont par joueur.']],
+    argent: ['L’argent de la game à Pelland', ['La game commence à : le montant de départ, gagné par l’équipe qui mène à la fin.', 'À chaque revirement : ajouté chaque fois que le meneur change.', 'Par point net : multiplié par l’écart de points à la fin.', 'Chaque normale 3 : gagné par l’équipe qui a la skin et fait la normale ; sinon reporté à la normale 3 suivante.', 'Tous les montants sont par joueur.']],
     equipes: ['Les équipes', ['Meilleur avec le moins bon : le plus bas index joue avec le plus haut, les deux du milieu ensemble.', 'Le meilleur joueur est toujours chez les Rouges.', 'Je choisis : vous décidez qui joue avec qui.']],
     game: ['La game commence à', ['Le montant de départ, par joueur. L’équipe qui mène à la fin du parcours le gagne.']],
     revirement: ['À chaque revirement', ['Un revirement, c’est quand l’équipe qui mène change. Chaque revirement ajoute ce montant au gain final, par joueur.', 'La case montre le total en ce moment.']],
@@ -468,7 +468,7 @@
       'Skin : 1 point à l’équipe du joueur qui l’obtient, choisi parmi ceux qui ont fait la normale ou mieux (au brut).',
       'Cabane : oiselet brut + skin + plus haut net chez l’adversaire = 12 points pour le trou.',
       'Press : l’équipe en déficit double les points du trou ; l’autre peut répondre par un reroll (×4).'],
-      money: ['La game : montant de départ gagné par l’équipe qui mène à la fin.', 'Chaque revirement (changement de meneur) ajoute un montant.', 'Normales 3 : la skin + la normale gagne 5 $, sinon reporté à la normale 3 suivante.', 'Chaque point net d’écart vaut le montant par point.', 'Montants par joueur.'] },
+      money: ['La game : montant de départ gagné par l’équipe qui mène à la fin.', 'Chaque revirement (changement de meneur) ajoute un montant.', 'Normales 3 : la skin + la normale gagne le montant choisi (5 $ par défaut), sinon reporté à la normale 3 suivante.', 'Chaque point net d’écart vaut le montant par point.', 'Montants par joueur.'] },
     { f: 'neuf', who: '3 joueurs, chacun pour soi', rules: ['À chaque trou : 5 points au meilleur net, 3 au deuxième, 1 au troisième.', 'Égalité : on partage (4-4-1, 5-2-2 ou 3-3-3).'],
       money: ['Chacun gagne ou paie la différence de points avec chaque autre joueur, × le montant par point.'] },
     { f: 'bestball', who: '4 joueurs, en équipes de deux', rules: ['Le meilleur net de chaque équipe compte.', 'L’équipe la plus basse gagne le trou ; égalité : trou partagé.'],
@@ -654,7 +654,7 @@
   // ---------------- Nouvelle partie ----------------
   function newDraft() {
     return {
-      courseId: (S.courses[0] || {}).id || 'pinegrove', mode: 'bas', responsable: 0, teamMode: null, teams: null, stake: '', leadChangeValue: '', perPoint: '1', count: 4,
+      courseId: (S.courses[0] || {}).id || 'pinegrove', mode: 'bas', responsable: 0, teamMode: null, teams: null, stake: '', leadChangeValue: '', perPoint: '1', par3Value: '5', count: 4,
       players: [0, 1, 2, 3].map(() => ({ name: '', index: '', tee: 'II' }))
     };
   }
@@ -752,7 +752,7 @@
         </div>
         <div class="row" style="flex-wrap:nowrap">
           <label style="flex:1">Par point net<span class="money-in"><input id="ppt" type="text" inputmode="decimal" placeholder="1" value="${esc(fmtIn(d.perPoint))}"><i>$</i></span></label>
-          <span style="flex:1"></span>
+          <label style="flex:1">Chaque normale 3<span class="money-in"><input id="p3v" type="text" inputmode="decimal" placeholder="5" value="${esc(fmtIn(d.par3Value))}"><i>$</i></span></label>
         </div>`}
       </section>
       <section class="card">
@@ -1391,7 +1391,7 @@
         if (d.offre) { const x = offreDates().find(y => y.key === d.offre), ok = (x ? x.names : []).map(L.norm); d.players.forEach(p => { if (p.name && !ok.includes(L.norm(p.name))) { p.name = ''; p.custom = false; } }); }
         render(); };
       const qp = $('#quatPick'); if (qp) qp.onchange = e => { const x = S.quatuors.find(q => q.id === e.target.value); if (!x) return;
-        const nd = draftFromQuatuor(x); nd.courseId = d.courseId; nd.mode = d.mode; nd.stake = d.stake; nd.leadChangeValue = d.leadChangeValue; nd.perPoint = d.perPoint; S.draft = nd; render(); };
+        const nd = draftFromQuatuor(x); nd.courseId = d.courseId; nd.mode = d.mode; nd.stake = d.stake; nd.leadChangeValue = d.leadChangeValue; nd.perPoint = d.perPoint; nd.par3Value = d.par3Value; S.draft = nd; render(); };
       d.players.forEach((p, i) => {
         const ps = $('#ps' + i);
         if (ps) ps.onchange = e => {
@@ -1428,7 +1428,7 @@
         if (n === 3) d.players = d.players.slice(0, 3); else while (d.players.length < 4) d.players.push({ name: '', index: '', tee: d.players[0].tee });
         if (d.responsable >= n) d.responsable = 0; render();
       });
-      ['stake', 'lcv', 'ppt'].forEach(id => { const el = $('#' + id), key = { stake: 'stake', lcv: 'leadChangeValue', ppt: 'perPoint' }[id]; if (!el) return;
+      ['stake', 'lcv', 'ppt', 'p3v'].forEach(id => { const el = $('#' + id), key = { stake: 'stake', lcv: 'leadChangeValue', ppt: 'perPoint', p3v: 'par3Value' }[id]; if (!el) return;
         el.oninput = e => { d[key] = e.target.value; };
         el.onblur = e => { e.target.value = fmtIn(e.target.value); d[key] = e.target.value; };
         el.onfocus = e => { e.target.select(); }; });
@@ -1443,7 +1443,7 @@
         ls.set('pelland.lastPlayers', d.players);
         const id = await Store.newCode();
         const g = { id, createdAt: Date.now(), ownerUid: Store.uid, course: pv.c, courseId: pv.c.id, mode: d.mode, responsable: rIdx >= 0 ? rIdx : 0,
-          format: jeu ? 'perso' : fmtG, custom: jeu ? JSON.parse(JSON.stringify(jeu)) : null, players: pv.ps, teams: neuf ? null : draftTeams(d, pv.ps), teamMode: neuf ? null : d.teamMode, stake: money(d.stake), leadChangeValue: money(d.leadChangeValue), perPoint: String(d.perPoint || '').trim() === '' ? 1 : money(d.perPoint), currentHole: d.holes === 'back' ? 10 : 1, firstHole: d.holes === 'back' ? 10 : 1, lastHole: d.holes === 'front' ? 9 : 18, scores: {}, events: {}, status: 'en cours' };
+          format: jeu ? 'perso' : fmtG, custom: jeu ? JSON.parse(JSON.stringify(jeu)) : null, players: pv.ps, teams: neuf ? null : draftTeams(d, pv.ps), teamMode: neuf ? null : d.teamMode, stake: money(d.stake), leadChangeValue: money(d.leadChangeValue), perPoint: String(d.perPoint || '').trim() === '' ? 1 : money(d.perPoint), par3Value: String(d.par3Value ?? '').trim() === '' ? 5 : money(d.par3Value), currentHole: d.holes === 'back' ? 10 : 1, firstHole: d.holes === 'back' ? 10 : 1, lastHole: d.holes === 'front' ? 9 : 18, scores: {}, events: {}, status: 'en cours' };
         try { await Store.saveGame(g); S.draft = null; openGame(id); toast('Partie créée.'); }
         catch (e) { toast('Création impossible : ' + e.message); }
       };
