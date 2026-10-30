@@ -929,7 +929,7 @@
         <div class="team-blocks">${[1, 0].map(k => { const tm = L.getTeams(g)[k], teamPts = L.teamPoints(g).tot;
           const tt = L.trailingTeam(g, h), pt = L.pressTeamOf(g, h), started = ((g.scores || {})[h] || []).some(v => v != null);
           let btn = '';
-          if (owner && tt === k && !(ev.presses || []).length) btn = `<button type="button" class="tb-btn t${k}" data-press-team="${k}">Press</button>`;
+          if (owner && (tt === k || (started && tt == null)) && !(ev.presses || []).length) btn = `<button type="button" class="tb-btn t${k}" data-press-team="${k}">Press</button>`;
           else if (owner && pt === k) btn = `<button type="button" class="tb-btn t${k} on" data-unpress="1">Pressé ✓</button>`;
           else if (owner && pt != null && pt !== k) btn = `<button type="button" class="tb-btn t${k} ${ev.reroll ? 'on' : ''}" data-reroll-team="${ev.reroll ? 0 : 1}">${ev.reroll ? 'Reroll ✓' : 'Reroll'}</button>`;
           else if (!owner && pt === k) btn = `<span class="tb-btn t${k} on">Pressé</span>`;

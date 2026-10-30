@@ -603,12 +603,14 @@
       if (a.type === 'press') {
         const tt = trailingTeam(g, a.hole);
         const team = a.player != null ? getTeams(g).findIndex(x => x.includes(a.player)) : (a.team != null ? a.team : tt);
-        if (tt == null) { say.push('Égalité : personne ne peut presser.'); return; }
-        if (team !== tt) { say.push(`Seuls ${tl(tt)} peuvent presser, ils sont en déficit.`); return; }
+        // Correction après coup (scores déjà entrés) : on accepte la press telle qu'elle a été jouée
+        const fix = ((g.scores || {})[a.hole] || []).some(v => v != null);
+        if (!fix && tt == null) { say.push('Égalité : personne ne peut presser.'); return; }
+        if (!fix && team !== tt) { say.push(`Seuls ${tl(tt)} peuvent presser, ils sont en déficit.`); return; }
         if ((ev(a.hole).presses || []).length) { say.push(`Le ${a.hole} est déjà pressé.`); return; }
-        ev(a.hole).pressTeam = tt;
+        ev(a.hole).pressTeam = team != null && team >= 0 ? team : tt;
       }
-      if (a.type === 'press') { ev(a.hole).noPress = false; ev(a.hole).presses.push(a.player); say.push(`${a.player != null ? g.players[a.player].name + ' presse' : 'Les ' + TEAMS[ev(a.hole).pressTeam] + ' pressent'} au ${a.hole}. Points fois 2.`); }
+      if (a.type === 'press') { ev(a.hole).noPress = false; ev(a.hole).presses.push(a.player); say.push(`${a.player != null ? g.players[a.player].name + ' presse' : (ev(a.hole).pressTeam != null ? 'Les ' + TEAMS[ev(a.hole).pressTeam] + ' pressent' : 'Press')} au ${a.hole}. Points fois 2.`); }
       if (a.type === 'reroll' && a.on && !(ev(a.hole).presses || []).length) { say.push('Il faut une press avant un reroll.'); return; }
       if (a.type === 'reroll') { ev(a.hole).reroll = a.on; ev(a.hole).rerollSet = true; say.push(a.on ? `Reroll au ${a.hole}. Points fois 4.` : `Pas de reroll au ${a.hole}.`); }
       if (a.type === 'par3') {
