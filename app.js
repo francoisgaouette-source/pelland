@@ -458,6 +458,7 @@
     argent: ['L’argent de la game à Pelland', ['La game commence à : le montant de départ, gagné par l’équipe qui mène à la fin.', 'À chaque revirement : ajouté chaque fois que le meneur change.', 'Par point net : multiplié par l’écart de points à la fin.', 'Chaque normale 3 : gagné par l’équipe qui a la skin et fait la normale ; sinon reporté à la normale 3 suivante.', 'Tous les montants sont par joueur.']],
     equipes: ['Les équipes', ['Meilleur avec le moins bon : le plus bas index joue avec le plus haut, les deux du milieu ensemble.', 'Le meilleur joueur est toujours chez les Rouges.', 'Je choisis : vous décidez qui joue avec qui.']],
     game: ['La game commence à', ['Le montant de départ, par joueur. L’équipe qui mène à la fin du parcours le gagne.']],
+    gamenow: ['La game est à', ['Le montant de la game en ce moment : la game du début plus tous les revirements jusqu’ici.', 'Il monte chaque fois que l’équipe qui mène change. L’équipe qui mène à la fin le gagne, par joueur.']],
     revirement: ['À chaque revirement', ['Un revirement, c’est quand l’équipe qui mène change. Chaque revirement ajoute ce montant au gain final, par joueur.', 'La case montre le total en ce moment.']],
     meneurs: ['Meneurs', ['L’équipe en avance et son écart en points nets.', 'Gain par joueur en ce moment = la game + les revirements + les normales 3 (gagnées moins perdues) + l’écart × le montant par point.']],
     press: ['Press et reroll', ['Avant le départ d’un trou, l’équipe en déficit peut presser : les points du trou comptent double.', 'L’autre équipe peut alors répondre par un reroll : les points comptent quatre fois.', 'Le responsable touche le bouton avant d’entrer les scores du trou.']],
@@ -922,6 +923,7 @@
         <div class="money-boxes">
           <div class="mbox green"><span>La game commence à ${info('game')}</span><b>${g.stake ? fmt$(money(g.stake)) : '—'}</b></div>
           <div class="mbox green"><span>À chaque revirement ${info('revirement')}</span><b>${g.leadChangeValue ? fmt$(L.leadChanges(g) * money(g.leadChangeValue)) : '—'}</b></div>
+          <div class="mbox yellow"><span>La game est à ${info('gamenow')}</span><b>${g.stake || g.leadChangeValue ? fmt$(money(g.stake) + L.leadChanges(g) * money(g.leadChangeValue)) : '—'}</b></div>
         </div>
         <div class="team-blocks">${[1, 0].map(k => { const tm = L.getTeams(g)[k], teamPts = L.teamPoints(g).tot;
           const tt = L.trailingTeam(g, h), pt = L.pressTeamOf(g, h), started = ((g.scores || {})[h] || []).some(v => v != null);

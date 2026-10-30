@@ -385,7 +385,7 @@ table.sc td.tp0, table.sc td.tp1 { width: 64px; }
 .item.hist.done .hist-st { color: var(--muted); }
 
 /* Encadrés vert (mise initiale) et jaune (changements de meneur) */
-.money-boxes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.money-boxes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
 .mbox { border: 3px solid; border-radius: 10px; padding: 8px 10px; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .mbox span { font-size: 14px; opacity: .9; }
 .mbox b { font-family: var(--display); font-size: 24px; }
