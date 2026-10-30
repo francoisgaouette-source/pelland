@@ -425,7 +425,7 @@
     const info = ls.get('pelland.lastGameInfo', null);
     const lastDate = info && info.id === last && info.createdAt ? new Date(info.createdAt).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' }) : null;
     return `
-      <div class="hero"><h1>${esc(groupName())}</h1><p>${APP} · le golf entre amis</p></div>
+      <div class="hero"><h1>${esc(groupName())}${canOrganize() ? ' <button class="hero-edit" id="renameGroup" type="button" aria-label="Modifier le nom du groupe">Modifier</button>' : ''}</h1><p>${APP} · le golf entre amis</p></div>
       <div class="tiles">
         <button class="tile" data-go="courses"><span class="pin">⛳</span><div><strong>Terrains</strong><span>Ajouter ou corriger un terrain</span></div></button>
         <button class="tile" data-go="players"><span class="pin"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M15.5 2.5 9 17.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M9 17.2c-.4 1.2-1.6 2.2-3.4 2.4l-2.1.2c-.6.1-.9.7-.6 1.2.2.3.5.5.9.5h4.6c1.6 0 2.7-.9 3.1-2.2l.3-.9" fill="currentColor"/><circle cx="18.5" cy="19.5" r="1.8" fill="currentColor"/></svg></span><div><strong>Joueurs</strong><span>Ajouter ou retirer des joueurs</span></div></button>
@@ -1295,7 +1295,22 @@
         try { await Store.deletePlayer(b.dataset.delp); S.players = await Store.listPlayers(); S.confirmDel = null; render(); } catch (e) { toast('Retrait impossible : ' + e.message); }
       });
     },
-    home(v) { commonNav(v); const lo = $('#logout'); if (lo) lo.onclick = () => Store.logout(); },
+    home(v) {
+      commonNav(v); const lo = $('#logout'); if (lo) lo.onclick = () => Store.logout();
+      const rg = $('#renameGroup'); if (rg) rg.onclick = () => openSheet(`<h3>Nom du groupe</h3>
+          <label>Nom<input id="gnIn" type="text" autocapitalize="sentences" value="${esc(groupName())}"></label>
+          <p class="note">Le nom paraît en haut de l’accueil et dans les textos envoyés aux joueurs.</p>
+          <div class="row"><button class="btn small" id="gnSave" type="button">Enregistrer</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`, sh => {
+        sh.querySelector('[data-close]').onclick = closeSheet;
+        sh.querySelector('#gnSave').onclick = async () => {
+          const nm = sh.querySelector('#gnIn').value.trim().replace(/\s+/g, ' ');
+          if (!nm) return toast('Entrez un nom.');
+          try { await Store.saveGroup({ ...curGroup(), name: nm }); S.groups = await Store.listGroups(); closeSheet(); toast('Nom du groupe modifié.'); render(); }
+          catch (e) { toast('Impossible : ' + e.message); }
+        };
+        setTimeout(() => { const i = sh.querySelector('#gnIn'); if (i) { i.focus(); i.select(); } }, 50);
+      });
+    },
     join(v) {
       $('#joinBtn').onclick = () => { const code = $('#code').value.trim().toUpperCase(); if (code) openGame(code); };
       $('#code').onkeydown = e => { if (e.key === 'Enter') $('#joinBtn').click(); };
