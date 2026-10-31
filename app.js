@@ -575,7 +575,7 @@
           <div><b>${esc(x.name || x.players.join(', '))}</b>${x.name ? `<span>${esc(x.players.join(', '))}</span>` : ''}</div>
           <span class="row" style="flex-wrap:nowrap;flex:none">${S.confirmDelQ === x.id
             ? `<button class="btn small" data-qdel="${esc(x.id)}" type="button" style="background:var(--red)">Retirer</button><button class="btn ghost small" data-qcancel type="button">Annuler</button>`
-            : canOrganize() ? `<button class="btn small" data-qplay="${esc(x.id)}" type="button">Jouer</button><button class="btn ghost small" data-qask="${esc(x.id)}" type="button">Retirer</button>` : ''}</span></div>`).join('')
+            : canOrganize() ? `<button class="btn small" data-qplay="${esc(x.id)}" type="button">Jouer</button><button class="btn ghost small" data-qrem="${esc(x.id)}" type="button">Rappel</button><button class="btn ghost small" data-qask="${esc(x.id)}" type="button">Retirer</button>` : ''}</span></div>`).join('')
         : ''}</div>`;
   }
   // ---------------- Offres de parties ----------------
@@ -609,6 +609,7 @@
     const noAns = (S.players || []).filter(p => L.norm(p.name) !== me && !answered.has(L.norm(p.name)));
     const choices = [];
     if (!past) choices.push({ label: 'Ceux qui n’ont pas encore répondu', ps: noAns, text: `Rappel – ${groupName()} : tu n’as pas encore indiqué tes disponibilités pour les parties à ${course}. Réponds avant le ${fmtDay(o.deadline)} : ${link}` });
+    if (!past) choices.push({ label: 'Tous les joueurs du groupe', ps: (S.players || []).filter(p => L.norm(p.name) !== me), text: `Rappel – ${groupName()} : parties offertes à ${course} : ${o.dates.map(fmtDate).join(', ')}. Indique tes disponibilités : ${link}` });
     o.dates.filter(dt => dt > Date.now() - 3600e3).forEach(dt => { const yes = new Set(reps.filter(r => (r.dates || []).includes(dt)).map(r => L.norm(r.name)));
       if (yes.size) choices.push({ label: `Joueurs du ${fmtDate(dt)}`, ps: byNames(yes), text: `Rappel – ${groupName()} : on joue ${fmtDate(dt)} à ${course}. À bientôt sur le terrain !` }); });
     const draw = (sh, sel) => {
@@ -1371,6 +1372,17 @@
         const list = (S.quatuors || []).concat([{ id: 'q' + Date.now().toString(36), name: nq.name, players: nq.players.slice() }]);
         try { await Store.saveQuatuors(list); S.quatuors = list; S.newQuat = null; render(); } catch (e) { toast('Enregistrement impossible : ' + e.message); }
       };
+      v.querySelectorAll('[data-qrem]').forEach(b => b.onclick = () => {
+        const x = S.quatuors.find(q => q.id === b.dataset.qrem), me = L.norm(ls.get('pelland.me', '') || '');
+        const ps = (S.players || []).filter(p => L.norm(p.name) !== me && x.players.some(n => L.norm(n) === L.norm(p.name)));
+        const txt = `Rappel – ${groupName()} : ${x.name ? 'on joue à ' + x.name.replace(/ – groupe \d+$/, '') : x.date ? 'on joue ' + fmtDate(x.date) : 'partie à venir'}. Ton groupe : ${x.players.join(', ')}. À bientôt sur le terrain !`;
+        openSheet(`<h3>Rappel au groupe</h3><p class="note">${esc(x.players.join(', '))}</p><label>Message<textarea id="qrMsg" rows="4">${esc(txt)}</textarea></label>
+          ${ps.some(p => !p.phone) ? `<p class="warn" style="margin:6px 0">Pas de numéro pour ${esc(ps.filter(p => !p.phone).map(p => p.name).join(', '))}.</p>` : ''}
+          <div class="row"><button class="btn small" id="qrGo" type="button" ${ps.some(p => p.phone) ? '' : 'disabled'}>Envoyer le texto (${ps.filter(p => p.phone).length})</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`, sh => {
+          sh.querySelector('[data-close]').onclick = closeSheet;
+          sh.querySelector('#qrGo').onclick = () => { const t = sh.querySelector('#qrMsg').value; closeSheet(); openSms(ps.filter(p => p.phone).map(p => p.phone), t); };
+        });
+      });
       v.querySelectorAll('[data-qplay]').forEach(b => b.onclick = () => { const x = S.quatuors.find(q => q.id === b.dataset.qplay); go('setup', { draft: draftFromQuatuor(x) }); });
       v.querySelectorAll('[data-qask]').forEach(b => b.onclick = () => { S.confirmDelQ = b.dataset.qask; render(); });
       v.querySelectorAll('[data-qcancel]').forEach(b => b.onclick = () => { S.confirmDelQ = null; render(); });
