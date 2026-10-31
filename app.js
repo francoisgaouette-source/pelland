@@ -195,6 +195,11 @@
       if (this.mode === 'firebase') { await this.db.collection('players').doc(this.qDoc()).set({ list, updatedAt: Date.now() }); return; }
       ls.set('pelland.quatuors.' + this.gid, list);
     },
+    // Demandes d'ajout de jeux : players/_demandes_jeux (lu par l'équipe Fanion)
+    async saveGameRequest(req) {
+      if (this.mode === 'firebase') { const ref = this.db.collection('players').doc('_demandes_jeux'); const d = await ref.get(); const list = (d.exists && d.data().list) || []; list.push(req); await ref.set({ list, updatedAt: Date.now() }); return; }
+      ls.set('pelland.demandesJeux', ls.get('pelland.demandesJeux', []).concat([req]));
+    },
     // Jeux maison du groupe : players/_jeux_<groupe>
     async listJeux() {
       if (this.mode === 'firebase') { try { const d = await this.db.collection('players').doc('_jeux_' + this.gid).get(); return (d.exists && d.data().list) || []; } catch (e) { return []; } }
@@ -506,6 +511,37 @@
         <ul>${persoLines(j).map(r => `<li>${esc(r)}</li>`).join('')}<li>${esc(gainRule({ format: 'perso', custom: j, players: [], perPoint: j.pp }))}.</li></ul>
         ${canOrganize() ? `<div class="row" style="margin-top:10px"><button class="btn small" data-jedit="${esc(j.id)}" type="button">Modifier</button><button class="btn ghost small" data-jdel="${esc(j.id)}" type="button">${S.confirmDelJ === j.id ? 'Confirmer' : 'Retirer'}</button></div>` : ''}</details>`).join('') || '<p class="note">Aucun jeu maison pour l’instant.</p>'}</div>
       ${canOrganize() ? '<button class="btn" data-jnew type="button">Ajouter un jeu</button>' : ''}`;
+  }
+  // Ajouter un jeu : on demande d'abord si les règles sont sur le web (adresse) ; sinon, on demande de l'expliquer
+  function askNewGame() {
+    const st = { web: null };
+    const draw = sh => {
+      sh.innerHTML = `<h3>Ajouter un jeu</h3>
+        <label>Nom du jeu<input id="ngName" type="text" placeholder="ex. Le Bingo Bango Bongo" value="${esc(st.name || '')}"></label>
+        <p style="margin:10px 0 6px"><b>Les explications de ce jeu sont-elles sur le web ?</b></p>
+        <div class="seg"><button type="button" data-web="1" aria-pressed="${st.web === true}"><b>Oui</b><small>Je donne l’adresse</small></button><button type="button" data-web="0" aria-pressed="${st.web === false}"><b>Non</b><small>Je l’explique</small></button></div>
+        ${st.web === true ? `<label>Où ? Adresse de la page (lien)<input id="ngUrl" type="url" inputmode="url" placeholder="https://…" value="${esc(st.url || '')}"></label>` : ''}
+        ${st.web === false ? `<label>Expliquez le jeu que vous voulez créer<textarea id="ngTxt" rows="7" placeholder="Combien de joueurs ? En équipes ou chacun pour soi ? Comment on gagne des points à chaque trou ? Comment l’argent se compte ?">${esc(st.txt || '')}</textarea></label>` : ''}
+        ${st.web != null ? '<p class="note">Nous ajoutons le jeu à Fanion Game et vous avisons dès qu’il est prêt.</p>' : ''}
+        <div class="row"><button class="btn small" id="ngSend" type="button" ${st.web == null ? 'disabled' : ''}>Envoyer</button><button class="btn ghost small" data-close type="button">Annuler</button></div>
+        <p class="note" style="margin-top:10px">Vous savez déjà comment le compter ? <button class="linkbtn" id="ngSelf" type="button">Le créer moi-même</button></p>`;
+      const keep = () => { const n = sh.querySelector('#ngName'), u = sh.querySelector('#ngUrl'), t = sh.querySelector('#ngTxt'); if (n) st.name = n.value; if (u) st.url = u.value; if (t) st.txt = t.value; };
+      sh.querySelectorAll('[data-web]').forEach(b => b.onclick = () => { keep(); st.web = b.dataset.web === '1'; draw(sh); const f = sh.querySelector(st.web ? '#ngUrl' : '#ngTxt'); if (f) f.focus(); });
+      sh.querySelector('[data-close]').onclick = closeSheet;
+      sh.querySelector('#ngSelf').onclick = () => { closeSheet(); go('jeuEdit', { editJeu: null }); };
+      sh.querySelector('#ngSend').onclick = async () => {
+        keep();
+        if (!String(st.name || '').trim()) return toast('Donnez le nom du jeu.');
+        if (st.web && !/^\S+\.\S+/.test(String(st.url || '').trim())) return toast('Entrez l’adresse de la page.');
+        if (!st.web && String(st.txt || '').trim().length < 20) return toast('Expliquez le jeu en quelques phrases.');
+        const req = { name: st.name.trim(), url: st.web ? st.url.trim() : '', text: st.web ? '' : st.txt.trim(), group: groupName(), groupId: Store.gid, by: ls.get('pelland.me', '') || '', at: Date.now() };
+        try { await Store.saveGameRequest(req); } catch (e) { }
+        const body = `Nouveau jeu demandé pour Fanion Game\n\nGroupe : ${req.group}\nDemandé par : ${req.by}\nJeu : ${req.name}\n` + (req.url ? `Règles sur le web : ${req.url}\n` : `Explication :\n${req.text}\n`);
+        closeSheet(); toast('Demande envoyée. Merci !');
+        location.href = 'mailto:bonjour@fanion.ai?subject=' + encodeURIComponent('Fanion Game – Ajouter un jeu : ' + req.name) + '&body=' + encodeURIComponent(body);
+      };
+    };
+    openSheet('', sh => draw(sh));
   }
   function vJeuEdit() {
     const j = S.editJeu || (S.editJeu = { name: '', mode: 'equipes', low: 2, high: 2, team: 0, birdie: 0, stake: 0, ranks: '5, 3, 1, 0', skin: 0, pp: 1 });
@@ -1177,7 +1213,7 @@
     },
     jeux(v) {
       commonNav(v);
-      const jn = v.querySelector('[data-jnew]'); if (jn) jn.onclick = () => go('jeuEdit', { editJeu: null });
+      const jn = v.querySelector('[data-jnew]'); if (jn) jn.onclick = () => askNewGame();
       v.querySelectorAll('[data-jedit]').forEach(b => b.onclick = () => go('jeuEdit', { editJeu: JSON.parse(JSON.stringify(S.jeux.find(j => j.id === b.dataset.jedit))) }));
       v.querySelectorAll('[data-jdel]').forEach(b => b.onclick = async () => {
         if (S.confirmDelJ !== b.dataset.jdel) { S.confirmDelJ = b.dataset.jdel; return render(); }
