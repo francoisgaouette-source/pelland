@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="fr-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Acheter Fanion Game · 50 $ par saison</title>
+<meta name="description" content="Achetez Fanion Game pour votre groupe de golf : 50 $ plus taxes pour la saison, jusqu’à 16 joueurs. Paiement sécurisé par carte.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="pages.css">
+<script src="config.js"></script>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="mark" href="index.html"><svg width="26" height="30" viewBox="0 0 26 30" aria-hidden="true"><path d="M5 2v26" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M6 3l15 5.5L6 14z" fill="#e3a90b"/><ellipse cx="9" cy="28" rx="7" ry="1.6" fill="#1f6b46"/></svg>Fanion</a>
+  <nav><a href="index.html#questions">Questions</a></nav>
+</div></header>
+
+<main><div class="wrap">
+  <h1>Fanion Game pour votre groupe</h1>
+  <p class="lead">Un seul paiement par saison, fait par l’organisateur. Tout le groupe en profite, jusqu’à 16 joueurs.</p>
+
+  <div class="buy">
+    <div>
+      <div class="box">
+        <h3>Ce qui est inclus</h3>
+        <p class="sub">Pour une saison complète, sur terrain ou en simulateur.</p>
+        <ul class="incl">
+          <li>Jusqu’à 16 joueurs dans le groupe</li>
+          <li>Dates offertes, disponibilités et date butoir</li>
+          <li>Quatuors formés automatiquement (groupes de 3 permis)</li>
+          <li>Tous les jeux : la game à Pelland, le 9 points, Best Ball, Nassau, Wolf, Sixes, Skins</li>
+          <li>Vos jeux maison, avec vos propres règles</li>
+          <li>Pointage en direct, coups de handicap et qui doit quoi</li>
+          <li>Parties de 9 ou 18 trous, terrains du Québec et de simulateur</li>
+          <li>Un organisateur en plus de vous</li>
+        </ul>
+      </div>
+
+      <h2>Comment ça se passe</h2>
+      <ol class="steps">
+        <li><b>Vous payez par carte</b><span>Sur la page sécurisée de Stripe. Vous y indiquez le nom de votre groupe et votre courriel.</span></li>
+        <li><b>Vous recevez votre reçu</b><span>Par courriel, avec la TPS et la TVQ détaillées.</span></li>
+        <li><b>Votre groupe passe à 16 joueurs</b><span>Dans les 24 heures. Si vous n’avez pas encore de groupe, créez-le dans l’app : vous en devenez le propriétaire.</span></li>
+        <li><b>Vous invitez votre gang</b><span>Chaque joueur reçoit un texto avec son lien et se connecte avec son numéro de téléphone.</span></li>
+      </ol>
+    </div>
+
+    <aside class="box order" aria-labelledby="orderTitle">
+      <h3 id="orderTitle">Groupe · 1 saison</h3>
+      <p class="sub">Jusqu’à 16 joueurs</p>
+      <table class="bill">
+        <tr><td>Fanion Game, 1 saison <small>(12 mois)</small></td><td>50,00 $</td></tr>
+        <tr><td>TPS <small>(5 %)</small></td><td>2,50 $</td></tr>
+        <tr><td>TVQ <small>(9,975 %)</small></td><td>4,99 $</td></tr>
+        <tr class="total"><td>Total</td><td>57,49 $</td></tr>
+      </table>
+      <div class="soon" id="soon" hidden>Les ventes ouvrent bientôt. Pour réserver votre place, écrivez-nous à <a id="soonMail" href="mailto:bonjour@fanion.ca">bonjour@fanion.ca</a>.</div>
+      <label class="agree"><input type="checkbox" id="agree"> <span>J’ai lu et j’accepte les <a href="conditions.html" target="_blank">conditions d’utilisation</a>, y compris la politique de remboursement, et la <a href="confidentialite.html" target="_blank">politique de confidentialité</a>.</span></label>
+      <a class="pay" id="pay" href="#" aria-disabled="true" rel="noopener">
+        <svg width="18" height="20" viewBox="0 0 18 20" aria-hidden="true"><rect x="1" y="8.5" width="16" height="10.5" rx="2" fill="currentColor"/><path d="M4.5 8.5V6a4.5 4.5 0 0 1 9 0v2.5" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+        Payer 57,49 $
+      </a>
+      <p class="secure">Paiement sécurisé par Stripe. Fanion ne voit jamais votre numéro de carte.</p>
+      <p class="note">Pas un abonnement : rien ne se renouvelle sans votre accord. Remboursement complet sur demande dans les 30 jours.</p>
+    </aside>
+  </div>
+
+  <h2>Pas encore prêt ?</h2>
+  <p>Essayez gratuitement avec votre quatuor (jusqu’à 4 joueurs) : <a id="appLink" href="https://francoisgaouette-source.github.io/pelland/">ouvrir l’app</a>. Une ligue de plus de 16 joueurs, un club ou un centre de simulateurs ? <a class="mail" href="mailto:bonjour@fanion.ca">Écrivez-nous</a>.</p>
+</div></main>
+
+<footer class="foot"><div class="wrap">
+  <div>© 2026 Fanion · Fait au Québec</div>
+  <div><a class="mail" href="mailto:bonjour@fanion.ca">bonjour@fanion.ca</a><a href="conditions.html">Conditions d’utilisation</a><a href="confidentialite.html">Confidentialité</a></div>
+</div></footer>
+
+<script>
+(function () {
+  var Q = window.FANION || {}, link = (Q.stripeLink || '').trim();
+  var pay = document.getElementById('pay'), agree = document.getElementById('agree');
+  if (Q.email) document.querySelectorAll('a.mail, #soonMail').forEach(function (a) { a.href = 'mailto:' + Q.email; if (a.id === 'soonMail' || a.textContent.indexOf('@') > -1) a.textContent = Q.email; });
+  if (Q.appUrl) document.getElementById('appLink').href = Q.appUrl;
+  if (!link) { document.getElementById('soon').hidden = false; agree.disabled = true; return; }
+  function sync() { var ok = agree.checked; pay.setAttribute('aria-disabled', ok ? 'false' : 'true'); pay.href = ok ? link : '#'; }
+  agree.addEventListener('change', sync); sync();
+})();
+</script>
+</body>
+</html>

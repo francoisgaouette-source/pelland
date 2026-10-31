@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="fr-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Merci · Fanion</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="pages.css">
+<script src="config.js"></script>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="mark" href="index.html"><svg width="26" height="30" viewBox="0 0 26 30" aria-hidden="true"><path d="M5 2v26" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M6 3l15 5.5L6 14z" fill="#e3a90b"/><ellipse cx="9" cy="28" rx="7" ry="1.6" fill="#1f6b46"/></svg>Fanion</a>
+</div></header>
+
+<main><div class="wrap prose">
+  <div class="big-ok" aria-hidden="true"><svg width="30" height="24" viewBox="0 0 30 24"><path d="M3 12l8 8L27 4" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+  <h1>Merci, c’est payé !</h1>
+  <p class="lead">Votre reçu est en route par courriel. Votre groupe passera à 16 joueurs dans les 24 heures.</p>
+
+  <h2>La suite</h2>
+  <ol>
+    <li><b>Vous avez déjà un groupe dans Fanion Game ?</b> Rien à faire : on l’active avec le nom que vous avez donné au paiement.</li>
+    <li><b>Pas encore de groupe ?</b> <a class="app" href="https://francoisgaouette-source.github.io/pelland/">Ouvrez l’app</a>, touchez « Créer un groupe » et donnez-lui le même nom qu’au paiement. Vous en devenez le propriétaire.</li>
+    <li><b>Ajoutez vos joueurs</b> dans Joueurs, avec leur numéro de téléphone. Chacun reçoit un texto avec son lien.</li>
+    <li><b>Offrez vos premières dates</b> dans Parties à préparer.</li>
+  </ol>
+  <p>Sur iPhone, ajoutez l’app à l’écran d’accueil : bouton Partager, puis « Sur l’écran d’accueil ».</p>
+  <p>Une question, ou votre groupe n’est pas activé après 24 heures ? Écrivez à <a class="mail" href="mailto:bonjour@fanion.ca">bonjour@fanion.ca</a>.</p>
+</div></main>
+
+<footer class="foot"><div class="wrap">
+  <div>© 2026 Fanion · Fait au Québec</div>
+  <div><a href="conditions.html">Conditions d’utilisation</a><a href="confidentialite.html">Confidentialité</a></div>
+</div></footer>
+<script>
+(function () { var Q = window.FANION || {};
+  if (Q.appUrl) document.querySelectorAll('a.app').forEach(function (a) { a.href = Q.appUrl; });
+  if (Q.email) document.querySelectorAll('a.mail').forEach(function (a) { a.href = 'mailto:' + Q.email; a.textContent = Q.email; });
+})();
+</script>
+</body>
+</html>

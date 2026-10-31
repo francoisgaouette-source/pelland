@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="fr-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fanion Game · le golf entre amis, organisé</title>
+<meta name="description" content="Fanion Game organise votre groupe de golf : dates offertes, disponibilités, quatuors formés automatiquement, pointage en direct et calcul de qui doit quoi. Fait au Québec, en français.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&display=swap">
+<style>
+:root {
+  --pine: #14231b;
+  --pine-2: #1c3226;
+  --fairway: #1f6b46;
+  --flag: #e3a90b;
+  --mist: #eef1ec;
+  --ink: #16201a;
+  --pencil: #5c6862;
+  --line: #d6ddd7;
+  --white: #ffffff;
+  --display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --body: 'Barlow', system-ui, sans-serif;
+  /* Lien vers l'app : à remplacer par l'adresse définitive (ex. https://app.fanion.ca) */
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { margin: 0; background: var(--mist); color: var(--ink); font-family: var(--body); font-size: 18px; line-height: 1.55; }
+img { max-width: 100%; display: block; }
+a { color: var(--fairway); }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px solid var(--flag); outline-offset: 3px; border-radius: 4px; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+/* En-tête */
+.top { background: var(--pine); color: var(--white); }
+.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 68px; }
+.mark { font-family: var(--display); font-weight: 800; font-size: 30px; letter-spacing: .01em; color: var(--white); text-decoration: none; display: flex; align-items: center; gap: 10px; }
+.mark svg { flex: none; }
+.nav { display: flex; align-items: center; gap: 28px; }
+.nav a { color: #cfd9d2; text-decoration: none; font-weight: 500; font-size: 16px; }
+.nav a:hover { color: var(--white); }
+.nav .try { background: var(--flag); color: var(--pine); padding: 8px 16px; border-radius: 8px; font-weight: 600; }
+.nav .try:hover { color: var(--pine); background: #f0bb24; }
+@media (max-width: 760px) { .nav a:not(.try) { display: none; } }
+
+/* Ouverture */
+.hero { background: var(--pine); color: var(--white); padding: 56px 0 0; overflow: hidden; }
+.hero .wrap { display: grid; grid-template-columns: 1.15fr .85fr; gap: 48px; align-items: end; }
+.hero h1 { font-family: var(--display); font-weight: 800; font-size: clamp(54px, 8.4vw, 104px); line-height: .92; letter-spacing: -.01em; margin: 0 0 24px; max-width: 11ch; }
+.hero .lead { font-size: 21px; color: #d6e0d9; max-width: 34em; margin: 0 0 32px; }
+.ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+.btn { display: inline-flex; align-items: center; min-height: 52px; padding: 0 24px; border-radius: 10px; font-weight: 600; font-size: 18px; text-decoration: none; }
+.btn.main { background: var(--flag); color: var(--pine); }
+.btn.main:hover { background: #f0bb24; }
+.btn.ghost { color: var(--white); border: 1.5px solid #4c6457; }
+.btn.ghost:hover { border-color: var(--white); }
+.hero .small { color: #9fb2a6; font-size: 15px; margin: 0 0 56px; }
+.phone { width: 300px; justify-self: center; background: #05100a; border-radius: 40px 40px 0 0; padding: 12px 12px 0; box-shadow: 0 -2px 0 #2f4a3b inset; }
+.phone img { width: 100%; border-radius: 30px 30px 0 0; height: 470px; object-fit: cover; object-position: top; }
+@media (max-width: 860px) {
+  .hero .wrap { grid-template-columns: 1fr; gap: 8px; }
+  .phone { width: 260px; }
+  .phone img { height: 380px; }
+}
+
+/* Bandeau de pointage : le motif de la carte de golf */
+.strip { background: var(--fairway); color: var(--white); }
+.strip .wrap { display: grid; grid-template-columns: repeat(9, 1fr); padding-top: 0; padding-bottom: 0; }
+.strip div { border-left: 1px solid rgba(255,255,255,.22); padding: 10px 0 12px 10px; font-family: var(--display); font-weight: 600; font-size: 15px; line-height: 1.2; }
+.strip div:last-child { border-right: 1px solid rgba(255,255,255,.22); }
+.strip b { display: block; font-size: 28px; font-weight: 800; }
+@media (max-width: 760px) { .strip .wrap { grid-template-columns: repeat(3, 1fr); } .strip div:nth-child(n+4) { display: none; } }
+
+/* Sections */
+section { padding: 88px 0; }
+h2 { font-family: var(--display); font-weight: 800; font-size: clamp(38px, 5vw, 58px); line-height: 1; margin: 0 0 16px; letter-spacing: -.005em; }
+.intro { font-size: 20px; color: var(--pencil); max-width: 36em; margin: 0 0 48px; }
+
+/* Comment ça marche */
+.how .wrap { display: grid; grid-template-columns: 1fr 340px; gap: 64px; align-items: start; }
+.steps { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 64px 1fr; gap: 20px; padding: 24px 0; border-top: 1px solid var(--line); }
+.steps li:last-child { border-bottom: 1px solid var(--line); }
+.steps li::before { content: counter(s); font-family: var(--display); font-weight: 800; font-size: 56px; line-height: .9; color: var(--fairway); }
+.steps h3 { font-family: var(--display); font-weight: 700; font-size: 28px; margin: 0 0 4px; line-height: 1.1; }
+.steps p { margin: 0; color: var(--pencil); max-width: 34em; }
+.shot { border-radius: 28px; overflow: hidden; border: 10px solid var(--pine); background: var(--pine); position: sticky; top: 24px; }
+@media (max-width: 860px) { .how .wrap { grid-template-columns: 1fr; } .shot { position: static; max-width: 320px; } }
+
+/* Jeux */
+.games { background: var(--white); }
+.game-list { display: grid; grid-template-columns: 1fr 1fr; gap: 0 56px; margin: 0; }
+.game-list div { padding: 20px 0; border-top: 1px solid var(--line); }
+.game-list dt { font-family: var(--display); font-weight: 700; font-size: 26px; line-height: 1.1; margin-bottom: 4px; }
+.game-list dt small { font-family: var(--body); font-weight: 500; font-size: 15px; color: var(--pencil); margin-left: 8px; }
+.game-list dd { margin: 0; color: var(--pencil); }
+.games .after { margin: 48px 0 0; display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: start; }
+.games .after .shot img { max-height: 560px; width: 100%; object-fit: cover; object-position: top; }
+.games .after p { margin: 0; font-size: 19px; max-width: 30em; }
+.games .after .shot { position: static; max-width: 320px; }
+@media (max-width: 760px) { .game-list, .games .after { grid-template-columns: 1fr; } }
+
+/* Simulateurs */
+.sim { background: var(--flag); color: var(--pine); }
+.sim .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
+.sim h2 { margin-bottom: 12px; }
+.sim p { font-size: 20px; margin: 0 0 16px; max-width: 32em; }
+.sim ul { margin: 0; padding-left: 20px; font-size: 18px; }
+.sim li { margin: 6px 0; }
+@media (max-width: 760px) { .sim .wrap { grid-template-columns: 1fr; gap: 16px; } }
+
+/* Prix */
+.plans { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 880px; }
+.plan { background: var(--white); border: 1.5px solid var(--line); border-radius: 14px; padding: 32px; display: flex; flex-direction: column; }
+.plan.pro { border: 2.5px solid var(--fairway); }
+.plan h3 { font-family: var(--display); font-weight: 700; font-size: 30px; margin: 0; }
+.price { font-family: var(--display); font-weight: 800; font-size: 64px; line-height: 1; margin: 12px 0 4px; }
+.price small { font-family: var(--body); font-weight: 500; font-size: 17px; color: var(--pencil); }
+.plan .for { color: var(--pencil); margin: 0 0 20px; }
+.plan ul { list-style: none; padding: 0; margin: 0 0 28px; flex: 1; }
+.plan li { padding: 8px 0 8px 28px; border-top: 1px solid var(--line); position: relative; }
+.plan li::before { content: ''; position: absolute; left: 4px; top: 16px; width: 10px; height: 10px; border-radius: 50%; background: var(--flag); }
+.plan .btn { align-self: flex-start; }
+.plan .btn.main { background: var(--fairway); color: var(--white); }
+.plan .btn.main:hover { background: #185a3a; }
+.plan .btn.line { border: 1.5px solid var(--fairway); color: var(--fairway); }
+.plans-note { color: var(--pencil); font-size: 16px; margin: 20px 0 0; }
+@media (max-width: 760px) { .plans { grid-template-columns: 1fr; } }
+
+/* Questions */
+.faq { background: var(--white); }
+.faq .list { max-width: 820px; }
+details { border-top: 1px solid var(--line); }
+details:last-child { border-bottom: 1px solid var(--line); }
+summary { cursor: pointer; list-style: none; padding: 20px 40px 20px 0; font-weight: 600; font-size: 20px; position: relative; }
+summary::-webkit-details-marker { display: none; }
+summary::after { content: '+'; position: absolute; right: 4px; top: 14px; font-family: var(--display); font-size: 32px; color: var(--fairway); }
+details[open] summary::after { content: '−'; }
+details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
+
+/* Pied */
+.foot { background: var(--pine); color: #b9c8bf; padding: 48px 0; font-size: 16px; }
+.foot .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 24px; }
+.foot a { color: #e2ebe5; }
+.foot .links { display: flex; gap: 24px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="mark" href="#">
+      <svg width="26" height="30" viewBox="0 0 26 30" aria-hidden="true"><path d="M5 2v26" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M6 3l15 5.5L6 14z" fill="#e3a90b"/><ellipse cx="9" cy="28" rx="7" ry="1.6" fill="#1f6b46"/></svg>
+      Fanion
+    </a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#comment">Comment ça marche</a>
+      <a href="#jeux">Les jeux</a>
+      <a href="#prix">Prix</a>
+      <a href="#questions">Questions</a>
+      <a class="try" href="achat.html">Acheter</a>
+    </nav>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="wrap">
+    <div>
+      <h1>Votre gang de golf, organisée.</h1>
+      <p class="lead">Fanion Game offre les dates, recueille les disponibilités, forme les quatuors, compte les points pendant la partie et dit qui doit quoi à la fin. Fini les 40 textos du jeudi soir.</p>
+      <div class="ctas">
+        <a class="btn main" href="https://francoisgaouette-source.github.io/pelland/">Essayer gratuitement</a>
+        <a class="btn ghost" href="#prix">Voir les prix</a>
+      </div>
+      <p class="small">Gratuit jusqu’à 4 joueurs. Sur iPhone, Android et ordinateur. Fait au Québec, en français.</p>
+    </div>
+    <div class="phone"><img src="img/partie.png" alt="Une partie en cours dans Fanion Game : le trou 8, les équipes Bleus et Rouges, les coups de handicap de chaque joueur."></div>
+  </div>
+</div>
+
+<div class="strip" aria-hidden="true">
+  <div class="wrap">
+    <div><b>1</b>Dates</div><div><b>2</b>Dispos</div><div><b>3</b>Quatuors</div><div><b>4</b>Départ</div><div><b>5</b>Scores</div><div><b>6</b>Points</div><div><b>7</b>Skins</div><div><b>8</b>Revirements</div><div><b>9</b>Qui doit quoi</div>
+  </div>
+</div>
+
+<section id="comment" class="how">
+  <div class="wrap">
+    <div>
+      <h2>De l’invitation au 19e trou</h2>
+      <p class="intro">L’organisateur fait tout depuis son téléphone. Les joueurs reçoivent un texto, touchent le lien et répondent.</p>
+      <ol class="steps">
+        <li><div><h3>Offrez des dates</h3><p>Choisissez le terrain ou le centre de simulateurs, les dates et une date butoir. Tous les joueurs du groupe reçoivent un texto.</p></div></li>
+        <li><div><h3>Chacun coche ses disponibilités</h3><p>En un geste, depuis le lien. Vous voyez qui est libre pour chaque date, et combien de quatuors ça donne.</p></div></li>
+        <li><div><h3>Les quatuors se forment</h3><p>Fanion Game mélange les groupes pour éviter de toujours jouer avec les mêmes. Groupes de 3 permis quand le compte n’est pas rond.</p></div></li>
+        <li><div><h3>Jouez, l’app compte</h3><p>Le responsable entre les scores ; tout le monde suit en direct. Coups de handicap, points, skins et argent sont calculés à chaque trou, même sans réseau.</p></div></li>
+      </ol>
+    </div>
+    <div class="shot"><img src="img/quatuors.png" alt="Quatuors formés automatiquement : 7 joueurs disponibles, un quatuor de 4 et un de 3."></div>
+  </div>
+</section>
+
+<section id="jeux" class="games">
+  <div class="wrap">
+    <h2>Sept jeux, plus les vôtres</h2>
+    <p class="intro">Choisissez le jeu en créant la partie. Tout se compte au net, avec les coups de handicap de chacun.</p>
+    <dl class="game-list">
+      <div><dt>La game à Pelland <small>4 joueurs</small></dt><dd>Équipes de deux. Le plus bas net rapporte 2 points, le plus haut en donne 2. Press, reroll, skins, cabane et argent des normales 3.</dd></div>
+      <div><dt>Le 9 points <small>3 joueurs</small></dt><dd>À chaque trou : 5 points au meilleur net, 3 au deuxième, 1 au troisième.</dd></div>
+      <div><dt>Best Ball <small>4 joueurs</small></dt><dd>Le meilleur net de chaque équipe gagne le trou. On compte les trous gagnés.</dd></div>
+      <div><dt>Nassau <small>4 joueurs</small></dt><dd>Trois paris en Best Ball : l’aller, le retour et le total des 18 trous.</dd></div>
+      <div><dt>Wolf <small>4 joueurs</small></dt><dd>Le loup tourne à chaque trou. Il choisit un partenaire ou joue seul contre les trois autres.</dd></div>
+      <div><dt>Sixes <small>4 joueurs</small></dt><dd>Les équipes changent à chaque tiers de la partie, pour que chacun joue avec chacun.</dd></div>
+      <div><dt>Skins <small>3 ou 4 joueurs</small></dt><dd>Le seul meilleur score du trou gagne le skin. À égalité, il est reporté au trou suivant.</dd></div>
+      <div><dt>Votre jeu maison <small>3 ou 4 joueurs</small></dt><dd>Votre gang a ses propres règles ? Créez votre jeu : points au plus bas net, oiselets, skins, mise. Fanion Game le compte comme les autres.</dd></div>
+    </dl>
+    <div class="after">
+      <p>À la fin, Fanion Game fait le compte : la mise de départ, les revirements, les points et les normales 3. Chacun sait ce qu’il doit, sans calculatrice au bar. L’app note les gageures ; elle ne touche jamais à l’argent.</p>
+      <div class="shot"><img src="img/carte.png" alt="Le meneur, le gain par joueur en ce moment et la carte de pointage avec le calcul de chaque trou."></div>
+    </div>
+  </div>
+</section>
+
+<section class="sim">
+  <div class="wrap">
+    <div>
+      <h2>L’hiver, en simulateur</h2>
+      <p>Votre groupe joue tout l’hiver dans un centre de simulateurs ? Fanion Game suit.</p>
+    </div>
+    <ul>
+      <li>Parties de 9 ou 18 trous.</li>
+      <li>Terrains virtuels, avec leurs normales et leur difficulté.</li>
+      <li>Le lieu et la baie dans l’invitation : « Golf Simulateur Laval, baie 3, mardi 19 h ».</li>
+      <li>Propriétaire d’un centre ? <a href="mailto:bonjour@fanion.ca" style="color:inherit">Écrivez-nous</a> pour l’offrir à vos ligues.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="prix">
+  <div class="wrap">
+    <h2>Un prix par groupe, pour la saison</h2>
+    <p class="intro">Pas d’abonnement par joueur : l’organisateur paie une fois, et le groupe en profite toute la saison.</p>
+    <div class="plans">
+      <div class="plan">
+        <h3>Gratuit</h3>
+        <div class="price">0 $</div>
+        <p class="for">Pour essayer avec votre quatuor.</p>
+        <ul>
+          <li>1 groupe, jusqu’à 4 joueurs</li>
+          <li>Tous les jeux</li>
+          <li>Pointage en direct et qui doit quoi</li>
+        </ul>
+        <a class="btn line" href="https://francoisgaouette-source.github.io/pelland/">Commencer gratuitement</a>
+      </div>
+      <div class="plan pro">
+        <h3>Groupe</h3>
+        <div class="price">50 $ <small>+ taxes, par saison</small></div>
+        <p class="for">Pour une gang qui joue toute la saison.</p>
+        <ul>
+          <li>Jusqu’à 16 joueurs</li>
+          <li>Dates offertes et disponibilités</li>
+          <li>Quatuors automatiques</li>
+          <li>Textos d’invitation et de rappel</li>
+          <li>Un organisateur en plus de vous</li>
+        </ul>
+        <a class="btn main" href="achat.html">Acheter pour mon groupe</a>
+      </div>
+    </div>
+    <p class="plans-note">Une ligue de plus de 16 joueurs ? Un club ou un centre de simulateurs ? <a href="mailto:bonjour@fanion.ca">Écrivez-nous</a>.</p>
+  </div>
+</section>
+
+<section id="questions" class="faq">
+  <div class="wrap">
+    <h2>Questions</h2>
+    <div class="list">
+      <details><summary>Faut-il télécharger une app ?</summary><p>Non. Ouvrez le lien sur votre téléphone, puis ajoutez Fanion Game à votre écran d’accueil (sur iPhone : bouton Partager, puis « Sur l’écran d’accueil »). Elle s’ouvre ensuite comme une app.</p></details>
+      <details><summary>Est-ce que ça marche sans réseau sur le terrain ?</summary><p>Oui. Les scores entrés sans réseau sont gardés sur le téléphone et envoyés dès que le signal revient.</p></details>
+      <details><summary>Est-ce que tout le monde doit avoir l’app ?</summary><p>Seul le responsable de la partie entre les scores. Les autres suivent la partie en direct s’ils le veulent, et répondent aux dates offertes avec le lien reçu par texto.</p></details>
+      <details><summary>Comment les joueurs se connectent-ils ?</summary><p>Avec leur nom et leur numéro de téléphone. L’invitation par texto choisit déjà leur nom ; ils n’ont qu’à entrer leur numéro.</p></details>
+      <details><summary>Comment se passe l’achat ?</summary><p>L’organisateur paie 50 $ plus taxes par carte de crédit, sur une page de paiement sécurisée (Stripe). Il indique le nom de son groupe et reçoit un reçu par courriel. Le groupe passe à 16 joueurs dans les 24 heures.</p></details>
+      <details><summary>Est-ce un abonnement qui se renouvelle tout seul ?</summary><p>Non. Vous payez une saison à la fois. Aucun montant n’est prélevé sans votre accord.</p></details>
+      <details><summary>Et si ça ne fait pas l’affaire ?</summary><p>Vous avez 30 jours après l’achat pour demander un remboursement complet, sans justification. Écrivez à <a href="mailto:bonjour@fanion.ca">bonjour@fanion.ca</a>.</p></details>
+      <details><summary>L’app gère-t-elle l’argent des gageures ?</summary><p>Non. Fanion Game calcule qui doit quoi selon vos règles, mais ne touche jamais à l’argent. Vous réglez entre vous, comme d’habitude.</p></details>
+      <details><summary>Où sont gardées nos données ?</summary><p>Les noms, numéros et parties de votre groupe ne sont visibles que par les membres du groupe. Consultez notre politique de confidentialité.</p></details>
+    </div>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="wrap">
+    <div>© 2026 Fanion · Fait au Québec</div>
+    <div class="links">
+      <a href="mailto:bonjour@fanion.ca">bonjour@fanion.ca</a>
+      <a href="conditions.html">Conditions d’utilisation</a>
+      <a href="confidentialite.html">Politique de confidentialité</a>
+      <a href="achat.html">Acheter</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
