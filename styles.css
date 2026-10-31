@@ -643,3 +643,4 @@ textarea { font-family: inherit; line-height: 1.4; resize: vertical; }
 .imp-row span { display: flex; flex-direction: column; }
 .imp-row small { color: var(--muted, #6b756f); font-size: 14px; }
 .imp-row.warnrow small { color: #b3402b; }
+.tp-more { margin: 10px 0; } .tp-more summary { cursor: pointer; font-weight: 600; color: var(--green, #1f6b46); padding: 6px 0; }

@@ -1126,7 +1126,6 @@
         </section>
       ${(() => { const dups = duplicateMap(S.players); const nd = Object.keys(dups).length; return nd ? `<div class="warn">${nd} joueurs semblent en double. Vérifiez les noms marqués « Doublon ? » et retirez celui de trop.</div>` : ''; })()}
       ${!ownerId() && S.players.length ? `<div class="warn">Le groupe n’a pas encore de propriétaire (la personne qui l’administre et paie l’abonnement). <button class="linkbtn" id="claimOwner" type="button">C’est moi</button></div>` : ''}
-      ${ownerId() ? `<p class="note">Le <b>propriétaire</b> administre le groupe et paie l’abonnement. Avec lui, un <b>organisateur</b> peut offrir des dates et créer les parties${meId() === ownerId() ? ' : touchez « + Organisateur » pour le nommer (un seul à la fois)' : ''}.</p>` : ''}
       ${S.players.length ? `<div class="row pl-head"><p class="pl-count"><b>${S.players.length}</b> joueur${S.players.length > 1 ? 's' : ''} dans le groupe</p>${canOrganize() ? `<button class="btn ghost small" data-selmode type="button">${S.selMode ? 'Terminer' : 'Sélectionner'}</button>` : ''}</div>` : ''}
       ${S.selMode ? (() => { const sel = S.sel || [], removable = S.players.filter(p => canRemove(p)); return `<div class="sel-bar"><button class="linkbtn" data-selall type="button">${sel.length === removable.length && removable.length ? 'Tout désélectionner' : 'Tout sélectionner'}</button><span class="note">${sel.length} sélectionné${sel.length > 1 ? 's' : ''}</span>${sel.length ? (S.confirmBulk ? `<button class="btn small" data-bulkdel type="button" style="background:var(--red)">Confirmer : retirer ${sel.length}</button><button class="btn ghost small" data-bulkcancel type="button">Annuler</button>` : `<button class="btn small" data-bulkask type="button" style="background:var(--red)">Retirer (${sel.length})</button>`) : ''}</div>`; })() : ''}
       <div class="list">${S.players.length ? (() => { const dups = duplicateMap(S.players); return S.players.map((p, n) => S.selMode ? `<label class="item pl-row sel-row ${dups[p.id] ? 'dup' : ''}">${canRemove(p) ? `<input type="checkbox" data-selp="${esc(p.id)}" ${(S.sel || []).includes(p.id) ? 'checked' : ''}>` : '<span class="sel-lock" title="Ne peut pas être retiré">—</span>'}<b><span class="pl-n">${n + 1}.</span> ${esc(p.name)}${p.id === ownerId() ? ' <span class="owner-tag">Propriétaire</span>' : ''}${p.id === meId() ? ' <span class="note">(vous)</span>' : ''}</b></label>` : `<div class="item pl-row ${dups[p.id] ? 'dup' : ''}"><b><span class="pl-n">${n + 1}.</span> ${canOrganize() || p.id === meId() ? `<button class="name-btn" data-rename="${esc(p.id)}" type="button">${esc(p.name)}</button>` : esc(p.name)}${p.id === ownerId() ? ' <span class="owner-tag">Propriétaire</span>' : !ownerId() ? '' : meId() === ownerId() ? ` <button class="role-chip ${isOrganizer(p.id) ? 'on' : ''}" data-org="${esc(p.id)}" type="button">${isOrganizer(p.id) ? 'Organisateur ✓' : '+ Organisateur'}</button>` : isOrganizer(p.id) ? ' <span class="org-tag">Organisateur</span>' : ''}${dups[p.id] ? ` <span class="dup-flag" title="Ressemble à ${esc(dups[p.id].join(', '))}">Doublon ?</span>` : ''}</b>${S.confirmDel === p.id
@@ -2034,18 +2033,40 @@
     const url = ios ? `sms:/open?addresses=${nums.join(',')}&body=${body}` : `sms:${nums.join(',')}?body=${body}`;
     window.__lastSms = url; (window.top || window).location.href = url;
   }
-  function textPlayers(g) {
+  // Texto : les joueurs de la partie sont cochés ; on peut ajouter des joueurs d'une autre partie (ou du groupe)
+  async function textPlayers(g) {
     const me = L.norm(ls.get('pelland.me', '') || '');
-    const nums = [], missing = [];
-    g.players.forEach(p => { if (L.norm(p.name) === me) return;
-      const lib = (S.players || []).find(x => L.norm(x.name) === L.norm(p.name));
-      if (lib && lib.phone) nums.push(lib.phone); else missing.push(p.name); });
-    const body = encodeURIComponent(smsSummary(g));
-    const ios = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
-    const url = ios ? `sms:/open?addresses=${nums.join(',')}&body=${body}` : `sms:${nums.join(',')}?body=${body}`;
-    if (missing.length) toast(`Pas de numéro complet pour ${missing.join(', ')} : ajoutez-le dans Joueurs.`);
-    window.__lastSms = url;
-    (window.top || window).location.href = url;
+    const inGame = new Set(g.players.map(p => L.norm(p.name)));
+    let others = [];
+    try { others = (await Store.listGames()).filter(x => x.id !== g.id && x.status !== 'terminée' && Math.abs((x.createdAt || 0) - Date.now()) < 36 * 3600e3); } catch (e) { }
+    const whereOf = n => { const o = others.find(x => x.players.some(p => L.norm(p.name) === n)); return o ? `Joue avec ${o.players.filter(p => L.norm(p.name) !== n).map(p => p.name.split(' ')[0]).join(', ')}` : ''; };
+    const lib = (S.players || []).filter(p => L.norm(p.name) !== me);
+    const rows = lib.map(p => ({ p, n: L.norm(p.name), on: inGame.has(L.norm(p.name)), where: inGame.has(L.norm(p.name)) ? '' : whereOf(L.norm(p.name)) }));
+    rows.sort((a, b) => (b.on - a.on) || ((!!b.where) - (!!a.where)) || a.p.name.localeCompare(b.p.name, 'fr'));
+    const msg = { text: smsSummary(g) };
+    const draw = sh => {
+      const sel = rows.filter(r => r.on), noPh = sel.filter(r => !r.p.phone);
+      const item = (r, k) => `<label class="imp-row"><input type="checkbox" data-tp="${k}" ${r.on ? 'checked' : ''}><span><b>${esc(r.p.name)}</b><small>${r.p.phone ? esc(fmtPhone(r.p.phone)) : 'Pas de numéro complet'}${r.where ? ' · ' + esc(r.where) : ''}</small></span></label>`;
+      const idx = r => rows.indexOf(r);
+      const mine = rows.filter(r => inGame.has(r.n)), rest = rows.filter(r => !inGame.has(r.n));
+      sh.innerHTML = `<h3>Texto</h3>
+        <p class="note" style="margin:0 0 4px">Joueurs de cette partie</p><div class="imp-list">${mine.map(r => item(r, idx(r))).join('') || '<p class="note" style="padding:10px">—</p>'}</div>
+        ${rest.length ? `<details class="tp-more" ${rest.some(r => r.on) ? 'open' : ''}><summary>Ajouter un joueur d’une autre partie</summary><div class="imp-list">${rest.map(r => item(r, idx(r))).join('')}</div></details>` : ''}
+        <label>Message<textarea id="tpMsg" rows="5">${esc(msg.text)}</textarea></label>
+        ${noPh.length ? `<p class="warn" style="margin:6px 0">Pas de numéro complet pour ${esc(noPh.map(r => r.p.name).join(', '))} : ajoutez-le dans Joueurs.</p>` : ''}
+        <div class="row"><button class="btn small" id="tpGo" type="button" ${sel.some(r => r.p.phone) ? '' : 'disabled'}>Ouvrir Messages (${sel.filter(r => r.p.phone).length})</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`;
+      sh.querySelector('#tpMsg').oninput = e => { msg.text = e.target.value; };
+      sh.querySelectorAll('[data-tp]').forEach(c => c.onchange = () => { rows[+c.dataset.tp].on = c.checked; draw(sh); });
+      sh.querySelector('[data-close]').onclick = closeSheet;
+      sh.querySelector('#tpGo').onclick = () => {
+        const nums = rows.filter(r => r.on && r.p.phone).map(r => r.p.phone), body = encodeURIComponent(msg.text);
+        const ios = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
+        const url = ios ? `sms:/open?addresses=${nums.join(',')}&body=${body}` : `sms:${nums.join(',')}?body=${body}`;
+        window.__lastSms = url; closeSheet();
+        (window.top || window).location.href = url;
+      };
+    };
+    openSheet('', sh => draw(sh));
   }
   // Détail d'un trou (en touchant la ligne de calcul sous le trou)
   function holeDetail(h) {
