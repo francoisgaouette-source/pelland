@@ -42,7 +42,9 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 .nav a:hover { color: var(--white); }
 .nav .try { background: var(--flag); color: var(--pine); padding: 8px 16px; border-radius: 8px; font-weight: 600; }
 .nav .try:hover { color: var(--pine); background: #f0bb24; }
-@media (max-width: 760px) { .nav a:not(.try) { display: none; } }
+.nav .login { border: 1.5px solid #4c6457; padding: 7px 14px; border-radius: 8px; color: var(--white); }
+.nav .login:hover { border-color: var(--white); }
+@media (max-width: 760px) { .nav a:not(.try):not(.login) { display: none; } .nav { gap: 10px; } .nav .login, .nav .try { font-size: 15px; padding: 7px 12px; white-space: nowrap; } .mark { font-size: 26px; } }
 
 /* Ouverture */
 .hero { background: var(--pine); color: var(--white); padding: 56px 0 0; overflow: hidden; }
@@ -160,6 +162,7 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
       <a href="#jeux">Les jeux</a>
       <a href="#prix">Prix</a>
       <a href="#questions">Questions</a>
+      <a class="login" href="https://francoisgaouette-source.github.io/pelland/">Se connecter</a>
       <a class="try" href="achat.html">Acheter</a>
     </nav>
   </div>
@@ -289,6 +292,7 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
   <div class="wrap">
     <h2>Questions</h2>
     <div class="list">
+      <details><summary>Je suis déjà client : où est l’app ?</summary><p>Touchez « Se connecter » en haut de cette page, ou ouvrez <a href="https://francoisgaouette-source.github.io/pelland/">l’app Fanion Game</a>. Choisissez votre nom et entrez votre numéro de téléphone. Ajoutez-la ensuite à votre écran d’accueil pour la retrouver en un geste.</p></details>
       <details><summary>Faut-il télécharger une app ?</summary><p>Non. Ouvrez le lien sur votre téléphone, puis ajoutez Fanion Game à votre écran d’accueil (sur iPhone : bouton Partager, puis « Sur l’écran d’accueil »). Elle s’ouvre ensuite comme une app.</p></details>
       <details><summary>Est-ce que ça marche sans réseau sur le terrain ?</summary><p>Oui. Les scores entrés sans réseau sont gardés sur le téléphone et envoyés dès que le signal revient.</p></details>
       <details><summary>Est-ce que tout le monde doit avoir l’app ?</summary><p>Seul le responsable de la partie entre les scores. Les autres suivent la partie en direct s’ils le veulent, et répondent aux dates offertes avec le lien reçu par texto.</p></details>
@@ -310,6 +314,7 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
       <a href="conditions.html">Conditions d’utilisation</a>
       <a href="confidentialite.html">Politique de confidentialité</a>
       <a href="achat.html">Acheter</a>
+      <a href="https://francoisgaouette-source.github.io/pelland/">Se connecter à l’app</a>
     </div>
   </div>
 </footer>
