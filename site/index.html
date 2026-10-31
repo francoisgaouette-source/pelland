@@ -111,12 +111,13 @@ h2 { font-family: var(--display); font-weight: 800; font-size: clamp(38px, 5vw, 
 @media (max-width: 760px) { .sim .wrap { grid-template-columns: 1fr; gap: 16px; } }
 
 /* Prix */
-.plans { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 880px; }
+.plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.soon-tag { font-family: var(--body); font-size: 13px; font-weight: 600; background: var(--flag); color: var(--pine); padding: 2px 8px; border-radius: 999px; vertical-align: middle; margin-left: 6px; }
 .plan { background: var(--white); border: 1.5px solid var(--line); border-radius: 14px; padding: 32px; display: flex; flex-direction: column; }
 .plan.pro { border: 2.5px solid var(--fairway); }
 .plan h3 { font-family: var(--display); font-weight: 700; font-size: 30px; margin: 0; }
 .price { font-family: var(--display); font-weight: 800; font-size: 64px; line-height: 1; margin: 12px 0 4px; }
-.price small { font-family: var(--body); font-weight: 500; font-size: 17px; color: var(--pencil); }
+.price small { display: block; font-family: var(--body); font-weight: 500; font-size: 16px; color: var(--pencil); margin-top: 4px; line-height: 1.3; }
 .plan .for { color: var(--pencil); margin: 0 0 20px; }
 .plan ul { list-style: none; padding: 0; margin: 0 0 28px; flex: 1; }
 .plan li { padding: 8px 0 8px 28px; border-top: 1px solid var(--line); position: relative; }
@@ -126,7 +127,7 @@ h2 { font-family: var(--display); font-weight: 800; font-size: clamp(38px, 5vw, 
 .plan .btn.main:hover { background: #185a3a; }
 .plan .btn.line { border: 1.5px solid var(--fairway); color: var(--fairway); }
 .plans-note { color: var(--pencil); font-size: 16px; margin: 20px 0 0; }
-@media (max-width: 760px) { .plans { grid-template-columns: 1fr; } }
+@media (max-width: 980px) { .plans { grid-template-columns: 1fr; max-width: 560px; } }
 
 /* Questions */
 .faq { background: var(--white); }
@@ -244,7 +245,7 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
     <div class="plans">
       <div class="plan">
         <h3>Gratuit</h3>
-        <div class="price">0 $</div>
+        <div class="price">0 $ <small>pour toujours</small></div>
         <p class="for">Pour essayer avec votre quatuor.</p>
         <ul>
           <li>1 groupe, jusqu’à 4 joueurs</li>
@@ -266,8 +267,21 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
         </ul>
         <a class="btn main" href="achat.html">Acheter pour mon groupe</a>
       </div>
+      <div class="plan">
+        <h3>Ligue <span class="soon-tag">Bientôt</span></h3>
+        <div class="price">150 $ <small>+ taxes, par saison</small></div>
+        <p class="for">Pour une ligue de club ou de centre de simulateurs.</p>
+        <ul>
+          <li>Jusqu’à 64 joueurs</li>
+          <li>Tout ce qu’offre la formule Groupe</li>
+          <li>Classement de la saison</li>
+          <li>Outils pour l’organisateur de la ligue</li>
+          <li>Plusieurs organisateurs</li>
+        </ul>
+        <a class="btn line" href="mailto:bonjour@fanion.ca?subject=Fanion%20Game%20-%20Ligue">Réserver pour ma ligue</a>
+      </div>
     </div>
-    <p class="plans-note">Une ligue de plus de 16 joueurs ? Un club ou un centre de simulateurs ? <a href="mailto:bonjour@fanion.ca">Écrivez-nous</a>.</p>
+    <p class="plans-note">Plus de 64 joueurs, un club ou un centre de simulateurs ? <a href="mailto:bonjour@fanion.ca">Écrivez-nous</a>.</p>
   </div>
 </section>
 
