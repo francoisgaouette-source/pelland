@@ -616,7 +616,7 @@
       sh.innerHTML = `<h3>Rappel</h3>
         ${choices.length ? `<div class="list">${choices.map((x, i) => `<button class="item rem-opt ${sel === i ? 'on' : ''}" data-rc="${i}" type="button"><b>${esc(x.label)}</b><span>${x.ps.length} joueur${x.ps.length > 1 ? 's' : ''}${x.ps.length ? ' : ' + esc(x.ps.map(p => p.name.split(' ')[0]).join(', ')) : ''}</span></button>`).join('')}</div>` : '<p class="note">Aucun rappel à envoyer pour l’instant.</p>'}
         ${c ? `<label>Message<textarea id="rmMsg" rows="4">${esc(c.text)}</textarea></label>${c.ps.some(p => !p.phone) ? `<p class="warn" style="margin:6px 0">Pas de numéro pour ${esc(c.ps.filter(p => !p.phone).map(p => p.name).join(', '))}.</p>` : ''}` : ''}
-        <div class="row"><button class="btn small" id="rmGo" type="button" ${c && c.ps.some(p => p.phone) ? '' : 'disabled'}>Ouvrir Messages${c ? ` (${c.ps.filter(p => p.phone).length})` : ''}</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`;
+        <div class="row"><button class="btn small" id="rmGo" type="button" ${c && c.ps.some(p => p.phone) ? '' : 'disabled'}>Envoyer le texto${c ? ` (${c.ps.filter(p => p.phone).length})` : ''}</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`;
       sh.querySelectorAll('[data-rc]').forEach(bt => bt.onclick = () => draw(sh, +bt.dataset.rc));
       sh.querySelector('[data-close]').onclick = closeSheet;
       const go = sh.querySelector('#rmGo'); if (go) go.onclick = () => { if (!c) return; const txt = sh.querySelector('#rmMsg').value; closeSheet(); openSms(c.ps.filter(p => p.phone).map(p => p.phone), txt); };
@@ -1890,10 +1890,7 @@
   function inviteSms(name, d, id) {
     const url = location.origin + location.pathname + (id ? '?joueur=' + encodeURIComponent(id) : '');
     const body = `Salut ${name.split(' ')[0]} ! Tu as été invité à te joindre au groupe « ${groupName()} » sur ${APP}, l’app de golf entre amis. Ouvre l’app : ${url} — ton nom est déjà choisi, entre seulement ton numéro de téléphone (${fmtPhone(d)}) pour te connecter. Sur iPhone : bouton Partager, puis « Sur l’écran d’accueil ».`;
-    const ios = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
-    const href = ios ? `sms:/open?addresses=${d}&body=${encodeURIComponent(body)}` : `sms:${d}?body=${encodeURIComponent(body)}`;
-    window.__lastSms = href;
-    (window.top || window).location.href = href;
+    openSms([d], body);
   }
   // Lignes de la carte selon les trous joués (18, aller ou retour)
   function scoreRows(g, row, sumRow) {
@@ -2051,7 +2048,27 @@
       if (lib && lib.phone) nums.push(lib.phone); else missing.push(p.name); });
     return { nums, missing };
   }
-  function openSms(nums, text) {
+  // Textos : par le service Fanion (Twilio, via fanion.ai) quand il est en place ; sinon, Messages s'ouvre sur le téléphone
+  const SMS_API = 'https://fanion.ai/api/sms';
+  async function smsService() {
+    if (S.smsReady != null) return S.smsReady;
+    try { const r = await fetch(SMS_API + '/status'); S.smsReady = r.ok && !!(await r.json()).ready; } catch (e) { S.smsReady = false; }
+    return S.smsReady;
+  }
+  async function openSms(nums, text) {
+    nums = (nums || []).filter(Boolean);
+    if (Store.mode === 'firebase' && nums.length && await smsService()) {
+      try {
+        const tok = await firebase.auth().currentUser.getIdToken();
+        const r = await fetch(SMS_API, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ to: nums, text }) });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && d.sent) { toast(`Texto envoyé à ${d.sent} joueur${d.sent > 1 ? 's' : ''}${(d.failed || []).length ? ` · ${d.failed.length} non envoyé${d.failed.length > 1 ? 's' : ''}` : ''}.`); return; }
+        toast('Envoi automatique impossible' + (d.error ? ' : ' + d.error : '') + '. Messages s’ouvre à la place.');
+      } catch (e) { }
+    }
+    openSmsApp(nums, text);
+  }
+  function openSmsApp(nums, text) {
     const body = encodeURIComponent(text), ios = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
     const url = ios ? `sms:/open?addresses=${nums.join(',')}&body=${body}` : `sms:${nums.join(',')}?body=${body}`;
     window.__lastSms = url; (window.top || window).location.href = url;
@@ -2077,16 +2094,13 @@
         ${rest.length ? `<details class="tp-more" ${rest.some(r => r.on) ? 'open' : ''}><summary>Ajouter un joueur d’une autre partie</summary><div class="imp-list">${rest.map(r => item(r, idx(r))).join('')}</div></details>` : ''}
         <label>Message<textarea id="tpMsg" rows="5">${esc(msg.text)}</textarea></label>
         ${noPh.length ? `<p class="warn" style="margin:6px 0">Pas de numéro complet pour ${esc(noPh.map(r => r.p.name).join(', '))} : ajoutez-le dans Joueurs.</p>` : ''}
-        <div class="row"><button class="btn small" id="tpGo" type="button" ${sel.some(r => r.p.phone) ? '' : 'disabled'}>Ouvrir Messages (${sel.filter(r => r.p.phone).length})</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`;
+        <div class="row"><button class="btn small" id="tpGo" type="button" ${sel.some(r => r.p.phone) ? '' : 'disabled'}>Envoyer le texto (${sel.filter(r => r.p.phone).length})</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`;
       sh.querySelector('#tpMsg').oninput = e => { msg.text = e.target.value; };
       sh.querySelectorAll('[data-tp]').forEach(c => c.onchange = () => { rows[+c.dataset.tp].on = c.checked; draw(sh); });
       sh.querySelector('[data-close]').onclick = closeSheet;
       sh.querySelector('#tpGo').onclick = () => {
-        const nums = rows.filter(r => r.on && r.p.phone).map(r => r.p.phone), body = encodeURIComponent(msg.text);
-        const ios = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
-        const url = ios ? `sms:/open?addresses=${nums.join(',')}&body=${body}` : `sms:${nums.join(',')}?body=${body}`;
-        window.__lastSms = url; closeSheet();
-        (window.top || window).location.href = url;
+        const nums = rows.filter(r => r.on && r.p.phone).map(r => r.p.phone);
+        closeSheet(); openSms(nums, msg.text);
       };
     };
     openSheet('', sh => draw(sh));

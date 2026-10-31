@@ -1,7 +1,8 @@
-// Cloudflare (www.fanion.ai) : sert seulement le site web Fanion (dossier site/).
+// Cloudflare (fanion.ai) : le site web (dossier site/) et l'envoi de textos (/api/sms, worker.js).
 // L'app Fanion Game reste sur GitHub Pages pour l'instant.
 {
   "name": "pelland",
+  "main": "worker.js",
   "compatibility_date": "2026-10-23",
-  "assets": { "directory": "./site", "not_found_handling": "404-page" }
+  "assets": { "directory": "./site", "binding": "ASSETS", "run_worker_first": ["/api/*"] }
 }
