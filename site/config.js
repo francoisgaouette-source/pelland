@@ -6,5 +6,5 @@ window.FANION = {
   // Adresse de l'app
   appUrl: 'https://francoisgaouette-source.github.io/pelland/',
   // Courriel de contact
-  email: 'bonjour@fanion.ca'
+  email: 'bonjour@fanion.ai'
 };
