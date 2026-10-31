@@ -69,10 +69,20 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 /* Bandeau de pointage : le motif de la carte de golf */
 .strip { background: var(--fairway); color: var(--white); }
 .strip .wrap { display: grid; grid-template-columns: repeat(10, 1fr); padding-top: 0; padding-bottom: 0; }
-.strip div { border-left: 1px solid rgba(255,255,255,.22); padding: 10px 0 12px 10px; font-family: var(--display); font-weight: 600; font-size: 15px; line-height: 1.2; }
-.strip div:last-child { border-right: 1px solid rgba(255,255,255,.22); }
+.strip button { all: unset; box-sizing: border-box; cursor: pointer; border-left: 1px solid rgba(255,255,255,.22); padding: 10px 0 12px 10px; font-family: var(--display); font-weight: 600; font-size: 15px; line-height: 1.2; color: var(--white); }
+.strip button:last-child { border-right: 1px solid rgba(255,255,255,.22); }
+.strip button:hover, .strip button[aria-expanded="true"] { background: var(--pine-2); }
+.strip button[aria-expanded="true"] b { color: var(--flag); }
+.strip button:focus-visible { outline: 3px solid var(--flag); outline-offset: -3px; }
 .strip b { display: block; font-size: 28px; font-weight: 800; }
-@media (max-width: 760px) { .strip .wrap { grid-template-columns: repeat(3, 1fr); } .strip div:nth-child(n+4) { display: none; } }
+.step-panels { background: var(--pine-2); color: #e6ece8; }
+.step-panel { padding: 22px 0 26px; max-width: 760px; }
+.step-hint { margin: 0; padding: 8px 0; font-size: 14px; color: #a9bab0; }
+.step-panel h3 { font-family: var(--display); font-size: 28px; margin: 0 0 6px; color: var(--white); display: flex; align-items: baseline; gap: 12px; }
+.step-panel h3 span { color: var(--flag); font-size: 34px; font-weight: 800; }
+.step-panel p { margin: 0 0 10px; font-size: 18px; }
+.step-panel a { color: var(--flag); font-weight: 600; }
+@media (max-width: 760px) { .strip .wrap { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 30%; overflow-x: auto; scroll-snap-type: x mandatory; } .strip button { scroll-snap-align: start; } }
 
 /* Sections */
 section { padding: 88px 0; }
@@ -183,11 +193,12 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
   </div>
 </div>
 
-<div class="strip" aria-hidden="true">
-  <div class="wrap">
-    <div><b>1</b>Terrain</div><div><b>2</b>Dates</div><div><b>3</b>Dispos</div><div><b>4</b>Quatuors</div><div><b>5</b>Départ</div><div><b>6</b>Scores</div><div><b>7</b>Points</div><div><b>8</b>Skins</div><div><b>9</b>Revirements</div><div><b>10</b>Qui doit quoi</div>
+<div class="strip">
+  <div class="wrap" role="tablist" aria-label="Les 10 étapes">
+    <button type="button" data-step="0" aria-expanded="false"><b>1</b>Terrain</button><button type="button" data-step="1" aria-expanded="false"><b>2</b>Dates</button><button type="button" data-step="2" aria-expanded="false"><b>3</b>Dispos</button><button type="button" data-step="3" aria-expanded="false"><b>4</b>Quatuors</button><button type="button" data-step="4" aria-expanded="false"><b>5</b>Départ</button><button type="button" data-step="5" aria-expanded="false"><b>6</b>Scores</button><button type="button" data-step="6" aria-expanded="false"><b>7</b>Points</button><button type="button" data-step="7" aria-expanded="false"><b>8</b>Skins</button><button type="button" data-step="8" aria-expanded="false"><b>9</b>Revirements</button><button type="button" data-step="9" aria-expanded="false"><b>10</b>Qui doit quoi</button>
   </div>
 </div>
+<div class="step-panels"><div class="wrap"><p class="step-hint" id="stepHint">Touchez une étape pour voir comment ça marche.</p><div class="step-panel" id="step0" hidden><h3><span>1</span>Le terrain</h3><p>Choisissez parmi les terrains du Québec déjà dans l’app ou un terrain virtuel de simulateur. Votre terrain n’y est pas ? Prenez la carte de pointage en photo : l’app lit les normales, les handicaps et les tertres.</p><a href="#comment">Voir la section →</a></div><div class="step-panel" id="step1" hidden><h3><span>2</span>Les dates offertes</h3><p>L’organisateur choisit le terrain, quelques dates et une date butoir. Tous les joueurs du groupe reçoivent un texto avec un lien pour répondre.</p><a href="#comment">Voir la section →</a></div><div class="step-panel" id="step2" hidden><h3><span>3</span>Les disponibilités</h3><p>Chacun touche le lien et coche les dates où il est libre. L’organisateur voit qui est disponible pour chaque date, et combien de quatuors ça donne.</p><a href="#comment">Voir la section →</a></div><div class="step-panel" id="step3" hidden><h3><span>4</span>Les quatuors</h3><p>À la date butoir, l’app forme les groupes en variant les partenaires. Groupes de 3 permis quand le compte n’est pas rond. On peut aussi les faire à la main.</p><a href="#comment">Voir la section →</a></div><div class="step-panel" id="step4" hidden><h3><span>5</span>Le départ</h3><p>Le responsable crée la partie : joueurs, index, tertres, jeu et montants. L’app calcule le handicap de parcours et place les coups reçus sur les trous les plus difficiles.</p><a href="#comment">Voir la section →</a></div><div class="step-panel" id="step5" hidden><h3><span>6</span>Les scores</h3><p>Le responsable entre les scores de chaque trou ; les autres suivent la partie en direct sur leur téléphone. Sans réseau sur le terrain ? Les scores sont gardés et envoyés au retour du signal.</p><a href="#comment">Voir la section →</a></div><div class="step-panel" id="step6" hidden><h3><span>7</span>Les points</h3><p>Chaque trou se compte selon votre jeu : la game à Pelland, le 9 points, Best Ball, Nassau, Wolf, Sixes, Skins ou votre propre jeu. Tout au net, avec les coups de chacun.</p><a href="#jeux">Voir la section →</a></div><div class="step-panel" id="step7" hidden><h3><span>8</span>Les skins</h3><p>La skin va au joueur qui la gagne ; s’il ne fait pas la normale, le point va à l’autre équipe. Avec une press, elle compte double, avec un reroll, quatre fois.</p><a href="#jeux">Voir la section →</a></div><div class="step-panel" id="step8" hidden><h3><span>9</span>Les revirements</h3><p>Chaque fois que l’équipe qui mène perd son avance (retour à égalité ou l’autre passe devant), la game monte du montant convenu. L’app les compte pour vous.</p><a href="#jeux">Voir la section →</a></div><div class="step-panel" id="step9" hidden><h3><span>10</span>Qui doit quoi</h3><p>À la fin, l’app fait le compte : la game, les revirements, les points et les normales 3, par joueur. Chacun sait ce qu’il doit, sans calculatrice au 19e. L’app ne touche jamais à l’argent.</p><a href="#jeux">Voir la section →</a></div></div></div>
 
 <section id="comment" class="how">
   <div class="wrap">
@@ -319,5 +330,17 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
   </div>
 </footer>
 
+<script>
+(function () {
+  var btns = document.querySelectorAll('.strip [data-step]');
+  btns.forEach(function (b) { b.addEventListener('click', function () {
+    var i = b.getAttribute('data-step'), open = b.getAttribute('aria-expanded') === 'true';
+    btns.forEach(function (x) { x.setAttribute('aria-expanded', 'false'); });
+    document.querySelectorAll('.step-panel').forEach(function (p) { p.hidden = true; });
+    if (!open) { b.setAttribute('aria-expanded', 'true'); document.getElementById('step' + i).hidden = false; }
+    document.getElementById('stepHint').hidden = !open;
+  }); });
+})();
+</script>
 </body>
 </html>
