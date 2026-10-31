@@ -379,7 +379,7 @@
   const S = { players: [], confirmDel: null, view: 'home', game: null, unwatch: null, undo: [], courses: [], draft: null, editCourse: null };
   // Responsable : celui qui a créé ou réclamé la partie ; après une passation, le joueur désigné (ownerUid vide)
   const myIdx = g => g.players.findIndex(p => L.norm(p.name) === L.norm(ls.get('pelland.me', '') || ''));
-  const isOwner = () => !!S.game && (S.game.ownerUid === Store.uid || (!S.game.ownerUid && S.game.responsable != null && myIdx(S.game) === S.game.responsable));
+  const isOwner = () => !!S.game && (S.game.ownerUid === Store.uid || (S.game.responsable != null && myIdx(S.game) === S.game.responsable));
   const handoffBtn = (g, owner) => owner && g.status !== 'terminée' ? `<div class="row handoff-row"><span class="note">Responsable : <b>${esc((g.players[g.responsable] || {}).name || '')}</b> ★</span><span class="row" style="gap:8px"><button class="btn ghost small" data-editmoney type="button">Modifier les montants</button><button class="btn ghost small" data-handoff type="button">Changer de responsable</button></span></div>` : '';
   function respActions(g, owner, note) {
     if (owner) return '';
@@ -725,7 +725,7 @@
   // ---------------- Nouvelle partie ----------------
   function newDraft() {
     return {
-      courseId: (S.courses[0] || {}).id || 'pinegrove', mode: 'bas', responsable: 0, teamMode: null, teams: null, stake: '', leadChangeValue: '', perPoint: '1', par3Value: '5', count: 4,
+      courseId: (S.courses[0] || {}).id || 'pinegrove', mode: 'bas', responsable: 0, teamMode: 'auto', teams: null, stake: '', leadChangeValue: '', perPoint: '1', par3Value: '5', count: 4,
       players: [0, 1, 2, 3].map(() => ({ name: '', index: '', tee: 'II' }))
     };
   }
@@ -1607,7 +1607,7 @@
       // Désigné responsable par l'ancien responsable : on prend la partie à son compte dès l'ouverture
       // Je suis responsable mais l'étoile est sur un autre joueur (parties créées avant la correction) : on la remet sur moi
       if (S.game.ownerUid === Store.uid && !S.claiming) { const mi = myIdx(S.game); if (mi >= 0 && mi !== S.game.responsable) { S.claiming = true; const ng = JSON.parse(JSON.stringify(S.game)); ng.responsable = mi; S.game = ng; Store.saveGame(ng).catch(() => { }).finally(() => { S.claiming = false; }); setTimeout(render, 0); } }
-      if (!S.game.ownerUid && isOwner() && Store.uid && !S.claiming) { S.claiming = true; const ng = JSON.parse(JSON.stringify(S.game)); ng.ownerUid = Store.uid; S.game = ng; Store.saveGame(ng).catch(() => { }).finally(() => { S.claiming = false; }); }
+      if (S.game.ownerUid !== Store.uid && isOwner() && Store.uid && !S.claiming) { S.claiming = true; const ng = JSON.parse(JSON.stringify(S.game)); ng.ownerUid = Store.uid; S.game = ng; Store.saveGame(ng).catch(() => { }).finally(() => { S.claiming = false; }); }
       v.querySelectorAll('[data-nav]').forEach(b => b.onclick = () => {
         const [h0, h1] = L.holeRange(S.game), h = Math.min(h1, Math.max(h0, (S.game.currentHole || 1) + +b.dataset.nav));
         if (isOwner()) commit([{ type: 'goto', hole: h }], false); else { S.game.currentHole = h; render(); }
