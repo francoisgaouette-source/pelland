@@ -588,7 +588,7 @@
       const reps = offreReps(o), past = Date.now() > o.deadline;
       return `<div class="offre"><div class="offre-h"><b>${esc(o.course)}</b>${o.place ? `<span class="place">${esc(o.place)}</span>` : ''}<small>${past ? 'Réponses fermées' : 'Réponses avant le ' + esc(fmtDay(o.deadline))} · ${reps.length} réponse${reps.length > 1 ? 's' : ''}</small></div>
         ${o.dates.map(dt => { const yes = reps.filter(r => (r.dates || []).includes(dt)).map(r => r.name);
-          return `<div class="offre-d"><div><b>${esc(fmtDate(dt))}</b><span>${yes.length ? esc(yes.join(', ')) : 'Personne pour l’instant'}</span>${yes.length ? `<span class="grp">${esc(groupsText(yes.length))}</span>` : ''}</div><span class="cnt ${yes.length >= 4 ? 'ok' : ''}">${yes.length}</span></div>${yes.length >= 3 && canOrganize() ? `<div class="row offre-acts"><button class="btn small" data-oauto="${esc(o.id)}|${dt}" type="button">Quatuors automatiques</button><button class="btn ghost small" data-oquat="${esc(o.id)}|${dt}" type="button">Manuel</button></div>` : ''}`; }).join('')}
+          return `<div class="offre-d"><div><b>${esc(fmtDate(dt))}</b><span>${yes.length ? esc(yes.join(', ')) : 'Personne pour l’instant'}</span>${yes.length ? `<span class="grp">${esc(groupsText(yes.length))}</span>` : ''}</div><span class="cnt ${yes.length >= 4 ? 'ok' : ''}">${yes.length}</span></div>${yes.length >= 3 && canOrganize() ? `<div class="row offre-acts"><button class="btn small" data-oauto="${esc(o.id)}|${dt}" type="button">Former les groupes</button><button class="btn ghost small" data-oquat="${esc(o.id)}|${dt}" type="button">Manuel</button></div>` : ''}`; }).join('')}
         ${canOrganize() ? '' : '<!--'}<div class="row"><button class="btn small" data-orem="${esc(o.id)}" type="button">Rappel</button><button class="btn ghost small" data-osms="${esc(o.id)}" type="button">Renvoyer le texto</button><button class="btn ghost small" data-odel="${esc(o.id)}" type="button">${S.confirmDelO === o.id ? 'Confirmer' : 'Retirer'}</button></div>${canOrganize() ? '' : '-->'}</div>`; }).join('');
     const form = f ? `<div class="offre-form">
         <label>Terrain<select id="oCourse">${S.courses.map(c => `<option value="${esc(c.name)}" ${c.name === f.course ? 'selected' : ''}>${esc(c.name)}${c.sim ? ' (simulateur)' : ''}</option>`).join('')}</select></label>
@@ -664,7 +664,8 @@
     (quats || []).forEach(q => add(q.players, 0.5));
     return (a, b) => m[[L.norm(a), L.norm(b)].sort().join('|')] || 0;
   }
-  function autoGroups(names, pc) {
+  function autoGroups(names, pc, hasard) {
+    if (hasard) pc = () => 0;
     const sizes = groupSizes(names.length), placed = sizes.reduce((a, b) => a + b, 0);
     const cost = gs => gs.reduce((t, g) => { let c = 0; for (let i = 0; i < g.length; i++) for (let j = i + 1; j < g.length; j++) c += pc(g[i], g[j]); return t + c; }, 0);
     let best = null, bestC = Infinity;
@@ -684,19 +685,25 @@
     }
     return { groups: best || [], waiting: names.slice(placed) };
   }
-  async function autoQuatuorsSheet(o, dt) {
+  // Former les groupes d'une date : en variant les partenaires (selon l'historique de tous) ou au hasard.
+  // onPlay(g) : depuis Nouvelle partie, « Jouer ce groupe » remplit la partie avec ces joueurs.
+  async function autoQuatuorsSheet(o, dt, onPlay) {
     const reps = offreReps(o).filter(r => (r.dates || []).includes(dt)).sort((a, b) => (a.at || 0) - (b.at || 0));
     const names = reps.map(r => r.name);
     let games = []; try { games = await Store.listGames(); } catch (e) { }
     const pc = pairHistory(games, S.quatuors);
-    let res = autoGroups(names, pc);
+    let mode = 'varier', res = autoGroups(names, pc, false);
     const label = `${o.course.replace(/^Club de golf /i, '')} – ${fmtDate(dt)}`;
-    const draw = () => openSheet(`<h3>Quatuors automatiques</h3><p class="note">${esc(label)} · ${names.length} disponibles : <b>${esc(groupsText(names.length))}</b>. Les groupes évitent de remettre ensemble ceux qui ont joué ensemble récemment.</p>
-      <div class="auto-groups">${res.groups.map((g, i) => `<div class="auto-g"><b>Groupe ${i + 1}${g.length === 3 ? ' (3 joueurs)' : ''}</b><span>${g.map(esc).join(', ')}</span></div>`).join('')}
+    const draw = () => openSheet(`<h3>Former les groupes</h3><p class="note">${esc(label)} · ${names.length} disponibles : <b>${esc(groupsText(names.length))}</b>.</p>
+      <div class="seg"><button type="button" data-gmode="varier" aria-pressed="${mode === 'varier'}"><b>Varier les partenaires</b><small>Selon les parties passées de tous</small></button><button type="button" data-gmode="hasard" aria-pressed="${mode === 'hasard'}"><b>Au hasard</b><small>Tirage aléatoire</small></button></div>
+      <p class="note">${mode === 'varier' ? 'Les groupes évitent de remettre ensemble ceux qui ont souvent joué ensemble, pour que chacun joue avec tout le monde.' : 'Les joueurs sont répartis au hasard.'}</p>
+      <div class="auto-groups">${res.groups.map((g, i) => `<div class="auto-g"><b>Groupe ${i + 1}${g.length === 3 ? ' (3 joueurs)' : ''}</b><span>${g.map(esc).join(', ')}</span>${onPlay ? `<button class="btn small" data-gplay="${i}" type="button" style="margin-top:8px">Jouer ce groupe</button>` : ''}</div>`).join('')}
       ${res.waiting.length ? `<div class="auto-g wait"><b>En attente</b><span>${res.waiting.map(esc).join(', ')}</span></div>` : ''}</div>
-      <div class="row"><button class="btn" data-autosave type="button">Enregistrer ces quatuors</button><button class="btn ghost small" data-autoredo type="button">Mélanger de nouveau</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`, sh => {
+      <div class="row"><button class="btn${onPlay ? ' ghost small' : ''}" data-autosave type="button">Enregistrer ces quatuors</button><button class="btn ghost small" data-autoredo type="button">Refaire</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`, sh => {
         sh.querySelector('[data-close]').onclick = closeSheet;
-        sh.querySelector('[data-autoredo]').onclick = () => { res = autoGroups(names, pc); draw(); };
+        sh.querySelectorAll('[data-gmode]').forEach(b => b.onclick = () => { mode = b.dataset.gmode; res = autoGroups(names, pc, mode === 'hasard'); draw(); });
+        sh.querySelector('[data-autoredo]').onclick = () => { res = autoGroups(names, pc, mode === 'hasard'); draw(); };
+        sh.querySelectorAll('[data-gplay]').forEach(b => b.onclick = () => { closeSheet(); onPlay(res.groups[+b.dataset.gplay]); });
         sh.querySelector('[data-autosave]').onclick = async () => {
           const add = res.groups.map((g, i) => ({ id: 'q' + Date.now().toString(36) + i, name: `${label}${res.groups.length > 1 ? ' – groupe ' + (i + 1) : ''}`, players: g.slice(), date: dt }));
           const list = (S.quatuors || []).concat(add);
@@ -783,7 +790,7 @@
         <div class="step">2 à 5 · Joueurs, responsable, index, tertre</div>
         ${offreDates().length ? `<div class="seg src-seg"><button type="button" data-src="offre" aria-pressed="${useOffres(d)}"><b>Ceux qui ont répondu</b><small>À une date offerte</small></button><button type="button" data-src="libre" aria-pressed="${!useOffres(d)}"><b>Tous les joueurs</b><small>Partie libre</small></button></div>` : ''}
         ${useOffres(d) ? `<label>Choisir parmi ceux qui ont répondu pour cette partie<select id="offPick"><option value="">— La date de la partie —</option>${offreDates().map(x => `<option value="${x.key}" ${d.offre === x.key ? 'selected' : ''}>${esc(x.label)} (${x.names.length} dispo)</option>`).join('')}</select></label>
-        ${d.offre ? (() => { const nm = (offreDates().find(x => x.key === d.offre) || { names: [] }).names; return `<p class="note">Disponibles : ${esc(nm.join(', ') || 'personne')}${nm.length ? `<br><b>${esc(groupsText(nm.length))}</b>` : ''}</p>`; })() : ''}` : ''}
+        ${d.offre ? (() => { const nm = (offreDates().find(x => x.key === d.offre) || { names: [] }).names; return `<p class="note">Disponibles : ${esc(nm.join(', ') || 'personne')}${nm.length ? `<br><b>${esc(groupsText(nm.length))}</b>` : ''}</p>${nm.length >= 3 ? `<div class="row grp-acts"><span class="note">Former les groupes :</span><button class="btn small" data-sgroups="varier" type="button">Varier les partenaires</button><button class="btn ghost small" data-sgroups="hasard" type="button">Au hasard</button><span class="note">ou choisissez les joueurs ci-dessous (manuel).</span></div>` : ''}`; })() : ''}` : ''}
         ${(S.quatuors || []).length ? `<label>Quatuor<select id="quatPick"><option value="">— Choisir un quatuor (facultatif) —</option>${S.quatuors.map(x => `<option value="${esc(x.id)}">${esc(x.name || x.players.join(', '))}</option>`).join('')}</select></label>` : ''}
         ${d.players.map((p, i) => `
           <div class="prow">
@@ -1539,6 +1546,15 @@
         $('#create').disabled = m.length > 0;
       };
       if ($('#course')) $('#course').onchange = e => { d.courseId = e.target.value; render(); };
+      v.querySelectorAll('[data-sgroups]').forEach(b => b.onclick = async () => {
+        const [oid, dt] = d.offre.split('|'), o = (S.offres || []).find(x => x.id === oid); if (!o) return;
+        await autoQuatuorsSheet(o, +dt, g => {
+          d.players.forEach((p, i) => { p.name = g[i] || ''; p.custom = false; });
+          const me = L.norm(ls.get('pelland.me', '') || ''), r = g.findIndex(n => L.norm(n) === me); if (r >= 0) d.responsable = r;
+          render(); toast('Groupe choisi : entrez les index.');
+        });
+        if (b.dataset.sgroups === 'hasard') { const h = document.querySelector('#sheet [data-gmode="hasard"]'); if (h) h.click(); }
+      });
       v.querySelectorAll('[data-src]').forEach(b => b.onclick = () => { d.src = b.dataset.src; if (d.src === 'libre') d.offre = null; render(); });
       const op = $('#offPick'); if (op) op.onchange = e => { d.offre = e.target.value || null;
         if (d.offre) { const x = offreDates().find(y => y.key === d.offre), ok = (x ? x.names : []).map(L.norm); d.players.forEach(p => { if (p.name && !ok.includes(L.norm(p.name))) { p.name = ''; p.custom = false; } }); }

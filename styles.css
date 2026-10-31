@@ -646,3 +646,4 @@ textarea { font-family: inherit; line-height: 1.4; resize: vertical; }
 .tp-more { margin: 10px 0; } .tp-more summary { cursor: pointer; font-weight: 600; color: var(--green, #1f6b46); padding: 6px 0; }
 .rem-opt { width: 100%; text-align: left; } .rem-opt.on { outline: 2px solid #1f6b46; }
 .src-seg { margin-bottom: 12px; }
+.grp-acts { align-items: center; gap: 8px; margin: 6px 0 10px; } .grp-acts .note { margin: 0; }
