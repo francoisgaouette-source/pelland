@@ -589,7 +589,7 @@
       return `<div class="offre"><div class="offre-h"><b>${esc(o.course)}</b>${o.place ? `<span class="place">${esc(o.place)}</span>` : ''}<small>${past ? 'Réponses fermées' : 'Réponses avant le ' + esc(fmtDay(o.deadline))} · ${reps.length} réponse${reps.length > 1 ? 's' : ''}</small></div>
         ${o.dates.map(dt => { const yes = reps.filter(r => (r.dates || []).includes(dt)).map(r => r.name);
           return `<div class="offre-d"><div><b>${esc(fmtDate(dt))}</b><span>${yes.length ? esc(yes.join(', ')) : 'Personne pour l’instant'}</span>${yes.length ? `<span class="grp">${esc(groupsText(yes.length))}</span>` : ''}</div><span class="cnt ${yes.length >= 4 ? 'ok' : ''}">${yes.length}</span></div>${yes.length >= 3 && canOrganize() ? `<div class="row offre-acts"><button class="btn small" data-oauto="${esc(o.id)}|${dt}" type="button">Quatuors automatiques</button><button class="btn ghost small" data-oquat="${esc(o.id)}|${dt}" type="button">Manuel</button></div>` : ''}`; }).join('')}
-        ${canOrganize() ? '' : '<!--'}<div class="row"><button class="btn ghost small" data-osms="${esc(o.id)}" type="button">Renvoyer le texto</button><button class="btn ghost small" data-odel="${esc(o.id)}" type="button">${S.confirmDelO === o.id ? 'Confirmer' : 'Retirer'}</button></div>${canOrganize() ? '' : '-->'}</div>`; }).join('');
+        ${canOrganize() ? '' : '<!--'}<div class="row"><button class="btn small" data-orem="${esc(o.id)}" type="button">Rappel</button><button class="btn ghost small" data-osms="${esc(o.id)}" type="button">Renvoyer le texto</button><button class="btn ghost small" data-odel="${esc(o.id)}" type="button">${S.confirmDelO === o.id ? 'Confirmer' : 'Retirer'}</button></div>${canOrganize() ? '' : '-->'}</div>`; }).join('');
     const form = f ? `<div class="offre-form">
         <label>Terrain<select id="oCourse">${S.courses.map(c => `<option value="${esc(c.name)}" ${c.name === f.course ? 'selected' : ''}>${esc(c.name)}${c.sim ? ' (simulateur)' : ''}</option>`).join('')}</select></label>
         <label>Lieu (facultatif)<input id="oPlace" type="text" value="${esc(f.place || '')}" placeholder="ex. Golf Simulateur Laval, baies 2 et 3"></label>
@@ -600,6 +600,28 @@
         <div class="row"><button class="btn sms-btn" id="oSend" type="button">Enregistrer et texter les joueurs</button><button class="btn ghost small" id="oCancel" type="button">Annuler</button></div></div>`
       : canOrganize() ? `<button class="btn" id="oNew" type="button">Offrir des parties</button>` : '<p class="note">Seuls le propriétaire et l’organisateur du groupe offrent des parties.</p>';
     return `<section class="card"><h2>Parties offertes</h2><p class="note">Proposez des dates : tous les joueurs reçoivent un texto et indiquent dans l’app les dates où ils sont disponibles, avant la date butoir.</p>${form}${list}</section>`;
+  }
+  // Rappels : à ceux qui n'ont pas répondu, ou aux joueurs disponibles pour une date
+  function reminderSheet(o) {
+    const me = L.norm(ls.get('pelland.me', '') || ''), reps = offreReps(o), answered = new Set(reps.map(r => L.norm(r.name)));
+    const course = o.course.replace(/^Club de golf /i, '') + (o.place ? ' – ' + o.place : ''), link = `${location.origin + location.pathname}?offre=${o.id}`, past = Date.now() > o.deadline;
+    const byNames = names => (S.players || []).filter(p => L.norm(p.name) !== me && names.has(L.norm(p.name)));
+    const noAns = (S.players || []).filter(p => L.norm(p.name) !== me && !answered.has(L.norm(p.name)));
+    const choices = [];
+    if (!past) choices.push({ label: 'Ceux qui n’ont pas encore répondu', ps: noAns, text: `Rappel – ${groupName()} : tu n’as pas encore indiqué tes disponibilités pour les parties à ${course}. Réponds avant le ${fmtDay(o.deadline)} : ${link}` });
+    o.dates.filter(dt => dt > Date.now() - 3600e3).forEach(dt => { const yes = new Set(reps.filter(r => (r.dates || []).includes(dt)).map(r => L.norm(r.name)));
+      if (yes.size) choices.push({ label: `Joueurs du ${fmtDate(dt)}`, ps: byNames(yes), text: `Rappel – ${groupName()} : on joue ${fmtDate(dt)} à ${course}. À bientôt sur le terrain !` }); });
+    const draw = (sh, sel) => {
+      const c = sel != null ? choices[sel] : null;
+      sh.innerHTML = `<h3>Rappel</h3>
+        ${choices.length ? `<div class="list">${choices.map((x, i) => `<button class="item rem-opt ${sel === i ? 'on' : ''}" data-rc="${i}" type="button"><b>${esc(x.label)}</b><span>${x.ps.length} joueur${x.ps.length > 1 ? 's' : ''}${x.ps.length ? ' : ' + esc(x.ps.map(p => p.name.split(' ')[0]).join(', ')) : ''}</span></button>`).join('')}</div>` : '<p class="note">Aucun rappel à envoyer pour l’instant.</p>'}
+        ${c ? `<label>Message<textarea id="rmMsg" rows="4">${esc(c.text)}</textarea></label>${c.ps.some(p => !p.phone) ? `<p class="warn" style="margin:6px 0">Pas de numéro pour ${esc(c.ps.filter(p => !p.phone).map(p => p.name).join(', '))}.</p>` : ''}` : ''}
+        <div class="row"><button class="btn small" id="rmGo" type="button" ${c && c.ps.some(p => p.phone) ? '' : 'disabled'}>Ouvrir Messages${c ? ` (${c.ps.filter(p => p.phone).length})` : ''}</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`;
+      sh.querySelectorAll('[data-rc]').forEach(bt => bt.onclick = () => draw(sh, +bt.dataset.rc));
+      sh.querySelector('[data-close]').onclick = closeSheet;
+      const go = sh.querySelector('#rmGo'); if (go) go.onclick = () => { if (!c) return; const txt = sh.querySelector('#rmMsg').value; closeSheet(); openSms(c.ps.filter(p => p.phone).map(p => p.phone), txt); };
+    };
+    openSheet('', sh => draw(sh, choices.length === 1 ? 0 : null));
   }
   function offreSms(o) {
     const me = L.norm(ls.get('pelland.me', '') || '');
@@ -1321,6 +1343,7 @@
         };
       }
       v.querySelectorAll('[data-osms]').forEach(b => b.onclick = () => offreSms(S.offres.find(o => o.id === b.dataset.osms)));
+      v.querySelectorAll('[data-orem]').forEach(b => b.onclick = () => reminderSheet(S.offres.find(o => o.id === b.dataset.orem)));
       v.querySelectorAll('[data-odel]').forEach(b => b.onclick = async () => {
         if (S.confirmDelO !== b.dataset.odel) { S.confirmDelO = b.dataset.odel; return render(); }
         try { await Store.deleteOffre(b.dataset.odel); S.offres = S.offres.filter(o => o.id !== b.dataset.odel); S.confirmDelO = null; render(); } catch (e) { toast('Retrait impossible : ' + e.message); }
