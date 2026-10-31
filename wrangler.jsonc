@@ -1,0 +1,7 @@
+// Cloudflare (www.fanion.ai) : sert seulement le site web Fanion (dossier site/).
+// L'app Fanion Game reste sur GitHub Pages pour l'instant.
+{
+  "name": "pelland",
+  "compatibility_date": "2026-10-23",
+  "assets": { "directory": "./site", "not_found_handling": "404-page" }
+}
