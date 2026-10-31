@@ -1,4 +1,4 @@
-/* Quatuor — garde l'app sur le téléphone pour qu'elle s'ouvre sans réseau. */
+/* Le 19e — garde l'app sur le téléphone pour qu'elle s'ouvre sans réseau. */
 const V = 'fanion-v2';
 self.addEventListener('install', e => {
   self.skipWaiting();
