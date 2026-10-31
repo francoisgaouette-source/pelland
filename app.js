@@ -1053,6 +1053,68 @@
       </section>
       <p class="note" style="text-align:center">Nouveau groupe d’amis ? <button class="linkbtn" id="newGroup" type="button">Créer un groupe</button></p>`;
   }
+  // ---------- Import de joueurs depuis Excel (ou CSV) : nom + cellulaire ----------
+  function loadXLSX() {
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    return new Promise((ok, ko) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'; sc.onload = () => ok(window.XLSX); sc.onerror = () => ko(new Error('Lecture Excel indisponible (réseau).')); document.head.appendChild(sc); });
+  }
+  const phoneDigits = v => { let d = String(v == null ? '' : v).replace(/\D/g, ''); if (d.length === 11 && d[0] === '1') d = d.slice(1); return d; };
+  // Lignes du tableau → [{ name, phone }] ; trouve les colonnes par leur titre (Nom, Prénom, Cellulaire…) ou prend les deux premières
+  function rowsToPlayers(rows) {
+    rows = rows.filter(r => r && r.some(c => String(c ?? '').trim() !== ''));
+    if (!rows.length) return [];
+    const nrm = x => L.norm(String(x ?? ''));
+    let hi = -1, cName = -1, cFirst = -1, cLast = -1, cPhone = -1;
+    for (let i = 0; i < Math.min(5, rows.length) && hi < 0; i++) {
+      const h = rows[i].map(nrm);
+      const ph = h.findIndex(x => /cell|tel|phone|mobile|portable|numero/.test(x));
+      const fi = h.findIndex(x => /prenom|first/.test(x));
+      const la = h.findIndex((x, j) => j !== fi && /(^| )nom( |$)|famille|last|surname/.test(x));
+      const nm = h.findIndex((x, j) => j !== fi && /nom|name|joueur/.test(x));
+      if (ph >= 0 || nm >= 0 || fi >= 0) { hi = i; cPhone = ph; cFirst = fi; cLast = fi >= 0 ? la : -1; cName = fi >= 0 ? -1 : nm; }
+    }
+    const data = hi >= 0 ? rows.slice(hi + 1) : rows;
+    if (hi < 0 || (cName < 0 && cFirst < 0)) { // pas de titres : la colonne avec des chiffres = téléphone, l'autre = nom
+      const r0 = data[0] || [];
+      cPhone = cPhone >= 0 ? cPhone : r0.findIndex(c => phoneDigits(c).length >= 7);
+      cName = r0.findIndex((c, j) => j !== cPhone && String(c ?? '').trim() && phoneDigits(c).length < 7);
+    }
+    return data.map(r => {
+      const name = (cFirst >= 0 ? [r[cFirst], cLast >= 0 ? r[cLast] : ''] : [r[cName]]).map(x => String(x ?? '').trim()).filter(Boolean).join(' ').replace(/\s+/g, ' ');
+      return { name, phone: cPhone >= 0 ? phoneDigits(r[cPhone]) : '' };
+    }).filter(x => x.name);
+  }
+  async function importPlayersFile(file) {
+    let rows;
+    try {
+      if (/\.csv$/i.test(file.name)) { const t = await file.text(); const sep = (t.split('\n')[0].match(/;/g) || []).length > (t.split('\n')[0].match(/,/g) || []).length ? ';' : ','; rows = t.split(/\r?\n/).map(l => l.split(sep).map(c => c.replace(/^"|"$/g, ''))); }
+      else { const X = await loadXLSX(); const wb = X.read(await file.arrayBuffer(), { type: 'array' }); rows = X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' }); }
+    } catch (e) { return toast('Fichier illisible : ' + e.message); }
+    const list = rowsToPlayers(rows);
+    if (!list.length) return toast('Aucun nom trouvé dans le fichier.');
+    const seen = new Set(S.players.map(p => L.norm(p.name)));
+    const items = list.map(x => { const dup = seen.has(L.norm(x.name)); seen.add(L.norm(x.name)); const bad = x.phone && x.phone.length !== 10; return { ...x, dup, bad, on: !dup && !bad }; });
+    const draw = sh => {
+      const n = items.filter(x => x.on).length;
+      sh.innerHTML = `<h3>Importer des joueurs</h3><p class="note">${items.length} ligne${items.length > 1 ? 's' : ''} lue${items.length > 1 ? 's' : ''} dans « ${esc(file.name)} ». Décochez ceux à ne pas ajouter.</p>
+        <div class="imp-list">${items.map((x, i) => `<label class="imp-row ${x.dup || x.bad ? 'warnrow' : ''}"><input type="checkbox" data-imp="${i}" ${x.on ? 'checked' : ''} ${x.dup ? 'disabled' : ''}><span><b>${esc(x.name)}</b><small>${x.phone ? esc(fmtPhone(x.phone)) : 'Pas de numéro'}${x.dup ? ' · déjà dans le groupe' : x.bad ? ' · numéro à vérifier' : ''}</small></span></label>`).join('')}</div>
+        <p class="note">Le cellulaire sert de mot de passe. Les invitations par texto s’envoient ensuite depuis la liste, avec le bouton ☎ de chaque joueur.</p>
+        <div class="row"><button class="btn small" id="impGo" type="button" ${n ? '' : 'disabled'}>Importer (${n})</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`;
+      sh.querySelectorAll('[data-imp]').forEach(c => c.onchange = () => { items[+c.dataset.imp].on = c.checked; draw(sh); });
+      sh.querySelector('[data-close]').onclick = closeSheet;
+      sh.querySelector('#impGo').onclick = async () => {
+        const todo = items.filter(x => x.on); let ok = 0, phErr = 0;
+        const btn = sh.querySelector('#impGo'); btn.disabled = true;
+        for (const x of todo) {
+          btn.textContent = `Ajout… ${ok + 1}/${todo.length}`;
+          try { const np = await Store.savePlayer(x.name); ok++; if (x.phone && x.phone.length >= 10) { try { await Store.setPhone(np, x.phone); } catch (e) { phErr++; } } } catch (e) { }
+        }
+        S.players = await Store.listPlayers(); closeSheet(); render();
+        toast(`${ok} joueur${ok > 1 ? 's' : ''} ajouté${ok > 1 ? 's' : ''}${phErr ? ` · ${phErr} numéro${phErr > 1 ? 's' : ''} à refaire` : ''}.`);
+      };
+    };
+    openSheet('', sh => draw(sh));
+  }
   // Peut être retiré en lot : ni le propriétaire, ni soi-même
   const canRemove = p => p.id !== ownerId() && p.id !== meId();
   function vPlayers() {
@@ -1060,6 +1122,7 @@
     return `<section class="card"><h2>Ajouter un joueur</h2>
         <input id="newPlayer" type="text" placeholder="Prénom et nom" autocapitalize="words">
         <div class="row" style="flex-wrap:nowrap"><input id="newPhone" type="tel" inputmode="tel" placeholder="Téléphone (sert de mot de passe)" style="flex:1;min-width:0"><button class="btn small" id="addPlayer" type="button">Ajouter</button></div>
+        ${canOrganize() ? `<div class="import-row"><label class="btn ghost small" for="xlsFile">Importer un fichier Excel</label><input id="xlsFile" type="file" accept=".xlsx,.xls,.csv,.ods" hidden><span class="note">Deux colonnes : le nom et le cellulaire.</span></div>` : ''}
         </section>
       ${(() => { const dups = duplicateMap(S.players); const nd = Object.keys(dups).length; return nd ? `<div class="warn">${nd} joueurs semblent en double. Vérifiez les noms marqués « Doublon ? » et retirez celui de trop.</div>` : ''; })()}
       ${!ownerId() && S.players.length ? `<div class="warn">Le groupe n’a pas encore de propriétaire (la personne qui l’administre et paie l’abonnement). <button class="linkbtn" id="claimOwner" type="button">C’est moi</button></div>` : ''}
@@ -1307,6 +1370,7 @@
         catch (e) { toast('Ajout impossible : ' + e.message); }
       };
       $('#addPlayer').onclick = add;
+      const xf = $('#xlsFile'); if (xf) xf.onchange = async () => { const f = xf.files[0]; xf.value = ''; if (f) importPlayersFile(f); };
       $('#newPlayer').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); add(); } };
       v.querySelectorAll('[data-askdel]').forEach(b => b.onclick = () => { S.confirmDel = b.dataset.askdel; render(); });
       v.querySelectorAll('[data-phone]').forEach(b => b.onclick = () => {
