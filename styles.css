@@ -627,3 +627,10 @@ label.check input { width: 22px; height: 22px; }
 .mbox .mbox-sub { align-self: center; text-align: center; font-size: 12px; opacity: .8; margin-top: -2px; }
 .money-boxes.editable { cursor: pointer; }
 textarea { font-family: inherit; line-height: 1.4; resize: vertical; }
+.pl-head { justify-content: space-between; align-items: center; }
+.pl-head .pl-count { margin: 0; }
+.sel-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; background: var(--card, #fff); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 8px 0; }
+.sel-bar .note { margin: 0; }
+.sel-row { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.sel-row input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--green, #1f6b46); flex: none; }
+.sel-lock { width: 22px; text-align: center; color: var(--muted, #8a948e); flex: none; }
