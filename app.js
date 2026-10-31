@@ -426,7 +426,7 @@
     bind[S.view] && bind[S.view](v);
   }
 
-  const APP = 'Fanion Game';
+  const APP = 'Quatuor';
   function curGroup() { return (S.groups || []).find(x => x.id === Store.gid) || { id: Store.gid, name: 'La gang à Pelland' }; }
   function groupName() { return curGroup().name; }
   const ownerId = () => curGroup().owner || null;
@@ -522,7 +522,7 @@
         <div class="seg"><button type="button" data-web="1" aria-pressed="${st.web === true}"><b>Oui</b><small>Je donne l’adresse</small></button><button type="button" data-web="0" aria-pressed="${st.web === false}"><b>Non</b><small>Je l’explique</small></button></div>
         ${st.web === true ? `<label>Où ? Adresse de la page (lien)<input id="ngUrl" type="url" inputmode="url" placeholder="https://…" value="${esc(st.url || '')}"></label>` : ''}
         ${st.web === false ? `<label>Expliquez le jeu que vous voulez créer<textarea id="ngTxt" rows="7" placeholder="Combien de joueurs ? En équipes ou chacun pour soi ? Comment on gagne des points à chaque trou ? Comment l’argent se compte ?">${esc(st.txt || '')}</textarea></label>` : ''}
-        ${st.web != null ? '<p class="note">Nous ajoutons le jeu à Fanion Game et vous avisons dès qu’il est prêt.</p>' : ''}
+        ${st.web != null ? '<p class="note">Nous ajoutons le jeu à Quatuor et vous avisons dès qu’il est prêt.</p>' : ''}
         <div class="row"><button class="btn small" id="ngSend" type="button" ${st.web == null ? 'disabled' : ''}>Envoyer</button><button class="btn ghost small" data-close type="button">Annuler</button></div>
         <p class="note" style="margin-top:10px">Vous savez déjà comment le compter ? <button class="linkbtn" id="ngSelf" type="button">Le créer moi-même</button></p>`;
       const keep = () => { const n = sh.querySelector('#ngName'), u = sh.querySelector('#ngUrl'), t = sh.querySelector('#ngTxt'); if (n) st.name = n.value; if (u) st.url = u.value; if (t) st.txt = t.value; };
@@ -536,9 +536,9 @@
         if (!st.web && String(st.txt || '').trim().length < 20) return toast('Expliquez le jeu en quelques phrases.');
         const req = { name: st.name.trim(), url: st.web ? st.url.trim() : '', text: st.web ? '' : st.txt.trim(), group: groupName(), groupId: Store.gid, by: ls.get('pelland.me', '') || '', at: Date.now() };
         try { await Store.saveGameRequest(req); } catch (e) { }
-        const body = `Nouveau jeu demandé pour Fanion Game\n\nGroupe : ${req.group}\nDemandé par : ${req.by}\nJeu : ${req.name}\n` + (req.url ? `Règles sur le web : ${req.url}\n` : `Explication :\n${req.text}\n`);
+        const body = `Nouveau jeu demandé pour Quatuor\n\nGroupe : ${req.group}\nDemandé par : ${req.by}\nJeu : ${req.name}\n` + (req.url ? `Règles sur le web : ${req.url}\n` : `Explication :\n${req.text}\n`);
         closeSheet(); toast('Demande envoyée. Merci !');
-        location.href = 'mailto:bonjour@fanion.ai?subject=' + encodeURIComponent('Fanion Game – Ajouter un jeu : ' + req.name) + '&body=' + encodeURIComponent(body);
+        location.href = 'mailto:bonjour@fanion.ai?subject=' + encodeURIComponent('Quatuor – Ajouter un jeu : ' + req.name) + '&body=' + encodeURIComponent(body);
       };
     };
     openSheet('', sh => draw(sh));
