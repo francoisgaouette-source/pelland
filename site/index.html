@@ -67,25 +67,28 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 }
 
 /* Bandeau de pointage : le motif de la carte de golf */
-.strip { background: var(--fairway); color: var(--white); }
-.strip .wrap { display: grid; grid-template-columns: repeat(10, 1fr); padding-top: 0; padding-bottom: 0; }
-.strip button { all: unset; box-sizing: border-box; cursor: pointer; border-left: 1px solid rgba(255,255,255,.22); padding: 10px 0 12px 10px; font-family: var(--display); font-weight: 600; font-size: 15px; line-height: 1.2; color: var(--white); }
-.strip button:last-child { border-right: 1px solid rgba(255,255,255,.22); }
-.strip button:hover, .strip button[aria-expanded="true"] { background: var(--pine-2); }
-.strip button[aria-expanded="true"] b { color: var(--flag); }
-.strip button:focus-visible { outline: 3px solid var(--flag); outline-offset: -3px; }
-.strip b { display: block; font-size: 28px; font-weight: 800; }
-.step-panels { background: var(--pine-2); color: #e6ece8; }
-.step-panel { padding: 24px 0 28px; display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 32px; align-items: center; max-width: 900px; }
+.strip { background: var(--mist); padding: 34px 0 6px; }
+.strip-title { font-family: var(--display); font-weight: 700; font-size: 15px; letter-spacing: .12em; text-transform: uppercase; color: var(--pencil); margin: 0 0 18px; }
+.strip .wrap[role=tablist] { display: grid; grid-template-columns: repeat(10, 1fr); position: relative; padding-top: 0; padding-bottom: 8px; }
+.strip .wrap[role=tablist]::before { content: ''; position: absolute; left: calc(24px + 5%); right: calc(24px + 5%); top: 27px; border-top: 3px dashed #b9c9bd; z-index: 0; }
+.strip button { all: unset; box-sizing: border-box; cursor: pointer; position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 0 4px 10px; text-align: center; font-family: var(--display); font-weight: 600; font-size: 15px; line-height: 1.15; color: var(--ink); }
+.strip b { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--white); border: 2.5px solid var(--fairway); color: var(--fairway); font-size: 24px; font-weight: 800; box-shadow: 0 4px 12px rgba(20,35,27,.12); transition: transform .15s, background .15s, color .15s; }
+.strip button:hover b { transform: translateY(-3px); background: var(--fairway); color: var(--white); }
+.strip button[aria-expanded="true"] b { background: var(--flag); border-color: var(--flag); color: var(--pine); transform: translateY(-3px) scale(1.06); }
+.strip button[aria-expanded="true"] { color: var(--pine); }
+.strip button:focus-visible b { outline: 3px solid var(--flag); outline-offset: 3px; }
+.step-panels { background: var(--mist); padding-bottom: 30px; }
+.step-panels .wrap > .step-panel { background: var(--pine); color: #e6ece8; border-radius: 22px; padding: 28px 32px; max-width: none; }
+.step-panel { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 32px; align-items: center; max-width: 900px; }
 .step-panel[hidden] { display: none; }
 .sp-shot { width: 240px; height: auto; border-radius: 22px; border: 6px solid #0c1611; box-shadow: 0 12px 30px rgba(0,0,0,.35); background: #fff; }
 @media (max-width: 760px) { .step-panel { grid-template-columns: 1fr; gap: 18px; } .sp-shot { width: 220px; justify-self: center; } }
-.step-hint { margin: 0; padding: 8px 0; font-size: 14px; color: #a9bab0; }
+.step-hint { margin: 0; padding: 4px 0 0; font-size: 15px; color: var(--pencil); text-align: center; }
 .step-panel h3 { font-family: var(--display); font-size: 28px; margin: 0 0 6px; color: var(--white); display: flex; align-items: baseline; gap: 12px; }
 .step-panel h3 span { color: var(--flag); font-size: 34px; font-weight: 800; }
 .step-panel p { margin: 0 0 10px; font-size: 18px; }
 .step-panel a { color: var(--flag); font-weight: 600; }
-@media (max-width: 760px) { .strip .wrap { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 30%; overflow-x: auto; scroll-snap-type: x mandatory; } .strip button { scroll-snap-align: start; } }
+@media (max-width: 760px) { .strip .wrap[role=tablist] { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 84px; overflow-x: auto; scroll-snap-type: x mandatory; padding-top: 8px; } .strip .wrap[role=tablist]::before { left: 66px; right: auto; width: 760px; } .strip button { scroll-snap-align: start; } .step-panels .wrap > .step-panel { padding: 22px 20px; } }
 
 /* Sections */
 section { padding: 88px 0; }
@@ -197,6 +200,7 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
 </div>
 
 <div class="strip">
+  <div class="wrap strip-head"><p class="strip-title">De l’invitation au 19e, en 10 trous</p></div>
   <div class="wrap" role="tablist" aria-label="Les 10 étapes">
     <button type="button" data-step="0" aria-expanded="false"><b>1</b>Terrain</button><button type="button" data-step="1" aria-expanded="false"><b>2</b>Dates</button><button type="button" data-step="2" aria-expanded="false"><b>3</b>Dispos</button><button type="button" data-step="3" aria-expanded="false"><b>4</b>Quatuors</button><button type="button" data-step="4" aria-expanded="false"><b>5</b>Départ</button><button type="button" data-step="5" aria-expanded="false"><b>6</b>Scores</button><button type="button" data-step="6" aria-expanded="false"><b>7</b>Points</button><button type="button" data-step="7" aria-expanded="false"><b>8</b>Skins</button><button type="button" data-step="8" aria-expanded="false"><b>9</b>Revirements</button><button type="button" data-step="9" aria-expanded="false"><b>10</b>Qui doit quoi</button>
   </div>
