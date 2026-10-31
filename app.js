@@ -743,7 +743,7 @@
   function syncCount(d) { d.count = filledIdx(d).length === 3 ? 3 : 4; return d.count; }
   function missingList(d) {
     const out = [], idx = filledIdx(d);
-    if (offreDates().length && !d.offre) return ['la date de la partie'];
+    if (useOffres(d) && !d.offre) return ['la date de la partie'];
     if (idx.length < 3) d.players.forEach((p, i) => { if (i < 3 && !String(p.name || '').trim()) out.push(`le nom du joueur ${i + 1}`); });
     idx.forEach(i => { const p = d.players[i];
       if (!String(p.index).trim()) out.push(`l'index de ${p.name.trim()}`);
@@ -781,7 +781,8 @@
       </section>
       <section class="card">
         <div class="step">2 à 5 · Joueurs, responsable, index, tertre</div>
-        ${offreDates().length ? `<label>Choisir parmi ceux qui ont répondu pour cette partie<select id="offPick"><option value="">— La date de la partie —</option>${offreDates().map(x => `<option value="${x.key}" ${d.offre === x.key ? 'selected' : ''}>${esc(x.label)} (${x.names.length} dispo)</option>`).join('')}</select></label>
+        ${offreDates().length ? `<div class="seg src-seg"><button type="button" data-src="offre" aria-pressed="${useOffres(d)}"><b>Ceux qui ont répondu</b><small>À une date offerte</small></button><button type="button" data-src="libre" aria-pressed="${!useOffres(d)}"><b>Tous les joueurs</b><small>Partie libre</small></button></div>` : ''}
+        ${useOffres(d) ? `<label>Choisir parmi ceux qui ont répondu pour cette partie<select id="offPick"><option value="">— La date de la partie —</option>${offreDates().map(x => `<option value="${x.key}" ${d.offre === x.key ? 'selected' : ''}>${esc(x.label)} (${x.names.length} dispo)</option>`).join('')}</select></label>
         ${d.offre ? (() => { const nm = (offreDates().find(x => x.key === d.offre) || { names: [] }).names; return `<p class="note">Disponibles : ${esc(nm.join(', ') || 'personne')}${nm.length ? `<br><b>${esc(groupsText(nm.length))}</b>` : ''}</p>`; })() : ''}` : ''}
         ${(S.quatuors || []).length ? `<label>Quatuor<select id="quatPick"><option value="">— Choisir un quatuor (facultatif) —</option>${S.quatuors.map(x => `<option value="${esc(x.id)}">${esc(x.name || x.players.join(', '))}</option>`).join('')}</select></label>` : ''}
         ${d.players.map((p, i) => `
@@ -835,10 +836,12 @@
   }
   // Noms de la bibliothèque pas encore choisis dans les autres cases
   // Menu déroulant des joueurs de la bibliothèque (sans ceux déjà choisis) + « Autre… » pour taper un nom
+  // Nouvelle partie : à partir des réponses aux dates offertes, ou partie libre avec tous les joueurs
+  const useOffres = d => offreDates().length > 0 && d.src !== 'libre';
   function playerPicker(d, i) {
     const p = d.players[i];
     const inLib = S.players.some(x => L.norm(x.name) === L.norm(p.name || ''));
-    const needDate = offreDates().length > 0, custom = !S.players.length;
+    const needDate = useOffres(d), custom = !S.players.length;
     const taken = d.players.map((q, j) => j !== i ? L.norm(q.name || '') : '').filter(Boolean);
     const dispo = d.offre ? ((offreDates().find(x => x.key === d.offre) || {}).names || []).map(L.norm) : null;
     if (needDate && !d.offre) return `<select id="ps${i}" disabled><option>— Choisissez d’abord la date —</option></select>`;
@@ -1536,6 +1539,7 @@
         $('#create').disabled = m.length > 0;
       };
       if ($('#course')) $('#course').onchange = e => { d.courseId = e.target.value; render(); };
+      v.querySelectorAll('[data-src]').forEach(b => b.onclick = () => { d.src = b.dataset.src; if (d.src === 'libre') d.offre = null; render(); });
       const op = $('#offPick'); if (op) op.onchange = e => { d.offre = e.target.value || null;
         if (d.offre) { const x = offreDates().find(y => y.key === d.offre), ok = (x ? x.names : []).map(L.norm); d.players.forEach(p => { if (p.name && !ok.includes(L.norm(p.name))) { p.name = ''; p.custom = false; } }); }
         render(); };
