@@ -795,7 +795,7 @@
       ${!teamsUsed ? '' : `<section class="card">
         <div class="step">6 · Équipes ${info('equipes')}</div>
         <div class="seg">
-          <button type="button" data-tmode="auto" aria-pressed="${d.teamMode === 'auto'}"><b>Meilleur avec le moins bon</b><small>Les deux du milieu ensemble</small></button>
+          <button type="button" data-tmode="auto" aria-pressed="${d.teamMode === 'auto'}"><b>Meilleur + Pire</b><small>Les deux du milieu ensemble</small></button>
           <button type="button" data-tmode="manual" aria-pressed="${d.teamMode === 'manual'}"><b>Je choisis</b><small>Qui joue avec qui</small></button>
         </div>
         ${d.teamMode === 'manual' ? `<label>Partenaire de ${esc(d.players[0].name || 'joueur 1')}<select id="partner">${[1, 2, 3].map(i => `<option value="${i}" ${d.teams && d.teams[0].includes(i) ? 'selected' : ''}>${esc(d.players[i].name || 'Joueur ' + (i + 1))}</option>`).join('')}</select></label>` : ''}
