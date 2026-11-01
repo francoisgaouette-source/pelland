@@ -96,6 +96,7 @@
       }
       this.needLogin = false;
       ls.set('pelland.me', player.name);
+      this.rememberGroup(player.groupId || 'pelland', null, player.id, player.name);
       await this.ensureSeed();
     },
     async logout() { try { await firebase.auth().signOut(); } catch (e) { } ls.set('pelland.me', null); location.reload(); },
@@ -181,6 +182,30 @@
       if (this.mode === 'firebase') { await this.db.collection('players').doc('_groupe_' + gr.id).set(gr); return; }
       const all = ls.get('pelland.groups', {}); all[gr.id] = gr; ls.set('pelland.groups', all);
     },
+    // Mes groupes (sur ce téléphone) : un joueur peut faire partie de plusieurs groupes, un compte par groupe
+    myGroups() { return ls.get('pelland.mygroups', []); },
+    rememberGroup(gid, name, playerId, playerName, owner) {
+      if (!gid || !playerId) return;
+      const all = this.myGroups(), old = all.find(x => x.gid === gid) || {}, l = all.filter(x => x.gid !== gid);
+      l.unshift({ gid, name: name || old.name || gid, playerId, playerName: playerName || '', owner: !!(owner || old.owner) });
+      ls.set('pelland.mygroups', l.slice(0, 12));
+    },
+    async switchGroup(entry, phone) {
+      const digits = String(phone || '').replace(/\D/g, '');
+      if (digits.length < 7) throw new Error('Entrez votre numéro de téléphone (10 chiffres).');
+      if (this.mode === 'firebase') {
+        const d = await this.db.collection('players').doc(entry.playerId).get();
+        if (!d.exists) throw new Error('Vous ne faites plus partie de ce groupe.');
+        const pl = { ...d.data(), id: d.id };
+        if (!pl.authEmail) throw new Error('Votre téléphone n’est pas encore enregistré dans ce groupe.');
+        try { await firebase.auth().signOut(); } catch (e) { }
+        try { const c = await firebase.auth().signInWithEmailAndPassword(pl.authEmail, digits); this.uid = c.user.uid; this.email = c.user.email; }
+        catch (e) { throw new Error('Numéro de téléphone incorrect pour ce groupe.'); }
+        await this.ensureMember(pl);
+        ls.set('pelland.me', pl.name);
+      } else ls.set('pelland.me', entry.playerName || ls.get('pelland.me', ''));
+      this.setGroup(entry.gid);
+    },
     // Nouveau groupe : crée le compte du premier membre, le groupe et le joueur
     async createGroup(groupName, name, phone) {
       const digits = String(phone || '').replace(/\D/g, '');
@@ -199,6 +224,7 @@
         await this.savePhone(pid, digits, false, gr.id);
       } else { await this.saveGroup(gr); const list = ls.get('pelland.players', []); list.push({ id: pid, name: name.trim(), groupId: gr.id, phone: digits, phoneHint: digits.slice(-2), authEmail: 'local' }); ls.set('pelland.players', list); }
       this.setGroup(gr.id); this.needLogin = false; ls.set('pelland.me', name.trim());
+      this.rememberGroup(gr.id, gr.name, pid, name.trim(), true);
       await this.ensureSeed();
       return gr;
     },
@@ -467,7 +493,7 @@
     const info = ls.get('pelland.lastGameInfo', null);
     const lastDate = info && info.id === last && info.createdAt ? new Date(info.createdAt).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' }) : null;
     return `
-      <div class="hero"><h1>${esc(groupName())}${canOrganize() ? ' <button class="hero-edit" id="renameGroup" type="button" aria-label="Modifier le nom du groupe">Modifier</button>' : ''}</h1><p>${APP} · le golf entre amis</p></div>
+      <div class="hero"><h1>${esc(groupName())}${canOrganize() ? ' <button class="hero-edit" id="renameGroup" type="button" aria-label="Modifier le nom du groupe">Modifier</button>' : ''}</h1><p>${APP} · le golf entre amis${Store.myGroups().length > 1 ? ' · <button class="linkbtn" id="switchGroup" type="button">Changer de groupe</button>' : ''}</p></div>
       <div class="tiles">
         <button class="tile" data-go="courses"><span class="pin">⛳</span><div><strong>Terrains</strong><span>Ajouter ou corriger un terrain</span></div></button>
         <button class="tile" data-go="players"><span class="pin"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M15.5 2.5 9 17.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M9 17.2c-.4 1.2-1.6 2.2-3.4 2.4l-2.1.2c-.6.1-.9.7-.6 1.2.2.3.5.5.9.5h4.6c1.6 0 2.7-.9 3.1-2.2l.3-.9" fill="currentColor"/><circle cx="18.5" cy="19.5" r="1.8" fill="currentColor"/></svg></span><div><strong>Joueurs</strong><span>Ajouter ou retirer des joueurs</span></div></button>
@@ -477,10 +503,67 @@
         <button class="tile" data-go="live"><span class="pin">⏵</span><div><strong>Parties en cours</strong><span>Les parties qui ont lieu en ce moment</span></div></button>
         <button class="tile" data-go="history"><span class="pin">≡</span><div><strong>Parties jouées</strong><span>Les parties terminées</span></div></button>
       </div>
+      ${viralCard('home')}
       ${Store.mode === 'firebase' && Store.email ? `<p class="note">Connecté : <b>${esc(ls.get('pelland.me', '') || '')}</b> · <button class="linkbtn" id="logout" type="button">Se déconnecter</button></p>` : ''}
       <p class="note">${Store.mode === 'firebase' ? 'Base partagée active : les autres joueurs suivent la partie en direct dans Parties en cours.' : 'Mode local : les parties restent sur ce téléphone.'}</p>
       ${Store.mode === 'local' && Store.error ? `<div class="warn"><b>Pourquoi le mode local :</b> ${esc(Store.error)}</div>` : ''}`;
   }
+
+  // ---------------- Effet viral : chaque joueur invité peut lancer son propre groupe, gratuit ----------------
+  // Montré aux membres qui ne sont pas propriétaires d'un groupe (à l'accueil, et à la fin d'une partie).
+  function ownsAGroup() { const me = meId(); return (!!me && me === ownerId()) || Store.myGroups().some(x => x.owner); }
+  function viralCard(where) {
+    if (ownsAGroup() || Store.needLogin) return '';
+    if (where === 'home' && (ls.get('pelland.viral.hide', 0) || 0) > Date.now()) return '';
+    return `<section class="card viral"><div class="viral-flag" aria-hidden="true"><svg width="22" height="26" viewBox="0 0 26 30"><path d="M5 2v26" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M6 3l15 5.5L6 14z" fill="#e3a90b"/></svg></div>
+      <div><h3>Vous aussi, organisez votre gang</h3>
+      <p>Créez votre propre groupe en une minute : invitations par texto, quatuors, pointage et argent calculés. <b>Gratuit pour 4 joueurs.</b></p>
+      <div class="row"><button class="btn small" data-viral type="button">Créer mon groupe</button>${where === 'home' ? '<button class="btn ghost small" data-viralhide type="button">Plus tard</button>' : ''}</div>
+      <p class="note">Vous restez dans « ${esc(groupName())} » : passez d’un groupe à l’autre à l’accueil.</p></div></section>`;
+  }
+  function myPhone() { const me = (S.players || []).find(p => p.id === meId()); return (me && me.phone) || ''; }
+  function newGroupSheet() {
+    rememberCurrent();
+    openSheet(`<h3>Créer mon groupe</h3>
+      <label>Nom du groupe<input id="vgName" type="text" autocapitalize="sentences" placeholder="ex. Les lève-tôt du samedi"></label>
+      <label>Votre prénom et nom<input id="vgMe" type="text" autocapitalize="words" value="${esc(ls.get('pelland.me', '') || '')}"></label>
+      <label>Votre numéro de téléphone<input id="vgPhone" type="tel" inputmode="tel" value="${esc(myPhone() ? fmtPhone(myPhone()) : '')}" placeholder="450 555-1234"></label>
+      <p class="note" id="vgMsg">Vous en serez le propriétaire. Ajoutez ensuite vos joueurs dans Joueurs : ils reçoivent l’invitation par texto. Gratuit jusqu’à 4 joueurs.</p>
+      <div class="row"><button class="btn small" id="vgGo" type="button">Créer le groupe</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`, sh => {
+      sh.querySelector('[data-close]').onclick = closeSheet;
+      const b = sh.querySelector('#vgGo');
+      b.onclick = async () => {
+        const msg = sh.querySelector('#vgMsg'); b.disabled = true; msg.textContent = 'Création…';
+        try { await Store.createGroup(sh.querySelector('#vgName').value, sh.querySelector('#vgMe').value, sh.querySelector('#vgPhone').value); ls.set('pelland.lastGame', null); location.href = location.pathname; }
+        catch (e) { msg.textContent = e.message; b.disabled = false; }
+      };
+      setTimeout(() => { const i = sh.querySelector('#vgName'); if (i) i.focus(); }, 50);
+    });
+  }
+  function rememberCurrent() { if (!Store.needLogin && meId()) Store.rememberGroup(Store.gid, groupName(), meId(), ls.get('pelland.me', ''), meId() === ownerId()); }
+  function switchGroupSheet() {
+    rememberCurrent();
+    const l = Store.myGroups();
+    openSheet(`<h3>Mes groupes</h3>
+      <div class="pick-list">${l.map((x, i) => `<button class="btn ${x.gid === Store.gid ? '' : 'ghost'} small" data-gsw="${i}" type="button" ${x.gid === Store.gid ? 'disabled' : ''}>${esc(x.name)}${x.gid === Store.gid ? ' · actuel' : ''}</button>`).join('')}</div>
+      <label>Votre numéro de téléphone<input id="gswPhone" type="tel" inputmode="tel" value="${esc(myPhone() ? fmtPhone(myPhone()) : '')}" placeholder="450 555-1234"></label>
+      <p class="note" id="gswMsg">Votre numéro sert de mot de passe dans chaque groupe.</p>
+      <div class="row"><button class="btn ghost small" data-viral type="button">Créer un autre groupe</button><button class="btn ghost small" data-close type="button">Fermer</button></div>`, sh => {
+      sh.querySelector('[data-close]').onclick = closeSheet;
+      sh.querySelectorAll('[data-gsw]').forEach(b => b.onclick = async () => {
+        const msg = sh.querySelector('#gswMsg'); msg.textContent = 'Connexion…';
+        try { await Store.switchGroup(l[+b.dataset.gsw], sh.querySelector('#gswPhone').value); ls.set('pelland.lastGame', null); location.href = location.pathname; }
+        catch (e) { msg.textContent = e.message; }
+      });
+    });
+  }
+  document.addEventListener('click', e => {
+    const t = e.target.closest && e.target.closest('[data-viral],[data-viralhide],#switchGroup'); if (!t) return;
+    e.preventDefault();
+    if (t.id === 'switchGroup') return switchGroupSheet();
+    if (t.hasAttribute('data-viralhide')) { ls.set('pelland.viral.hide', Date.now() + 30 * 864e5); return render(); }
+    closeSheet(); setTimeout(newGroupSheet, 30);
+  });
 
   // ---------------- Petit « i » d'explication ----------------
   const info = key => `<button type="button" class="info" data-info="${key}" aria-label="Explication">i</button>`;
@@ -1049,6 +1132,7 @@
         <tbody>${scoreRows(g, row, sumRow)}</tbody>
       </table></div>
       <button class="btn sms-btn" data-sms type="button">Texto aux joueurs</button>
+      ${g.status === 'terminée' ? viralCard('game') : ''}
         ${owner ? `<div class="row game-actions bottom-actions">${g.status === 'terminée'
           ? '<span class="note">Partie terminée.</span><button class="btn ghost small" data-reopen type="button">Rouvrir</button>'
           : '<button class="btn small" data-finish type="button">Terminer la partie</button>'}
@@ -1494,6 +1578,7 @@
     },
     home(v) {
       commonNav(v); const lo = $('#logout'); if (lo) lo.onclick = () => Store.logout();
+      rememberCurrent();
       const rg = $('#renameGroup'); if (rg) rg.onclick = () => openSheet(`<h3>Nom du groupe</h3>
           <label>Nom<input id="gnIn" type="text" autocapitalize="sentences" value="${esc(groupName())}"></label>
           <p class="note">Le nom paraît en haut de l’accueil et dans les textos envoyés aux joueurs.</p>
@@ -2062,6 +2147,7 @@
         <tr class="sum"><td colspan="3">${f === 'skins' ? 'Skins' : f === 'neuf' || f === 'wolf' ? 'Points' : 'Trous'}</td>${pts.map(x => `<td>${(x > 0 && f !== 'neuf' ? '+' : '') + fmtPts(x)}</td>`).join('')}</tr></tbody>
       </table></div>
       <button class="btn sms-btn" data-sms type="button">Texto aux joueurs</button>
+      ${g.status === 'terminée' ? viralCard('game') : ''}
       ${owner ? `<div class="row game-actions bottom-actions">${g.status === 'terminée'
         ? '<span class="note">Partie terminée.</span><button class="btn ghost small" data-reopen type="button">Rouvrir</button>'
         : '<button class="btn small" data-finish type="button">Terminer la partie</button>'}

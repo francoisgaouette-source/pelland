@@ -647,3 +647,7 @@ textarea { font-family: inherit; line-height: 1.4; resize: vertical; }
 .rem-opt { width: 100%; text-align: left; } .rem-opt.on { outline: 2px solid #1f6b46; }
 .src-seg { margin-bottom: 12px; }
 .grp-acts { align-items: center; gap: 8px; margin: 6px 0 10px; } .grp-acts .note { margin: 0; }
+.viral { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; background: linear-gradient(135deg, #f4f1e4, #fbf8ee); border: 1px solid #e6dcb8; margin-top: 14px; }
+.viral-flag { width: 40px; height: 40px; border-radius: 50%; background: #1f6b46; color: #fff; display: grid; place-items: center; }
+.viral h3 { margin: 2px 0 4px; } .viral p { margin: 0 0 10px; } .viral .row { gap: 8px; } .viral .note { margin: 8px 0 0; font-size: 13px; }
+.pick-list { display: grid; gap: 8px; margin: 8px 0 12px; } .pick-list .btn { width: 100%; text-align: left; }
