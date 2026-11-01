@@ -1,39 +1,112 @@
 rules_version = '2';
-// Règles de sécurité Firestore pour Pelland.
-// - Seuls les joueurs connectés avec leur nom et leur téléphone (compte « Email/Password ») ont accès.
-// - La liste des noms des joueurs est lisible pour afficher l'écran de connexion (aucun téléphone n'y est stocké).
-// - Seul le responsable qui a créé une partie peut la modifier ou l'effacer.
+// Règles de sécurité Firestore — Le 19e (Fanion).
+// Principe : chaque membre ne voit et ne modifie que les données de SON groupe.
+// - Un membre = un compte « courriel / mot de passe » relié à son joueur par auth/{uid} = { playerId, groupId }.
+//   Ce lien est vérifié : le courriel du compte doit être celui inscrit sur la fiche du joueur.
+// - La liste des noms (collection players) reste lisible pour l'écran de connexion ; aucun numéro n'y est stocké.
+// - Les terrains sont communs à tous les groupes.
 service cloud.firestore {
   match /databases/{database}/documents {
+
     function membre() {
       return request.auth != null && request.auth.token.firebase.sign_in_provider == 'password';
     }
-    match /players/{playerId} {
+    function lien() {
+      return get(/databases/$(database)/documents/auth/$(request.auth.uid)).data;
+    }
+    // Le membre connecté fait partie du groupe g
+    function dansGroupe(g) {
+      return membre() && exists(/databases/$(database)/documents/auth/$(request.auth.uid)) && lien().groupId == g;
+    }
+    function joueur(id) {
+      return get(/databases/$(database)/documents/players/$(id)).data;
+    }
+    function groupeDe(data) {
+      return data.get('groupId', 'pelland');
+    }
+
+    // ---------- Lien compte → joueur → groupe ----------
+    match /auth/{uid} {
+      allow read: if membre() && request.auth.uid == uid;
+      allow create, update: if membre() && request.auth.uid == uid
+        && joueur(request.resource.data.playerId).get('authEmail', '') == request.auth.token.email
+        && request.resource.data.groupId == groupeDe(joueur(request.resource.data.playerId));
+      allow delete: if false;
+    }
+
+    // ---------- Joueurs et documents du groupe ----------
+    match /players/{id} {
       allow read: if true;
-      allow create, delete: if membre();
-      // le premier membre enregistre son propre compte au moment de sa première connexion
-      allow update: if membre();
+
+      // Fiche d'un joueur (identifiant sans « _ »)
+      allow create: if membre() && !id.matches('_.*') && (
+          dansGroupe(request.resource.data.groupId)
+          // fondateur d'un nouveau groupe : c'est lui le propriétaire et la fiche porte son courriel
+          || (get(/databases/$(database)/documents/players/$('_groupe_' + request.resource.data.groupId)).data.owner == id
+              && request.resource.data.authEmail == request.auth.token.email));
+      allow update: if membre() && !id.matches('_.*') && (
+          (dansGroupe(groupeDe(resource.data)) && groupeDe(request.resource.data) == groupeDe(resource.data))
+          // premier membre d'un ancien groupe : il inscrit son propre courriel sur sa fiche
+          || (resource.data.get('authEmail', '') == '' && request.resource.data.authEmail == request.auth.token.email
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['authEmail', 'phoneHint'])));
+      allow delete: if membre() && !id.matches('_.*') && dansGroupe(groupeDe(resource.data));
+
+      // Groupe : _groupe_<g>
+      allow create: if membre() && id.matches('_groupe_.+') && request.resource.data.id == id.split('_groupe_')[1];
+      allow update: if membre() && id.matches('_groupe_.+') && dansGroupe(id.split('_groupe_')[1])
+        && request.resource.data.id == resource.data.id;
+
+      // Quatuors enregistrés : _quatuors (groupe pelland) ou _quatuors_<g>
+      allow write: if id == '_quatuors' && dansGroupe('pelland');
+      allow write: if id.matches('_quatuors_.+') && dansGroupe(id.split('_quatuors_')[1]);
+
+      // Jeux maison : _jeux_<g>
+      allow write: if id.matches('_jeux_.+') && dansGroupe(id.split('_jeux_')[1]);
+
+      // Dates offertes : _offre_<id> (champ groupId)
+      allow create: if id.matches('_offre_.+') && dansGroupe(groupeDe(request.resource.data));
+      allow update: if id.matches('_offre_.+') && dansGroupe(groupeDe(resource.data))
+        && groupeDe(request.resource.data) == groupeDe(resource.data);
+      allow delete: if id.matches('_offre_.+') && dansGroupe(groupeDe(resource.data));
+
+      // Demandes d'ajout de jeux (lues par l'équipe Fanion)
+      allow create, update: if id == '_demandes_jeux' && membre();
     }
-    // numéros de téléphone complets : visibles seulement par les membres connectés
+
+    // ---------- Numéros de téléphone complets : seulement le groupe du joueur ----------
     match /phones/{playerId} {
-      allow read, write: if membre();
+      // lecture d'un numéro ou de la liste du groupe (requête « groupId == mon groupe »)
+      allow get, list: if dansGroupe(resource.data.groupId);
+      allow create, update: if dansGroupe(request.resource.data.groupId)
+        && groupeDe(joueur(playerId)) == request.resource.data.groupId;
+      allow delete: if dansGroupe(resource.data.groupId);
     }
-    // présences aux parties : chaque membre confirme la sienne
+
+    // ---------- Parties ----------
+    match /games/{gameId} {
+      // une partie (lien ou code) ; les anciennes parties sans groupe appartiennent à la gang à Pelland
+      allow get: if dansGroupe(resource.data.get('groupId', 'pelland'));
+      // la liste des parties du groupe (requête « groupId == mon groupe »)
+      allow list: if dansGroupe(resource.data.groupId);
+      allow create: if dansGroupe(request.resource.data.groupId) && request.resource.data.ownerUid == request.auth.uid;
+      // le responsable modifie sa partie ; un autre membre du groupe peut la reprendre ; le groupe ne change jamais
+      allow update: if dansGroupe(resource.data.get('groupId', 'pelland'))
+        && request.resource.data.groupId == resource.data.get('groupId', 'pelland')
+        && (resource.data.ownerUid == request.auth.uid
+            || resource.data.ownerUid == ''
+            || request.resource.data.ownerUid == request.auth.uid);
+      allow delete: if dansGroupe(resource.data.get('groupId', 'pelland')) && resource.data.ownerUid == request.auth.uid;
+    }
+
+    // ---------- Présences à une partie ----------
     match /presence/{gameId} {
-      allow read, write: if membre();
+      allow read, write: if dansGroupe(get(/databases/$(database)/documents/games/$(gameId)).data.get('groupId', 'pelland'));
     }
+
+    // ---------- Terrains (communs) ----------
     match /courses/{courseId} {
       allow read, create, update: if membre();
       allow delete: if false;
-    }
-    match /games/{gameId} {
-      allow read: if membre();
-      allow create: if membre() && request.resource.data.ownerUid == request.auth.uid;
-      // le responsable modifie sa partie ; un autre membre peut « devenir responsable » (reprise de la partie)
-      allow update: if membre()
-                    && (resource.data.ownerUid == request.auth.uid
-                        || request.resource.data.ownerUid == request.auth.uid);
-      allow delete: if membre() && resource.data.ownerUid == request.auth.uid;
     }
   }
 }

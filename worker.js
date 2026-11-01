@@ -1,8 +1,8 @@
 // Fanion : sert le site (dossier site/) et l'envoi de textos /api/sms par Twilio.
 // Secrets à entrer dans Cloudflare (Workers & Pages → pelland → Settings → Variables and secrets) :
 //   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM (ex. +15145550000)
-// Sécurité : seuls les membres connectés (jeton Firebase) peuvent texter, et seulement des numéros
-// enregistrés dans le groupe (collection Firestore « phones »). Maximum 30 numéros par envoi.
+// Sécurité : seuls les membres connectés (jeton Firebase) peuvent texter, et seulement les numéros
+// de leur propre groupe (collection Firestore « phones », champ groupId). Maximum 30 numéros par envoi.
 
 const PROJECT = 'pelland';
 const ORIGINS = ['https://francoisgaouette-source.github.io', 'https://fanion.ai', 'https://www.fanion.ai', 'https://app.fanion.ai'];
@@ -36,16 +36,17 @@ async function verifyToken(tok) {
   return pay;
 }
 
-// --- Numéros enregistrés (lus avec le jeton du membre, donc selon les règles Firestore) ---
-async function knownPhones(tok) {
-  const set = new Set(); let page = '';
-  for (let i = 0; i < 10; i++) {
-    const r = await fetch(`https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents/phones?pageSize=300${page ? '&pageToken=' + page : ''}`, { headers: { Authorization: 'Bearer ' + tok } });
-    if (!r.ok) throw new Error('lecture des numéros refusée');
-    const d = await r.json();
-    (d.documents || []).forEach(doc => { const v = ((doc.fields || {}).phone || {}).stringValue; if (v) set.add(v.replace(/\D/g, '').slice(-10)); });
-    if (!d.nextPageToken) break; page = d.nextPageToken;
-  }
+// --- Numéros du groupe du membre (lus avec son jeton, donc selon les règles Firestore) ---
+const FS = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
+async function knownPhones(tok, uid) {
+  const a = await fetch(`${FS}/auth/${uid}`, { headers: { Authorization: 'Bearer ' + tok } });
+  if (!a.ok) throw new Error('membre sans groupe');
+  const g = (((await a.json()).fields || {}).groupId || {}).stringValue; if (!g) throw new Error('membre sans groupe');
+  const r = await fetch(`${FS}:runQuery`, { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'phones' }], where: { fieldFilter: { field: { fieldPath: 'groupId' }, op: 'EQUAL', value: { stringValue: g } } } } }) });
+  if (!r.ok) throw new Error('lecture des numéros refusée');
+  const set = new Set();
+  (await r.json()).forEach(x => { const v = (((x.document || {}).fields || {}).phone || {}).stringValue; if (v) set.add(v.replace(/\D/g, '').slice(-10)); });
   return set;
 }
 
@@ -68,13 +69,13 @@ export default {
     if (url.pathname !== '/api/sms' || req.method !== 'POST') return json({ error: 'introuvable' }, 404, origin);
     if (!ready) return json({ error: 'Service de textos pas encore configuré.' }, 503, origin);
     const tok = (req.headers.get('Authorization') || '').replace(/^Bearer /, '');
-    try { await verifyToken(tok); } catch (e) { return json({ error: 'Connexion requise : ' + e.message }, 401, origin); }
+    let who; try { who = await verifyToken(tok); } catch (e) { return json({ error: 'Connexion requise : ' + e.message }, 401, origin); }
     let data; try { data = await req.json(); } catch (e) { return json({ error: 'requête invalide' }, 400, origin); }
     const body = String(data.text || '').slice(0, MAX_LEN).trim();
     const to = [...new Set((data.to || []).map(n => String(n).replace(/\D/g, '').slice(-10)).filter(n => n.length === 10))];
     if (!body || !to.length) return json({ error: 'message ou numéros manquants' }, 400, origin);
     if (to.length > MAX_TO) return json({ error: `maximum ${MAX_TO} numéros par envoi` }, 400, origin);
-    let known; try { known = await knownPhones(tok); } catch (e) { return json({ error: e.message }, 403, origin); }
+    let known; try { known = await knownPhones(tok, who.user_id || who.sub); } catch (e) { return json({ error: e.message }, 403, origin); }
     const sent = [], failed = [];
     for (const n of to) {
       if (!known.has(n)) { failed.push({ to: n, error: 'numéro hors du groupe' }); continue; }

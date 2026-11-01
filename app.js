@@ -47,7 +47,30 @@
         this.uid = ls.get('pelland.uid', null) || ('local-' + Math.random().toString(36).slice(2, 10));
         ls.set('pelland.uid', this.uid);
       }
+      if (this.mode === 'firebase' && !this.needLogin) { await this.ensureMember(); await this.migrateGroups(); }
       if (!this.needLogin) await this.ensureSeed();
+    },
+    // Sécurité : auth/{uid} = { playerId, groupId } relie le compte à son joueur et à son groupe.
+    // Les règles Firestore vérifient que le courriel du compte est bien celui du joueur, puis limitent chaque membre à son groupe.
+    async ensureMember(player) {
+      if (this.mode !== 'firebase' || !this.uid || !this.email) return;
+      try {
+        if (!player) { const sn = await this.db.collection('players').where('authEmail', '==', this.email).limit(1).get(); if (!sn.empty) player = { ...sn.docs[0].data(), id: sn.docs[0].id }; }
+        if (!player) return;
+        const g = player.groupId || 'pelland', ref = this.db.collection('auth').doc(this.uid), cur = await ref.get();
+        if (!cur.exists || cur.data().groupId !== g || cur.data().playerId !== player.id) await ref.set({ playerId: player.id, groupId: g, at: Date.now() });
+        if (this.gid !== g) this.setGroup(g);
+      } catch (e) { console.warn('membre', e.message); }
+    },
+    // Une fois : ajoute le groupe aux anciennes parties et aux numéros (nécessaire avant de publier les nouvelles règles)
+    async migrateGroups() {
+      if (ls.get('pelland.migr.groups', 0) >= 1) return;
+      try {
+        const pl = await this.db.collection('players').get(), gOf = {}; pl.docs.forEach(d => { if (!d.id.startsWith('_')) gOf[d.id] = d.data().groupId || 'pelland'; });
+        const gs = await this.db.collection('games').get(); for (const d of gs.docs) if (!d.data().groupId) await d.ref.set({ groupId: 'pelland' }, { merge: true });
+        const ph = await this.db.collection('phones').get(); for (const d of ph.docs) if (!d.data().groupId && gOf[d.id]) await d.ref.set({ groupId: gOf[d.id] }, { merge: true });
+        ls.set('pelland.migr.groups', 1);
+      } catch (e) { ls.set('pelland.migr.groups', 1); /* règles déjà publiées : plus rien à faire */ }
     },
     // Connexion avec le nom (choisi dans la liste) et le numéro de téléphone
     async login(player, phone) {
@@ -58,7 +81,8 @@
       if (player.authEmail) {
         try { const c = await auth.signInWithEmailAndPassword(player.authEmail, digits); this.uid = c.user.uid; this.email = c.user.email; }
         catch (e) { throw new Error('Numéro de téléphone incorrect pour ' + player.name + '.'); }
-        this.savePhone(player.id, digits);
+        await this.ensureMember(player); this.migrateGroups();
+        this.savePhone(player.id, digits, false, player.groupId || 'pelland');
       } else {
         const all = await this.listPlayers();
         if (all.some(x => x.authEmail)) throw new Error('Le téléphone de ' + player.name + ' n\'est pas encore enregistré. Demandez à un membre de l\'ajouter dans Joueurs.');
@@ -67,7 +91,8 @@
         const c = await auth.createUserWithEmailAndPassword(email, digits);
         this.uid = c.user.uid; this.email = email;
         await this.db.collection('players').doc(player.id).set({ authEmail: email, phoneHint: digits.slice(-2) }, { merge: true });
-        this.savePhone(player.id, digits);
+        await this.ensureMember({ ...player, authEmail: email });
+        this.savePhone(player.id, digits, false, player.groupId || 'pelland');
       }
       this.needLogin = false;
       ls.set('pelland.me', player.name);
@@ -84,10 +109,10 @@
       await sec.auth().createUserWithEmailAndPassword(email, digits);
       try { await sec.auth().signOut(); } catch (e) { }
       await this.db.collection('players').doc(player.id).set({ authEmail: email, phoneHint: digits.slice(-2) }, { merge: true });
-      await this.savePhone(player.id, digits, true);
+      await this.savePhone(player.id, digits, true, player.groupId || this.gid);
     },
     // Numéro complet : gardé à part, lisible seulement par les membres connectés
-    async savePhone(id, digits, strict) { try { await this.db.collection('phones').doc(id).set({ phone: digits }); this.phonesBlocked = false; } catch (e) { console.warn('phones', e.message); this.phonesBlocked = true; if (strict) throw new Error('Numéro non conservé : publiez la règle « phones » dans Firebase (Firestore → Règles).'); } },
+    async savePhone(id, digits, strict, groupId) { try { await this.db.collection('phones').doc(id).set({ phone: digits, groupId: groupId || this.gid }); this.phonesBlocked = false; } catch (e) { console.warn('phones', e.message); this.phonesBlocked = true; if (strict) throw new Error('Numéro non conservé : publiez la règle « phones » dans Firebase (Firestore → Règles).'); } },
     async ensureSeed() {
       const list = await this.listCourses();
       if (!list.find(c => c.id === L.PINEGROVE.id)) await this.saveCourse(L.PINEGROVE);
@@ -111,7 +136,7 @@
       const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
       for (let n = 0; n < 20; n++) {
         const code = Array.from({ length: 4 }, () => A[Math.floor(Math.random() * A.length)]).join('');
-        let used = null; try { used = await this.getGame(code); } catch (e) { return code; }
+        let used = null; try { used = await this.getGame(code); } catch (e) { if (e && e.code === 'permission-denied') continue; return code; }
         if (!used) return code;
       }
       return 'P' + Date.now().toString(36).toUpperCase().slice(-5);
@@ -170,7 +195,8 @@
         this.uid = c.user.uid; this.email = email;
         await this.saveGroup(gr);
         await this.db.collection('players').doc(pid).set({ id: pid, name: name.trim(), groupId: gr.id, authEmail: email, phoneHint: digits.slice(-2), updatedAt: Date.now() });
-        await this.savePhone(pid, digits);
+        await this.ensureMember({ id: pid, groupId: gr.id, authEmail: email });
+        await this.savePhone(pid, digits, false, gr.id);
       } else { await this.saveGroup(gr); const list = ls.get('pelland.players', []); list.push({ id: pid, name: name.trim(), groupId: gr.id, phone: digits, phoneHint: digits.slice(-2), authEmail: 'local' }); ls.set('pelland.players', list); }
       this.setGroup(gr.id); this.needLogin = false; ls.set('pelland.me', name.trim());
       await this.ensureSeed();
@@ -181,7 +207,7 @@
       if (this.mode === 'firebase') {
         const snap = await this.db.collection('players').get();
         const list = snap.docs.filter(d => !d.id.startsWith('_')).map(d => ({ ...d.data(), id: d.id })).filter(mine);
-        if (this.email) { try { const ph = await this.db.collection('phones').get(); const m = {}; ph.docs.forEach(d => { m[d.id] = d.data().phone; }); list.forEach(p => { if (m[p.id]) p.phone = m[p.id]; }); this.phonesBlocked = false; } catch (e) { this.phonesBlocked = true; } }
+        if (this.email) { try { const ph = await this.db.collection('phones').where('groupId', '==', this.gid).get(); const m = {}; ph.docs.forEach(d => { m[d.id] = d.data().phone; }); list.forEach(p => { if (m[p.id]) p.phone = m[p.id]; }); this.phonesBlocked = false; } catch (e) { this.phonesBlocked = true; } }
         return list.sort(byName);
       }
       return ls.get('pelland.players', []).filter(mine).sort(byName);
@@ -255,8 +281,8 @@
       const all = ls.get('pelland.presence', {}); all[id] = { ...(all[id] || {}), [key]: v }; ls.set('pelland.presence', all);
       (this._presSubs || []).forEach(([gid, f]) => { if (gid === id) f(); });
     },
-    async listPresence() {
-      if (this.mode === 'firebase') { try { const sn = await this.db.collection('presence').get(); const m = {}; sn.docs.forEach(d => { m[d.id] = d.data(); }); return m; } catch (e) { return {}; } }
+    async listPresence(ids) {
+      if (this.mode === 'firebase') { const m = {}; await Promise.all((ids || []).map(async id => { try { const d = await this.db.collection('presence').doc(id).get(); if (d.exists) m[id] = d.data(); } catch (e) { } })); return m; }
       return ls.get('pelland.presence', {});
     },
     async deleteGame(id) {
@@ -265,8 +291,8 @@
     },
     async listGames() {
       if (this.mode === 'firebase') {
-        const snap = await this.db.collection('games').orderBy('createdAt', 'desc').limit(200).get();
-        return snap.docs.map(d => fromDb(d.data())).filter(g => (g.groupId || 'pelland') === this.gid);
+        const snap = await this.db.collection('games').where('groupId', '==', this.gid).get();
+        return snap.docs.map(d => fromDb(d.data())).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 200);
       }
       return Object.values(ls.get('pelland.games', {})).filter(g => (g.groupId || 'pelland') === this.gid).sort((a, b) => b.createdAt - a.createdAt);
     }
@@ -1037,7 +1063,7 @@
   function vHistory() {
     const live = S.view === 'live';
     $('#barTitle').textContent = live ? 'Parties en cours' : 'Parties jouées';
-    if (S.historyList == null) { Store.listPresence().then(m => { S.presAll = m; }); Store.listGames().then(l => { S.historyList = l; if (S.view === 'history' || S.view === 'live') render(); }).catch(e => toast(e.message)); return '<p class="note">Chargement…</p>'; }
+    if (S.historyList == null) { Store.listGames().then(l => { S.historyList = l; Store.listPresence(l.map(g => g.id)).then(m => { S.presAll = m; if (S.view === 'live') render(); }); if (S.view === 'history' || S.view === 'live') render(); }).catch(e => toast(e.message)); return '<p class="note">Chargement…</p>'; }
     const list = S.historyList.filter(g => live ? g.status !== 'terminée' : g.status === 'terminée');
     if (!list.length) return live
       ? '<section class="card"><h2>Aucune partie en cours</h2><p class="note">Les parties apparaissent ici dès leur création, jusqu’à ce que le responsable les termine.</p></section>'
