@@ -2,14 +2,25 @@ rules_version = '2';
 // Règles de sécurité Firestore — Le 19e (Fanion).
 // Principe : chaque membre ne voit et ne modifie que les données de SON groupe.
 // - Un membre = un compte « courriel / mot de passe » relié à son joueur par auth/{uid} = { playerId, groupId }.
-//   Ce lien est vérifié : le courriel du compte doit être celui inscrit sur la fiche du joueur.
+//   Ce lien est vérifié : le courriel du compte est celui inscrit sur la fiche du joueur,
+//   ou, pour une connexion par code texto, le numéro qui a reçu le code est celui du joueur.
 // - La collection players ne contient plus que les noms et les groupes (lisibles pour l'écran de connexion) ; aucun numéro.
 // - Les terrains sont communs à tous les groupes.
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function membre() {
-      return request.auth != null && request.auth.token.firebase.sign_in_provider == 'password';
+      return request.auth != null && request.auth.token.firebase.sign_in_provider in ['password', 'phone'];
+    }
+    function courriel() {
+      return request.auth.token.get('email', '');
+    }
+    // Connexion par code texto : le numéro qui a reçu le code est celui inscrit pour ce joueur
+    function bonNumero(playerId) {
+      return request.auth.token.firebase.sign_in_provider == 'phone'
+        && exists(/databases/$(database)/documents/phones/$(playerId))
+        && (('+1' + get(/databases/$(database)/documents/phones/$(playerId)).data.phone) == request.auth.token.phone_number
+            || ('+' + get(/databases/$(database)/documents/phones/$(playerId)).data.phone) == request.auth.token.phone_number);
     }
     function lien() {
       return get(/databases/$(database)/documents/auth/$(request.auth.uid)).data;
@@ -29,7 +40,8 @@ service cloud.firestore {
     match /auth/{uid} {
       allow read: if membre() && request.auth.uid == uid;
       allow create, update: if membre() && request.auth.uid == uid
-        && joueur(request.resource.data.playerId).get('authEmail', '') == request.auth.token.email
+        && ((courriel() != '' && joueur(request.resource.data.playerId).get('authEmail', '') == courriel())
+            || bonNumero(request.resource.data.playerId))
         && request.resource.data.groupId == groupeDe(joueur(request.resource.data.playerId));
       allow delete: if false;
     }
@@ -43,11 +55,11 @@ service cloud.firestore {
           dansGroupe(request.resource.data.groupId)
           // fondateur d'un nouveau groupe : c'est lui le propriétaire et la fiche porte son courriel
           || (get(/databases/$(database)/documents/players/$('_groupe_' + request.resource.data.groupId)).data.owner == id
-              && request.resource.data.authEmail == request.auth.token.email));
+              && courriel() != '' && request.resource.data.authEmail == courriel()));
       allow update: if membre() && !id.matches('_.*') && (
           (dansGroupe(groupeDe(resource.data)) && groupeDe(request.resource.data) == groupeDe(resource.data))
           // premier membre d'un ancien groupe : il inscrit son propre courriel sur sa fiche
-          || (resource.data.get('authEmail', '') == '' && request.resource.data.authEmail == request.auth.token.email
+          || (resource.data.get('authEmail', '') == '' && courriel() != '' && request.resource.data.authEmail == courriel()
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['authEmail', 'phoneHint'])));
       allow delete: if membre() && !id.matches('_.*') && dansGroupe(groupeDe(resource.data));
 

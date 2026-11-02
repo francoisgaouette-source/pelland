@@ -26,7 +26,7 @@
           this.db = firebase.firestore();
           // Connexion des membres : nom + numéro de téléphone (compte Firebase « courriel / mot de passe »)
           const user = await new Promise(res => { const off = firebase.auth().onAuthStateChanged(u => { off(); res(u); }); });
-          if (user && !user.isAnonymous) { this.uid = user.uid; this.email = user.email; }
+          if (user && !user.isAnonymous) { this.uid = user.uid; this.email = user.email || user.phoneNumber; this.phoneUser = !user.email && !!user.phoneNumber; }
           else { if (user && user.isAnonymous) { try { await firebase.auth().signOut(); } catch (e) { } } this.needLogin = true; }
           try { await this.db.enablePersistence({ synchronizeTabs: true }); } catch (e) { /* déjà active ou non supportée */ }
           this.mode = 'firebase';
@@ -59,6 +59,8 @@
     async ensureMember(player) {
       if (this.mode !== 'firebase' || !this.uid || !this.email) return;
       try {
+        // Connexion par code texto : le lien compte → joueur est dans auth/{uid}
+        if (this.phoneUser && !player) { const a = await this.db.collection('auth').doc(this.uid).get(); if (!a.exists) return false; if (this.gid !== a.data().groupId) this.setGroup(a.data().groupId); return true; }
         if (!player) { const sn = await this.db.collection('players').where('authEmail', '==', this.email).limit(1).get(); if (!sn.empty) player = { ...sn.docs[0].data(), id: sn.docs[0].id }; }
         if (!player) return false;
         const g = player.groupId || 'pelland', ref = this.db.collection('auth').doc(this.uid), cur = await ref.get();
@@ -77,7 +79,38 @@
         ls.set('pelland.migr.groups', 1);
       } catch (e) { ls.set('pelland.migr.groups', 1); /* règles déjà publiées : plus rien à faire */ }
     },
-    // Connexion avec le nom (choisi dans la liste) et le numéro de téléphone
+    // ---------- Connexion par code texto (Firebase envoie le code) ----------
+    phoneE164(phone) { let d = String(phone || '').replace(/\D/g, ''); if (d.length === 10) d = '1' + d; return d.length === 11 ? '+' + d : ''; },
+    async sendCode(phone, buttonId) {
+      const num = this.phoneE164(phone);
+      if (!num) throw Object.assign(new Error('Entrez votre numéro de cellulaire (10 chiffres).'), { code: 'local/phone' });
+      firebase.auth().languageCode = 'fr';
+      // reCAPTCHA invisible (exigé par Firebase) dans un conteneur fixe, hors de l'écran redessiné
+      let box = document.getElementById('recap'); if (!box) { box = document.createElement('div'); box.id = 'recap'; document.body.appendChild(box); }
+      if (!this._captcha) this._captcha = new firebase.auth.RecaptchaVerifier('recap', { size: 'invisible' });
+      try { return await firebase.auth().signInWithPhoneNumber(num, this._captcha); }
+      catch (e) { try { this._captcha.clear(); } catch (x) { } this._captcha = null; throw e; }
+    },
+    // Relie le compte « téléphone » au joueur ; les règles vérifient que c'est bien son numéro
+    async linkPhonePlayer(player) {
+      const g = player.groupId || 'pelland';
+      try { await this.db.collection('auth').doc(this.uid).set({ playerId: player.id, groupId: g, at: Date.now() }); }
+      catch (e) { throw Object.assign(new Error('Ce numéro n’est pas celui inscrit pour ' + player.name + '. Demandez à un membre de le vérifier dans Joueurs.'), { code: 'local/nolink' }); }
+      this.setGroup(g);
+    },
+    async loginWithCode(player, confirmation, code) {
+      const c = String(code || '').replace(/\D/g, '');
+      if (c.length !== 6) throw Object.assign(new Error('Entrez le code à 6 chiffres reçu par texto.'), { code: 'local/code' });
+      const cred = await confirmation.confirm(c);
+      this.uid = cred.user.uid; this.email = cred.user.phoneNumber; this.phoneUser = true;
+      try { await this.linkPhonePlayer(player); }
+      catch (e) { try { await firebase.auth().signOut(); } catch (x) { } this.uid = null; this.email = null; this.phoneUser = false; throw e; }
+      this.needLogin = false;
+      ls.set('pelland.me', player.name);
+      this.rememberGroup(player.groupId || 'pelland', null, player.id, player.name);
+      await this.ensureSeed();
+    },
+    // Ancienne méthode (transition) : le numéro sert de mot de passe
     async login(player, phone) {
       const digits = String(phone || '').replace(/\D/g, '');
       if (digits.length < 7) throw new Error('Entrez votre numéro de téléphone (10 chiffres).');
@@ -202,6 +235,13 @@
     },
     async switchGroup(entry, phone) {
       const digits = String(phone || '').replace(/\D/g, '');
+      if (this.mode === 'firebase' && this.phoneUser) {
+        // Connecté par code : même compte pour tous les groupes où ce numéro est inscrit
+        const d = await this.db.collection('players').doc(entry.playerId).get();
+        if (!d.exists) throw new Error('Vous ne faites plus partie de ce groupe.');
+        const pl = { ...d.data(), id: d.id };
+        await this.linkPhonePlayer(pl); ls.set('pelland.me', pl.name); return;
+      }
       if (digits.length < 7) throw new Error('Entrez votre numéro de téléphone (10 chiffres).');
       if (this.mode === 'firebase') {
         const d = await this.db.collection('players').doc(entry.playerId).get();
@@ -595,8 +635,8 @@
     const l = Store.myGroups();
     openSheet(`<h3>Mes groupes</h3>
       <div class="pick-list">${l.map((x, i) => `<button class="btn ${x.gid === Store.gid ? '' : 'ghost'} small" data-gsw="${i}" type="button" ${x.gid === Store.gid ? 'disabled' : ''}>${esc(x.name)}${x.gid === Store.gid ? ' · actuel' : ''}</button>`).join('')}</div>
-      <label>Votre numéro de téléphone<input id="gswPhone" type="tel" inputmode="tel" value="${esc(myPhone() ? fmtPhone(myPhone()) : '')}" placeholder="450 555-1234"></label>
-      <p class="note" id="gswMsg">Votre numéro sert de mot de passe dans chaque groupe.</p>
+      ${Store.phoneUser ? '<input id="gswPhone" type="hidden" value="">' : `<label>Votre numéro de téléphone<input id="gswPhone" type="tel" inputmode="tel" value="${esc(myPhone() ? fmtPhone(myPhone()) : '')}" placeholder="450 555-1234"></label>`}
+      <p class="note" id="gswMsg">${Store.phoneUser ? 'Touchez un groupe pour y passer.' : 'Votre numéro sert de mot de passe dans chaque groupe.'}</p>
       <div class="row"><button class="btn ghost small" data-viral type="button">Créer un autre groupe</button><button class="btn ghost small" data-close type="button">Fermer</button></div>`, sh => {
       sh.querySelector('[data-close]').onclick = closeSheet;
       sh.querySelectorAll('[data-gsw]').forEach(b => b.onclick = async () => {
@@ -1238,10 +1278,16 @@
     return `<div class="hero"><h1>${APP}</h1><p>Le golf entre amis : pointage, jeux et parties à venir.</p></div>
       <section class="card"><h2>Connexion</h2>
         ${groups.length > 1 ? `<label>Votre groupe<select id="loginGroup">${groups.map(gr => `<option value="${esc(gr.id)}" ${gr.id === S.loginGroup ? 'selected' : ''}>${esc(gr.name)}</option>`).join('')}</select></label>` : ''}
-        <label>Votre nom<select id="loginName"><option value="">— Choisir —</option>${inGroup.map(p => `<option value="${esc(p.id)}" ${(invited ? p.id === invited : p.name === me) ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
-        <label>Votre numéro de téléphone<input id="loginPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="450 555-1234"></label>
-        <button class="btn" id="loginBtn" type="button">Entrer</button>
-        <p class="note" id="loginMsg">Votre numéro sert de mot de passe. Seuls les joueurs du groupe peuvent le voir.</p>
+        <label>Votre nom<select id="loginName"><option value="">— Choisir —</option>${inGroup.map(p => `<option value="${esc(p.id)}" ${(S.loginPick ? p.id === S.loginPick : invited ? p.id === invited : p.name === me) ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
+        ${S.code ? `<p class="note">Code envoyé par texto au <b>${esc(fmtPhone(S.code.phone))}</b>.</p>
+        <label>Code à 6 chiffres<input id="loginCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456"></label>
+        <button class="btn" id="codeBtn" type="button">Entrer</button>
+        <p class="note" style="text-align:center"><button class="linkbtn" id="codeAgain" type="button">Renvoyer le code</button> · <button class="linkbtn" id="codeBack" type="button">Changer de numéro</button></p>`
+        : `<label>Votre numéro de cellulaire<input id="loginPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="450 555-1234" value="${esc(S.loginPhone || '')}"></label>
+        ${S.pwMode ? '<button class="btn" id="loginBtn" type="button">Entrer</button>' : '<button class="btn" id="sendCode" type="button">Recevoir un code par texto</button>'}`}
+        <p class="note" id="loginMsg">${esc(S.loginMsg || (S.code ? 'Le code arrive en quelques secondes.' : S.pwMode ? 'Votre numéro sert de mot de passe.' : 'Vous recevrez un code à 6 chiffres. Votre numéro reste visible seulement par votre groupe.'))}</p>
+        ${S.pwMode && !S.pwForced ? '<p class="note" style="text-align:center"><button class="linkbtn" id="useCode" type="button">Recevoir plutôt un code par texto</button></p>' : ''}
+        ${S.allowPw && !S.pwMode && !S.code ? '<p class="note" style="text-align:center"><button class="linkbtn" id="usePw" type="button">Entrer avec mon numéro comme avant</button></p>' : ''}
       </section>
       <p class="note" style="text-align:center">Nouveau groupe d’amis ? <button class="linkbtn" id="newGroup" type="button">Créer un groupe</button></p>`;
   }
@@ -1452,10 +1498,50 @@
         try { await Store.createGroup($('#ngName').value, $('#ngMe').value, $('#ngPhone').value); location.href = location.pathname; }
         catch (e) { msg.textContent = e.message && e.message.includes('auth/') ? 'Création impossible : ' + e.message : e.message; nc.disabled = false; }
       };
-      const lg = $('#loginGroup'); if (lg) lg.onchange = e => { S.loginGroup = e.target.value; render(); };
-      if (!$('#loginBtn')) return;
-      $('#loginBtn').onclick = go2;
-      $('#loginPhone').onkeydown = e => { if (e.key === 'Enter') go2(); };
+      const lg = $('#loginGroup'); if (lg) lg.onchange = e => { S.loginGroup = e.target.value; S.code = null; render(); };
+      const ln = $('#loginName'); if (ln) ln.onchange = () => { S.loginPick = ln.value; if (S.code) { S.code = null; render(); } };
+      const say = (t, again) => { S.loginMsg = t; if (again) render(); else { const m = $('#loginMsg'); if (m) m.textContent = t; } };
+      // Codes d'erreur qui veulent dire « la connexion par code n'est pas disponible ici » : on passe à l'ancienne méthode
+      const UNAVAILABLE = /operation-not-allowed|unauthorized-domain|captcha|app-credential|internal-error|quota-exceeded|admin-restricted|network-request-failed/;
+      const phoneErr = e => {
+        const c = (e && e.code) || '';
+        if (c.startsWith('local/')) return e.message;
+        if (/invalid-phone-number|missing-phone-number/.test(c)) return 'Numéro invalide : entrez vos 10 chiffres.';
+        if (/too-many-requests/.test(c)) return 'Trop d’essais pour ce numéro. Réessayez dans quelques minutes.';
+        if (/invalid-verification-code/.test(c)) return 'Code incorrect. Vérifiez le texto et réessayez.';
+        if (/code-expired|session-expired/.test(c)) return 'Code expiré : touchez « Renvoyer le code ».';
+        return 'Erreur : ' + (c || e.message);
+      };
+      const send = async () => {
+        const pl = S.players.find(p => p.id === $('#loginName').value);
+        if (!pl) return say('Choisissez votre nom.');
+        const ph = S.code ? S.code.phone : $('#loginPhone').value; S.loginPhone = ph; S.loginPick = pl.id;
+        const b = $('#sendCode') || $('#codeAgain'); if (b) b.disabled = true; say('Envoi du code…');
+        try { const conf = await Store.sendCode(ph, b.id); S.code = { conf, phone: String(ph).replace(/\D/g, ''), player: pl.id }; S.loginMsg = ''; S.allowPw = false; render(); setTimeout(() => { const i = $('#loginCode'); if (i) i.focus(); }, 50); }
+        catch (e) {
+          if (UNAVAILABLE.test((e && e.code) || '')) { S.pwMode = true; S.pwForced = true; S.code = null; say('La connexion par code n’est pas encore activée : entrez avec votre numéro comme avant.', true); return; }
+          if (b) b.disabled = false; say(phoneErr(e));
+        }
+      };
+      const enter = async () => {
+        const pl = S.players.find(p => p.id === S.code.player); const b = $('#codeBtn'); if (b.disabled) return; b.disabled = true; say('Connexion…');
+        try { await Store.loginWithCode(pl, S.code.conf, $('#loginCode').value); const q = new URLSearchParams(location.search); q.delete('joueur'); location.href = location.pathname + (q.toString() ? '?' + q : ''); }
+        catch (e) {
+          b.disabled = false;
+          // Numéro pas encore inscrit dans le groupe (anciens comptes) : on offre l'ancienne méthode
+          if (e.code === 'local/nolink' && pl.authEmail) { S.code = null; S.allowPw = true; say(e.message, true); return; }
+          say(phoneErr(e));
+        }
+      };
+      const sc = $('#sendCode'); if (sc) sc.onclick = send;
+      const ca = $('#codeAgain'); if (ca) ca.onclick = send;
+      const cb = $('#codeBack'); if (cb) cb.onclick = () => { S.code = null; S.loginMsg = ''; render(); };
+      const cbt = $('#codeBtn'); if (cbt) cbt.onclick = enter;
+      const ci = $('#loginCode'); if (ci) { ci.onkeydown = e => { if (e.key === 'Enter') enter(); }; ci.oninput = () => { if (ci.value.replace(/\D/g, '').length === 6) enter(); }; }
+      const up = $('#usePw'); if (up) up.onclick = () => { S.pwMode = true; S.loginMsg = ''; render(); };
+      const uc = $('#useCode'); if (uc) uc.onclick = () => { S.pwMode = false; S.loginMsg = ''; render(); };
+      const lp = $('#loginPhone'); if (lp) lp.onkeydown = e => { if (e.key === 'Enter') (S.pwMode ? go2 : send)(); };
+      if ($('#loginBtn')) $('#loginBtn').onclick = go2;
     },
     offre(v) {
       commonNav(v);
@@ -2081,7 +2167,7 @@
   }
   function inviteSms(name, d, id) {
     const url = location.origin + location.pathname + (id ? '?joueur=' + encodeURIComponent(id) : '');
-    const body = `Salut ${name.split(' ')[0]} ! Tu as été invité à te joindre au groupe « ${groupName()} » sur ${APP}, l’app de golf entre amis. Ouvre l’app : ${url} — ton nom est déjà choisi, entre seulement ton numéro de téléphone (${fmtPhone(d)}) pour te connecter. Sur iPhone : bouton Partager, puis « Sur l’écran d’accueil ».`;
+    const body = `Salut ${name.split(' ')[0]} ! Tu as été invité à te joindre au groupe « ${groupName()} » sur ${APP}, l’app de golf entre amis. Ouvre l’app : ${url} — ton nom est déjà choisi : entre ton numéro (${fmtPhone(d)}) et tu recevras un code par texto pour te connecter. Sur iPhone : bouton Partager, puis « Sur l’écran d’accueil ».`;
     openSms([d], body);
   }
   // Lignes de la carte selon les trous joués (18, aller ou retour)
