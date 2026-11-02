@@ -636,7 +636,7 @@
     openSheet(`<h3>Mes groupes</h3>
       <div class="pick-list">${l.map((x, i) => `<button class="btn ${x.gid === Store.gid ? '' : 'ghost'} small" data-gsw="${i}" type="button" ${x.gid === Store.gid ? 'disabled' : ''}>${esc(x.name)}${x.gid === Store.gid ? ' · actuel' : ''}</button>`).join('')}</div>
       ${Store.phoneUser ? '<input id="gswPhone" type="hidden" value="">' : `<label>Votre numéro de téléphone<input id="gswPhone" type="tel" inputmode="tel" value="${esc(myPhone() ? fmtPhone(myPhone()) : '')}" placeholder="450 555-1234"></label>`}
-      <p class="note" id="gswMsg">${Store.phoneUser ? 'Touchez un groupe pour y passer.' : 'Votre numéro sert de mot de passe dans chaque groupe.'}</p>
+      <p class="note" id="gswMsg">${Store.phoneUser ? 'Touchez un groupe pour y passer.' : 'Entrez votre numéro pour passer à l’autre groupe.'}</p>
       <div class="row"><button class="btn ghost small" data-viral type="button">Créer un autre groupe</button><button class="btn ghost small" data-close type="button">Fermer</button></div>`, sh => {
       sh.querySelector('[data-close]').onclick = closeSheet;
       sh.querySelectorAll('[data-gsw]').forEach(b => b.onclick = async () => {
@@ -1285,7 +1285,7 @@
         <p class="note" style="text-align:center"><button class="linkbtn" id="codeAgain" type="button">Renvoyer le code</button> · <button class="linkbtn" id="codeBack" type="button">Changer de numéro</button></p>`
         : `<label>Votre numéro de cellulaire<input id="loginPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="450 555-1234" value="${esc(S.loginPhone || '')}"></label>
         ${S.pwMode ? '<button class="btn" id="loginBtn" type="button">Entrer</button>' : '<button class="btn" id="sendCode" type="button">Recevoir un code par texto</button>'}`}
-        <p class="note" id="loginMsg">${esc(S.loginMsg || (S.code ? 'Le code arrive en quelques secondes.' : S.pwMode ? 'Votre numéro sert de mot de passe.' : 'Vous recevrez un code à 6 chiffres. Votre numéro reste visible seulement par votre groupe.'))}</p>
+        <p class="note" id="loginMsg">${esc(S.loginMsg || (S.code ? 'Le code arrive en quelques secondes.' : S.pwMode ? 'Entrez votre numéro de cellulaire.' : 'Vous recevrez un code à 6 chiffres. Votre numéro reste visible seulement par votre groupe.'))}</p>
         ${S.pwMode && !S.pwForced ? '<p class="note" style="text-align:center"><button class="linkbtn" id="useCode" type="button">Recevoir plutôt un code par texto</button></p>' : ''}
         ${S.allowPw && !S.pwMode && !S.code ? '<p class="note" style="text-align:center"><button class="linkbtn" id="usePw" type="button">Entrer avec mon numéro comme avant</button></p>' : ''}
       </section>
@@ -1336,7 +1336,7 @@
       const n = items.filter(x => x.on).length;
       sh.innerHTML = `<h3>Importer des joueurs</h3><p class="note">${items.length} ligne${items.length > 1 ? 's' : ''} lue${items.length > 1 ? 's' : ''} dans « ${esc(file.name)} ». Décochez ceux à ne pas ajouter.</p>
         <div class="imp-list">${items.map((x, i) => `<label class="imp-row ${x.dup || x.bad ? 'warnrow' : ''}"><input type="checkbox" data-imp="${i}" ${x.on ? 'checked' : ''} ${x.dup ? 'disabled' : ''}><span><b>${esc(x.name)}</b><small>${x.phone ? esc(fmtPhone(x.phone)) : 'Pas de numéro'}${x.dup ? ' · déjà dans le groupe' : x.bad ? ' · numéro à vérifier' : ''}</small></span></label>`).join('')}</div>
-        <p class="note">Le cellulaire sert de mot de passe. Les invitations par texto s’envoient ensuite depuis la liste, avec le bouton ☎ de chaque joueur.</p>
+        <p class="note">Les invitations par texto s’envoient ensuite depuis la liste, avec le bouton ☎ de chaque joueur.</p>
         <div class="row"><button class="btn small" id="impGo" type="button" ${n ? '' : 'disabled'}>Importer (${n})</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`;
       sh.querySelectorAll('[data-imp]').forEach(c => c.onchange = () => { items[+c.dataset.imp].on = c.checked; draw(sh); });
       sh.querySelector('[data-close]').onclick = closeSheet;
@@ -1359,7 +1359,7 @@
     $('#barTitle').textContent = 'Joueurs';
     return `<section class="card"><h2>Ajouter un joueur</h2>
         <input id="newPlayer" type="text" placeholder="Prénom et nom" autocapitalize="words">
-        <div class="row" style="flex-wrap:nowrap"><input id="newPhone" type="tel" inputmode="tel" placeholder="Téléphone (sert de mot de passe)" style="flex:1;min-width:0"><button class="btn small" id="addPlayer" type="button">Ajouter</button></div>
+        <div class="row" style="flex-wrap:nowrap"><input id="newPhone" type="tel" inputmode="tel" placeholder="Cellulaire" style="flex:1;min-width:0"><button class="btn small" id="addPlayer" type="button">Ajouter</button></div>
         ${canOrganize() ? `<div class="import-row"><label class="btn ghost small" for="xlsFile">Importer un fichier Excel</label><input id="xlsFile" type="file" accept=".xlsx,.xls,.csv,.ods" hidden><span class="note">Deux colonnes : le nom et le cellulaire.</span></div>` : ''}
         </section>
       ${(() => { const dups = duplicateMap(S.players); const nd = Object.keys(dups).length; return nd ? `<div class="warn">${nd} joueurs semblent en double. Vérifiez les noms marqués « Doublon ? » et retirez celui de trop.</div>` : ''; })()}
@@ -1667,7 +1667,7 @@
         openSheet(`<h3>Téléphone de ${esc(pl.name)}</h3>
           <p class="note">${pl.phone ? `Numéro actuel : <b style="font-size:20px">${esc(fmtPhone(pl.phone))}</b>` : pl.authEmail ? `Numéro actuel : se termine par <b>${esc(pl.phoneHint || '')}</b>. Entrez le numéro complet une fois ci-dessous et touchez Enregistrer : il s’affichera ensuite.` : 'Aucun numéro pour l’instant.'}</p>
           <label>${pl.authEmail ? 'Nouveau numéro' : 'Numéro'}<input id="phIn" type="tel" inputmode="tel" placeholder="450 555-1234" value="${esc(pl.phone ? fmtPhone(pl.phone) : '')}"></label>
-          <p class="note">Ce numéro sert de mot de passe pour se connecter. Il est visible seulement par les joueurs connectés.</p>
+          <p class="note">Ce numéro sert à se connecter. Il est visible seulement par les joueurs du groupe.</p>
           ${Store.phonesBlocked ? '<div class="warn">La base refuse de garder les numéros complets : la règle « phones » n’est pas encore publiée dans Firebase (Firestore → Règles).</div>' : ''}
           <div class="row"><button class="btn small" id="phSave" type="button">Enregistrer</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`, sh => {
           sh.querySelector('[data-close]').onclick = closeSheet;
