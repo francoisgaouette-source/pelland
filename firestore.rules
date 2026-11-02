@@ -64,9 +64,12 @@ service cloud.firestore {
       allow delete: if membre() && !id.matches('_.*') && dansGroupe(groupeDe(resource.data));
 
       // Groupe : _groupe_<g>
-      allow create: if membre() && id.matches('_groupe_.+') && request.resource.data.id == id.split('_groupe_')[1];
+      // Le forfait (plan, paidUntil) est donné par Fanion après le paiement : jamais modifiable depuis l'app
+      allow create: if membre() && id.matches('_groupe_.+') && request.resource.data.id == id.split('_groupe_')[1]
+        && !request.resource.data.keys().hasAny(['plan', 'paidUntil']);
       allow update: if membre() && id.matches('_groupe_.+') && dansGroupe(id.split('_groupe_')[1])
-        && request.resource.data.id == resource.data.id;
+        && request.resource.data.id == resource.data.id
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan', 'paidUntil']);
 
       // Anciens documents privés (_quatuors, _jeux_, _offre_, _demandes_jeux) : déplacés dans groupdata, offres et requests.
       // On permet seulement de les effacer (migration faite par l'app) ; plus aucune création.

@@ -583,6 +583,7 @@
     const lastDate = info && info.id === last && info.createdAt ? new Date(info.createdAt).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' }) : null;
     return `
       <div class="hero"><h1>${esc(groupName())}${canOrganize() ? ' <button class="hero-edit" id="renameGroup" type="button" aria-label="Modifier le nom du groupe">Modifier</button>' : ''}</h1><p>${APP} · le golf entre amis${Store.myGroups().length > 1 ? ' · <button class="linkbtn" id="switchGroup" type="button">Changer de groupe</button>' : ''}</p></div>
+      ${Store.needLogin ? '' : groupInfo(true)}
       <div class="tiles">
         <button class="tile" data-go="courses"><span class="pin">⛳</span><div><strong>Terrains</strong><span>Ajouter ou corriger un terrain</span></div></button>
         <button class="tile" data-go="players"><span class="pin"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M15.5 2.5 9 17.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M9 17.2c-.4 1.2-1.6 2.2-3.4 2.4l-2.1.2c-.6.1-.9.7-.6 1.2.2.3.5.5.9.5h4.6c1.6 0 2.7-.9 3.1-2.2l.3-.9" fill="currentColor"/><circle cx="18.5" cy="19.5" r="1.8" fill="currentColor"/></svg></span><div><strong>Joueurs</strong><span>Ajouter ou retirer des joueurs</span></div></button>
@@ -596,6 +597,23 @@
       ${Store.mode === 'firebase' && Store.email ? `<p class="note">Connecté : <b>${esc(ls.get('pelland.me', '') || '')}</b> · <button class="linkbtn" id="logout" type="button">Se déconnecter</button></p>` : ''}
       <p class="note">${Store.mode === 'firebase' ? 'Base partagée active : les autres joueurs suivent la partie en direct dans Parties en cours.' : 'Mode local : les parties restent sur ce téléphone.'}</p>
       ${Store.mode === 'local' && Store.error ? `<div class="warn"><b>Pourquoi le mode local :</b> ${esc(Store.error)}</div>` : ''}`;
+  }
+
+  // ---------------- Propriétaire et forfait du groupe ----------------
+  // Forfait gardé dans players/_groupe_<g> : plan = 'groupe' (16 joueurs, payé) et paidUntil (ms). Sans forfait : Gratuit, 4 joueurs.
+  function planOf(gr) {
+    gr = gr || curGroup();
+    if (gr.plan === 'groupe' && (!gr.paidUntil || gr.paidUntil > Date.now())) return { name: 'Groupe', max: 16, until: gr.paidUntil || null, paid: true };
+    return { name: 'Gratuit', max: 4, until: null, paid: false, expired: gr.plan === 'groupe' };
+  }
+  function groupInfo(compact) {
+    const own = (S.players || []).find(p => p.id === ownerId()), pl = planOf(), n = (S.players || []).length, over = n > pl.max;
+    const until = pl.until ? ' · jusqu’au ' + new Date(pl.until).toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+    const buy = !pl.paid && meId() && meId() === ownerId() ? ` <a class="linkbtn" href="https://fanion.ai/achat.html" target="_blank" rel="noopener">Passer au forfait Groupe</a>` : '';
+    return `<div class="grp-info${compact ? ' compact' : ''}">
+      <div><span>Propriétaire</span><b>${own ? esc(own.name) + (own.id === meId() ? ' (vous)' : '') : 'Aucun'}</b></div>
+      <div><span>Forfait</span><b>${pl.name}${pl.expired ? ' (saison terminée)' : ''}</b><small class="${over ? 'over' : ''}">${n} / ${pl.max} joueurs${until}</small>${buy}</div>
+    </div>`;
   }
 
   // ---------------- Effet viral : chaque joueur invité peut lancer son propre groupe, gratuit ----------------
@@ -1357,7 +1375,7 @@
   const canRemove = p => p.id !== ownerId() && p.id !== meId();
   function vPlayers() {
     $('#barTitle').textContent = 'Joueurs';
-    return `<section class="card"><h2>Ajouter un joueur</h2>
+    return `${groupInfo()}<section class="card"><h2>Ajouter un joueur</h2>
         <input id="newPlayer" type="text" placeholder="Prénom et nom" autocapitalize="words">
         <div class="row" style="flex-wrap:nowrap"><input id="newPhone" type="tel" inputmode="tel" placeholder="Cellulaire" style="flex:1;min-width:0"><button class="btn small" id="addPlayer" type="button">Ajouter</button></div>
         ${canOrganize() ? `<div class="import-row"><label class="btn ghost small" for="xlsFile">Importer un fichier Excel</label><input id="xlsFile" type="file" accept=".xlsx,.xls,.csv,.ods" hidden><span class="note">Deux colonnes : le nom et le cellulaire.</span></div>` : ''}
