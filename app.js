@@ -47,7 +47,11 @@
         this.uid = ls.get('pelland.uid', null) || ('local-' + Math.random().toString(36).slice(2, 10));
         ls.set('pelland.uid', this.uid);
       }
-      if (this.mode === 'firebase' && !this.needLogin) { await this.ensureMember(); await this.migrateGroups(); }
+      if (this.mode === 'firebase' && !this.needLogin) {
+        // Compte qui n'est plus relié à aucun joueur (ex. numéro changé depuis) : on revient à l'écran de connexion
+        if (await this.ensureMember() === false) { try { await firebase.auth().signOut(); } catch (e) { } this.uid = null; this.email = null; this.needLogin = true; }
+        else { await this.migrateGroups(); await this.migrateData(); }
+      }
       if (!this.needLogin) await this.ensureSeed();
     },
     // Sécurité : auth/{uid} = { playerId, groupId } relie le compte à son joueur et à son groupe.
@@ -56,11 +60,12 @@
       if (this.mode !== 'firebase' || !this.uid || !this.email) return;
       try {
         if (!player) { const sn = await this.db.collection('players').where('authEmail', '==', this.email).limit(1).get(); if (!sn.empty) player = { ...sn.docs[0].data(), id: sn.docs[0].id }; }
-        if (!player) return;
+        if (!player) return false;
         const g = player.groupId || 'pelland', ref = this.db.collection('auth').doc(this.uid), cur = await ref.get();
         if (!cur.exists || cur.data().groupId !== g || cur.data().playerId !== player.id) await ref.set({ playerId: player.id, groupId: g, at: Date.now() });
         if (this.gid !== g) this.setGroup(g);
-      } catch (e) { console.warn('membre', e.message); }
+        return true;
+      } catch (e) { console.warn('membre', e.message); return null; }
     },
     // Une fois : ajoute le groupe aux anciennes parties et aux numéros (nécessaire avant de publier les nouvelles règles)
     async migrateGroups() {
@@ -110,6 +115,11 @@
       await sec.auth().createUserWithEmailAndPassword(email, digits);
       try { await sec.auth().signOut(); } catch (e) { }
       await this.db.collection('players').doc(player.id).set({ authEmail: email, phoneHint: digits.slice(-2) }, { merge: true });
+      if (player.authEmail && player.authEmail === this.email) {
+        // Mon propre numéro : je passe au nouveau compte pour rester relié à mon joueur
+        const c = await firebase.auth().signInWithEmailAndPassword(email, digits); this.uid = c.user.uid; this.email = email;
+        await this.ensureMember({ ...player, authEmail: email });
+      }
       await this.savePhone(player.id, digits, true, player.groupId || this.gid);
     },
     // Numéro complet : gardé à part, lisible seulement par les membres connectés
@@ -238,46 +248,85 @@
       }
       return ls.get('pelland.players', []).filter(mine).sort(byName);
     },
-    // Quatuors (groupes de 4 joueurs) : gardés dans players/_quatuors (aucune nouvelle règle Firebase)
+    // Données privées du groupe : groupdata/<groupe> = { groupId, quatuors, jeux } ; offres/<id> ; requests/<id>.
+    // (Avant : documents « _… » dans players, lisibles par tous.) Lecture de l'ancien emplacement tant qu'il existe.
+    async gdata() {
+      try { const d = await this.db.collection('groupdata').doc(this.gid).get(); if (d.exists) return d.data(); } catch (e) { }
+      return null;
+    },
+    async legacy(id) { try { const d = await this.db.collection('players').doc(id).get(); return d.exists ? d.data() : null; } catch (e) { return null; } },
+    async setGdata(field, list) { await this.db.collection('groupdata').doc(this.gid).set({ groupId: this.gid, [field]: list, updatedAt: Date.now() }, { merge: true }); },
+    // Une fois : déplace les données privées hors de players (à faire avant de publier les nouvelles règles)
+    async migrateData() {
+      if (ls.get('pelland.migr.data', 0) >= 1) return;
+      let ok = true;
+      try {
+        const sn = await this.db.collection('players').get();
+        for (const d of sn.docs) {
+          const id = d.id, x = d.data();
+          let g = null, field = null;
+          if (id === '_quatuors') { g = 'pelland'; field = 'quatuors'; }
+          else if (id.startsWith('_quatuors_')) { g = id.slice(10); field = 'quatuors'; }
+          else if (id.startsWith('_jeux_')) { g = id.slice(6); field = 'jeux'; }
+          try {
+            if (field) await this.db.collection('groupdata').doc(g).set({ groupId: g, [field]: x.list || [], updatedAt: Date.now() }, { merge: true });
+            else if (id.startsWith('_offre_')) await this.db.collection('offres').doc(id.slice(7)).set({ ...x, groupId: x.groupId || 'pelland' });
+            else if (id === '_demandes_jeux') { for (const r of (x.list || [])) await this.db.collection('requests').add(r); }
+            else continue;
+            await d.ref.delete();
+          } catch (e) { ok = false; console.warn('migration', id, e.message); }
+        }
+      } catch (e) { ok = false; }
+      if (ok) ls.set('pelland.migr.data', 1);
+    },
     async listQuatuors() {
-      if (this.mode === 'firebase') { try { const d = await this.db.collection('players').doc(this.qDoc()).get(); return (d.exists && d.data().list) || []; } catch (e) { return []; } }
+      if (this.mode === 'firebase') { const g = await this.gdata(); if (g && g.quatuors) return g.quatuors; const l = await this.legacy(this.qDoc()); return (l && l.list) || []; }
       return ls.get('pelland.quatuors.' + this.gid, this.gid === 'pelland' ? ls.get('pelland.quatuors', []) : []);
     },
     async saveQuatuors(list) {
-      if (this.mode === 'firebase') { await this.db.collection('players').doc(this.qDoc()).set({ list, updatedAt: Date.now() }); return; }
+      if (this.mode === 'firebase') { await this.setGdata('quatuors', list); return; }
       ls.set('pelland.quatuors.' + this.gid, list);
     },
-    // Demandes d'ajout de jeux : players/_demandes_jeux (lu par l'équipe Fanion)
+    // Demandes d'ajout de jeux : requests/<id> (écriture seulement ; lues par l'équipe Fanion dans la console)
     async saveGameRequest(req) {
-      if (this.mode === 'firebase') { const ref = this.db.collection('players').doc('_demandes_jeux'); const d = await ref.get(); const list = (d.exists && d.data().list) || []; list.push(req); await ref.set({ list, updatedAt: Date.now() }); return; }
+      if (this.mode === 'firebase') { await this.db.collection('requests').add(req); return; }
       ls.set('pelland.demandesJeux', ls.get('pelland.demandesJeux', []).concat([req]));
     },
-    // Jeux maison du groupe : players/_jeux_<groupe>
+    // Jeux maison du groupe : groupdata/<groupe>.jeux
     async listJeux() {
-      if (this.mode === 'firebase') { try { const d = await this.db.collection('players').doc('_jeux_' + this.gid).get(); return (d.exists && d.data().list) || []; } catch (e) { return []; } }
+      if (this.mode === 'firebase') { const g = await this.gdata(); if (g && g.jeux) return g.jeux; const l = await this.legacy('_jeux_' + this.gid); return (l && l.list) || []; }
       return ls.get('pelland.jeux.' + this.gid, []);
     },
     async saveJeux(list) {
-      if (this.mode === 'firebase') { await this.db.collection('players').doc('_jeux_' + this.gid).set({ list, updatedAt: Date.now() }); return; }
+      if (this.mode === 'firebase') { await this.setGdata('jeux', list); return; }
       ls.set('pelland.jeux.' + this.gid, list);
     },
     qDoc() { return this.gid === 'pelland' ? '_quatuors' : '_quatuors_' + this.gid;
     },
-    // Offres de parties : players/_offre_<id> = { id, course, dates:[ms], deadline:ms, by, createdAt, rep_<joueur>: { name, dates:[ms], at } }
+    // Offres de parties : offres/<id> = { id, groupId, course, dates:[ms], deadline:ms, by, createdAt, rep_<joueur>: { name, dates:[ms], at } }
     async listOffres() {
-      if (this.mode === 'firebase') { try { const sn = await this.db.collection('players').get(); return sn.docs.filter(d => d.id.startsWith('_offre_')).map(d => d.data()).filter(o => (o.groupId || 'pelland') === this.gid).sort((a, b) => b.createdAt - a.createdAt); } catch (e) { return []; } }
+      if (this.mode === 'firebase') {
+        const m = {};
+        try { const sn = await this.db.collection('players').get(); sn.docs.filter(d => d.id.startsWith('_offre_')).forEach(d => { const o = d.data(); if ((o.groupId || 'pelland') === this.gid) m[o.id] = o; }); } catch (e) { }
+        try { const sn = await this.db.collection('offres').where('groupId', '==', this.gid).get(); sn.docs.forEach(d => { m[d.id] = { ...d.data(), id: d.id }; }); } catch (e) { }
+        return Object.values(m).sort((a, b) => b.createdAt - a.createdAt);
+      }
       return Object.values(ls.get('pelland.offres', {})).filter(o => (o.groupId || 'pelland') === this.gid).sort((a, b) => b.createdAt - a.createdAt);
     },
     async getOffre(id) {
-      if (this.mode === 'firebase') { const d = await this.db.collection('players').doc('_offre_' + id).get(); return d.exists ? d.data() : null; }
+      if (this.mode === 'firebase') { try { const d = await this.db.collection('offres').doc(id).get(); if (d.exists) return { ...d.data(), id }; } catch (e) { } return await this.legacy('_offre_' + id); }
       return ls.get('pelland.offres', {})[id] || null;
     },
     async saveOffre(o, merge) {
-      if (this.mode === 'firebase') { await this.db.collection('players').doc('_offre_' + o.id).set(o, merge ? { merge: true } : undefined); return; }
+      if (this.mode === 'firebase') {
+        const ref = this.db.collection('offres').doc(o.id);
+        if (merge) { let cur = null; try { cur = await ref.get(); } catch (e) { } if (!cur || !cur.exists) { const l = await this.legacy('_offre_' + o.id); if (l) o = { ...l, ...o }; } }
+        await ref.set({ ...o, groupId: o.groupId || this.gid }, { merge: true }); return;
+      }
       const all = ls.get('pelland.offres', {}); all[o.id] = merge ? { ...(all[o.id] || {}), ...o } : o; ls.set('pelland.offres', all);
     },
     async deleteOffre(id) {
-      if (this.mode === 'firebase') { await this.db.collection('players').doc('_offre_' + id).delete(); return; }
+      if (this.mode === 'firebase') { await this.db.collection('offres').doc(id).delete(); try { await this.db.collection('players').doc('_offre_' + id).delete(); } catch (e) { } return; }
       const all = ls.get('pelland.offres', {}); delete all[id]; ls.set('pelland.offres', all);
     },
     async savePlayer(name) {

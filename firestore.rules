@@ -3,7 +3,7 @@ rules_version = '2';
 // Principe : chaque membre ne voit et ne modifie que les données de SON groupe.
 // - Un membre = un compte « courriel / mot de passe » relié à son joueur par auth/{uid} = { playerId, groupId }.
 //   Ce lien est vérifié : le courriel du compte doit être celui inscrit sur la fiche du joueur.
-// - La liste des noms (collection players) reste lisible pour l'écran de connexion ; aucun numéro n'y est stocké.
+// - La collection players ne contient plus que les noms et les groupes (lisibles pour l'écran de connexion) ; aucun numéro.
 // - Les terrains sont communs à tous les groupes.
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -56,21 +56,35 @@ service cloud.firestore {
       allow update: if membre() && id.matches('_groupe_.+') && dansGroupe(id.split('_groupe_')[1])
         && request.resource.data.id == resource.data.id;
 
-      // Quatuors enregistrés : _quatuors (groupe pelland) ou _quatuors_<g>
-      allow write: if id == '_quatuors' && dansGroupe('pelland');
-      allow write: if id.matches('_quatuors_.+') && dansGroupe(id.split('_quatuors_')[1]);
-
-      // Jeux maison : _jeux_<g>
-      allow write: if id.matches('_jeux_.+') && dansGroupe(id.split('_jeux_')[1]);
-
-      // Dates offertes : _offre_<id> (champ groupId)
-      allow create: if id.matches('_offre_.+') && dansGroupe(groupeDe(request.resource.data));
-      allow update: if id.matches('_offre_.+') && dansGroupe(groupeDe(resource.data))
-        && groupeDe(request.resource.data) == groupeDe(resource.data);
+      // Anciens documents privés (_quatuors, _jeux_, _offre_, _demandes_jeux) : déplacés dans groupdata, offres et requests.
+      // On permet seulement de les effacer (migration faite par l'app) ; plus aucune création.
+      allow delete: if id == '_quatuors' && dansGroupe('pelland');
+      allow delete: if id.matches('_quatuors_.+') && dansGroupe(id.split('_quatuors_')[1]);
+      allow delete: if id.matches('_jeux_.+') && dansGroupe(id.split('_jeux_')[1]);
       allow delete: if id.matches('_offre_.+') && dansGroupe(groupeDe(resource.data));
+      allow delete: if id == '_demandes_jeux' && membre();
+    }
 
-      // Demandes d'ajout de jeux (lues par l'équipe Fanion)
-      allow create, update: if id == '_demandes_jeux' && membre();
+    // ---------- Données privées du groupe : quatuors et jeux maison ----------
+    match /groupdata/{g} {
+      allow read: if dansGroupe(g);
+      allow create, update: if dansGroupe(g) && request.resource.data.groupId == g;
+      allow delete: if false;
+    }
+
+    // ---------- Dates offertes et disponibilités ----------
+    match /offres/{id} {
+      allow get: if dansGroupe(resource.data.groupId);
+      allow list: if dansGroupe(resource.data.groupId);
+      allow create: if dansGroupe(request.resource.data.groupId);
+      allow update: if dansGroupe(resource.data.groupId) && request.resource.data.groupId == resource.data.groupId;
+      allow delete: if dansGroupe(resource.data.groupId);
+    }
+
+    // ---------- Demandes d'ajout de jeux : envoyées par les membres, lues seulement dans la console ----------
+    match /requests/{id} {
+      allow create: if membre();
+      allow read, update, delete: if false;
     }
 
     // ---------- Numéros de téléphone complets : seulement le groupe du joueur ----------
