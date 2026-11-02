@@ -610,11 +610,28 @@
     const own = (S.players || []).find(p => p.id === ownerId()), pl = planOf(), n = (S.players || []).length, over = n > pl.max;
     const until = pl.until ? ' · jusqu’au ' + new Date(pl.until).toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
     const buy = !pl.paid && meId() && meId() === ownerId() ? ` <a class="linkbtn" href="https://fanion.ai/achat.html" target="_blank" rel="noopener">Passer au forfait Groupe</a>` : '';
+    const orgId = (curGroup().organizers || [])[0], org = (S.players || []).find(p => p.id === orgId);
+    const meOwner = !!meId() && meId() === ownerId();
     return `<div class="grp-info${compact ? ' compact' : ''}">
-      <div><span>Propriétaire</span><b>${own ? esc(own.name) + (own.id === meId() ? ' (vous)' : '') : 'Aucun'}</b></div>
+      <div><span>Propriétaire</span><b>${own ? esc(own.name) + (own.id === meId() ? ' (vous)' : '') : 'Aucun'}</b><small>Détient le forfait</small></div>
+      <div><span>Organisateur</span><b>${org ? esc(org.name) + (org.id === meId() ? ' (vous)' : '') : own ? esc(own.name) + (own.id === meId() ? ' (vous)' : '') : '—'}</b><small>Prépare les parties</small>${meOwner ? '<button class="linkbtn" data-pickorg type="button">Changer</button>' : ''}</div>
       <div><span>Forfait</span><b>${pl.name}${pl.expired ? ' (saison terminée)' : ''}</b><small class="${over ? 'over' : ''}">${n} / ${pl.max} joueurs${until}</small>${buy}</div>
     </div>`;
   }
+
+  function pickOrganizerSheet() {
+    const cur = (curGroup().organizers || [])[0] || ownerId();
+    openSheet(`<h3>Organisateur du groupe</h3><p class="note">Il prépare les parties : dates offertes, quatuors, nouvelles parties. Le propriétaire garde le forfait.</p>
+      <div class="pick-list">${(S.players || []).map(p => `<button class="btn ${p.id === cur ? '' : 'ghost'} small" data-orgpick="${esc(p.id)}" type="button">${esc(p.name)}${p.id === ownerId() ? ' · propriétaire' : ''}${p.id === cur ? ' ✓' : ''}</button>`).join('')}</div>
+      <div class="sheet-actions"><button class="btn ghost" data-close type="button">Fermer</button></div>`, sh => {
+      sh.querySelector('[data-close]').onclick = closeSheet;
+      sh.querySelectorAll('[data-orgpick]').forEach(b => b.onclick = async () => {
+        const id = b.dataset.orgpick, gr = { ...curGroup(), organizers: id === ownerId() ? [] : [id] };
+        try { await Store.saveGroup(gr); S.groups = await Store.listGroups(); closeSheet(); toast('Organisateur : ' + ((S.players.find(p => p.id === id) || {}).name || '')); render(); } catch (e) { toast('Impossible : ' + e.message); }
+      });
+    });
+  }
+  document.addEventListener('click', e => { const t = e.target.closest && e.target.closest('[data-pickorg]'); if (t) { e.preventDefault(); pickOrganizerSheet(); } });
 
   // ---------------- Effet viral : chaque joueur invité peut lancer son propre groupe, gratuit ----------------
   // Montré aux membres qui ne sont pas propriétaires d'un groupe (à l'accueil, et à la fin d'une partie).

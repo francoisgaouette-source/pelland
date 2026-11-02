@@ -69,7 +69,11 @@ service cloud.firestore {
         && !request.resource.data.keys().hasAny(['plan', 'paidUntil']);
       allow update: if membre() && id.matches('_groupe_.+') && dansGroupe(id.split('_groupe_')[1])
         && request.resource.data.id == resource.data.id
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan', 'paidUntil']);
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan', 'paidUntil'])
+        // propriétaire et organisateur : seul le propriétaire les change (ou un membre réclame un groupe sans propriétaire)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['owner', 'organizers'])
+            || resource.data.get('owner', '') == ''
+            || lien().playerId == resource.data.owner);
 
       // Anciens documents privés (_quatuors, _jeux_, _offre_, _demandes_jeux) : déplacés dans groupdata, offres et requests.
       // On permet seulement de les effacer (migration faite par l'app) ; plus aucune création.

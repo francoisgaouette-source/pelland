@@ -651,8 +651,10 @@ textarea { font-family: inherit; line-height: 1.4; resize: vertical; }
 .viral-flag { width: 40px; height: 40px; border-radius: 50%; background: #1f6b46; color: #fff; display: grid; place-items: center; }
 .viral h3 { margin: 2px 0 4px; } .viral p { margin: 0 0 10px; } .viral .row { gap: 8px; } .viral .note { margin: 8px 0 0; font-size: 13px; }
 .pick-list { display: grid; gap: 8px; margin: 8px 0 12px; } .pick-list .btn { width: 100%; text-align: left; }
-.grp-info { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #fff; border: 1px solid var(--line, #dde3df); border-radius: 14px; padding: 12px 14px; margin: 10px 0 14px; }
+.grp-info { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; background: #fff; border: 1px solid var(--line, #dde3df); border-radius: 14px; padding: 12px 14px; margin: 10px 0 14px; }
 .grp-info > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .grp-info span { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .grp-info b { font-size: 17px; } .grp-info small { color: var(--muted); font-size: 13px; } .grp-info small.over { color: #b3402b; font-weight: 600; }
 .grp-info .linkbtn { font-size: 13px; margin-top: 2px; }
+@media (max-width: 460px) { .grp-info { grid-template-columns: 1fr 1fr; } .grp-info > div:last-child { grid-column: 1 / -1; border-top: 1px solid var(--line, #dde3df); padding-top: 8px; } }
+.grp-info > div > .linkbtn { align-self: flex-start; }
