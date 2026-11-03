@@ -6,8 +6,8 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<title>Acheter Le 19e · 50 $ par saison</title>
-<meta name="description" content="Achetez Le 19e pour votre groupe de golf : 50 $ plus taxes pour la saison, jusqu’à 16 joueurs. Paiement sécurisé par carte.">
+<title>Acheter Le 19e · 79 $ par saison</title>
+<meta name="description" content="Achetez Le 19e pour votre groupe de golf : 79 $ plus taxes pour la saison (49 $ au prix fondateur avant le 31 mars 2027), jusqu’à 16 joueurs. Paiement sécurisé par carte.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&display=swap">
@@ -53,17 +53,18 @@
     <aside class="box order" aria-labelledby="orderTitle">
       <h3 id="orderTitle">Groupe · 1 saison</h3>
       <p class="sub">Jusqu’à 16 joueurs</p>
+      <p class="founder" id="founder" hidden><b>Prix fondateur</b> : <s>79 $</s> 49 $ jusqu’au 31 mars 2027, garanti les saisons suivantes.</p>
       <table class="bill">
-        <tr><td>Le 19e, 1 saison <small>(12 mois)</small></td><td>50,00 $</td></tr>
-        <tr><td>TPS <small>(5 %)</small></td><td>2,50 $</td></tr>
-        <tr><td>TVQ <small>(9,975 %)</small></td><td>4,99 $</td></tr>
-        <tr class="total"><td>Total</td><td>57,49 $</td></tr>
+        <tr><td>Le 19e, 1 saison <small>(12 mois)</small></td><td id="bPrix">79,00 $</td></tr>
+        <tr><td>TPS <small>(5 %)</small></td><td id="bTps">3,95 $</td></tr>
+        <tr><td>TVQ <small>(9,975 %)</small></td><td id="bTvq">7,88 $</td></tr>
+        <tr class="total"><td>Total</td><td id="bTot">90,83 $</td></tr>
       </table>
       <div class="soon" id="soon" hidden>Les ventes ouvrent bientôt. Pour réserver votre place, écrivez-nous à <a id="soonMail" href="mailto:bonjour@fanion.ai">bonjour@fanion.ai</a>.</div>
       <label class="agree"><input type="checkbox" id="agree"> <span>J’ai lu et j’accepte les <a href="conditions.html" target="_blank">conditions d’utilisation</a>, y compris la politique de remboursement, et la <a href="confidentialite.html" target="_blank">politique de confidentialité</a>.</span></label>
       <a class="pay" id="pay" href="#" aria-disabled="true" rel="noopener">
         <svg width="18" height="20" viewBox="0 0 18 20" aria-hidden="true"><rect x="1" y="8.5" width="16" height="10.5" rx="2" fill="currentColor"/><path d="M4.5 8.5V6a4.5 4.5 0 0 1 9 0v2.5" stroke="currentColor" stroke-width="2" fill="none"/></svg>
-        Payer 57,49 $
+        <span id="payTxt">Payer 90,83 $</span>
       </a>
       <p class="secure">Paiement sécurisé par Stripe. Fanion ne voit jamais votre numéro de carte.</p>
       <p class="note">Pas un abonnement : rien ne se renouvelle sans votre accord. Remboursement complet sur demande dans les 30 jours.</p>
@@ -82,6 +83,14 @@
 <script>
 (function () {
   var Q = window.FANION || {}, link = (Q.stripeLink || '').trim();
+  // Prix fondateur jusqu'à la date prévue ; taxes calculées (TPS 5 %, TVQ 9,975 %)
+  var fin = new Date((Q.finFondateur || '2027-03-31') + 'T23:59:59'), fondateur = new Date() <= fin;
+  var prix = fondateur ? (Q.prixFondateur || 49) : (Q.prix || 79);
+  if (fondateur) { document.getElementById('founder').hidden = false; link = (Q.stripeLinkFondateur || '').trim(); }
+  var r = function (x) { return Math.round(x * 100) / 100; }, f = function (x) { return x.toFixed(2).replace('.', ',') + ' $'; };
+  var tps = r(prix * 0.05), tvq = r(prix * 0.09975), tot = r(prix + tps + tvq);
+  document.getElementById('bPrix').textContent = f(prix); document.getElementById('bTps').textContent = f(tps); document.getElementById('bTvq').textContent = f(tvq); document.getElementById('bTot').textContent = f(tot);
+  document.getElementById('payTxt').textContent = 'Payer ' + f(tot);
   var pay = document.getElementById('pay'), agree = document.getElementById('agree');
   if (Q.email) document.querySelectorAll('a.mail, #soonMail').forEach(function (a) { a.href = 'mailto:' + Q.email; if (a.id === 'soonMail' || a.textContent.indexOf('@') > -1) a.textContent = Q.email; });
   if (Q.appUrl) document.getElementById('appLink').href = Q.appUrl;

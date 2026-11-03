@@ -138,6 +138,8 @@ h2 { font-family: var(--display); font-weight: 800; font-size: clamp(38px, 5vw, 
 .plan.pro { border: 2.5px solid var(--fairway); }
 .plan h3 { font-family: var(--display); font-weight: 700; font-size: 30px; margin: 0; }
 .price { font-family: var(--display); font-weight: 800; font-size: 64px; line-height: 1; margin: 12px 0 4px; }
+.price s.was { font-size: 34px; color: var(--pencil); font-weight: 700; margin-right: 6px; text-decoration-thickness: 3px; }
+.founder { background: #fdf3d6; border-radius: 10px; padding: 8px 12px; font-size: 15px; line-height: 1.35; margin: 6px 0 10px; }
 .price small { display: block; font-family: var(--body); font-weight: 500; font-size: 16px; color: var(--pencil); margin-top: 4px; line-height: 1.3; }
 .plan .for { color: var(--pencil); margin: 0 0 20px; }
 .plan ul { list-style: none; padding: 0; margin: 0 0 28px; flex: 1; }
@@ -281,7 +283,8 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
       </div>
       <div class="plan pro">
         <h3>Groupe</h3>
-        <div class="price">50 $ <small>+ taxes, par saison</small></div>
+        <div class="price"><s class="was">79 $</s> 49 $ <small>+ taxes, par saison</small></div>
+        <p class="founder"><b>Prix fondateur</b> pour les groupes inscrits avant le 31 mars 2027, garanti les saisons suivantes. Ensuite : 79 $.</p>
         <p class="for">Pour une gang qui joue toute la saison.</p>
         <ul>
           <li>Jusqu’à 16 joueurs</li>
@@ -294,7 +297,7 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
       </div>
       <div class="plan">
         <h3>Ligue <span class="soon-tag">Bientôt</span></h3>
-        <div class="price">150 $ <small>+ taxes, par saison</small></div>
+        <div class="price">199 $ <small>+ taxes, par saison</small></div>
         <p class="for">Pour une ligue de club ou de centre de simulateurs.</p>
         <ul>
           <li>Jusqu’à 64 joueurs</li>
@@ -303,7 +306,7 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
           <li>Outils pour l’organisateur de la ligue</li>
           <li>Plusieurs organisateurs</li>
         </ul>
-        <a class="btn line" href="mailto:bonjour@fanion.ai?subject=Fanion%20Game%20-%20Ligue">Réserver pour ma ligue</a>
+        <a class="btn line" href="mailto:bonjour@fanion.ai?subject=Le%2019e%20-%20Ligue">Réserver pour ma ligue</a>
       </div>
     </div>
     <p class="plans-note">Plus de 64 joueurs, un club ou un centre de simulateurs ? <a href="mailto:bonjour@fanion.ai">Écrivez-nous</a>.</p>
@@ -318,8 +321,8 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
       <details><summary>Faut-il télécharger une app ?</summary><p>Non. Ouvrez le lien sur votre téléphone, puis ajoutez Le 19e à votre écran d’accueil (sur iPhone : bouton Partager, puis « Sur l’écran d’accueil »). Elle s’ouvre ensuite comme une app.</p></details>
       <details><summary>Est-ce que ça marche sans réseau sur le terrain ?</summary><p>Oui. Les scores entrés sans réseau sont gardés sur le téléphone et envoyés dès que le signal revient.</p></details>
       <details><summary>Est-ce que tout le monde doit avoir l’app ?</summary><p>Seul le responsable de la partie entre les scores. Les autres suivent la partie en direct s’ils le veulent, et répondent aux dates offertes avec le lien reçu par texto.</p></details>
-      <details><summary>Comment les joueurs se connectent-ils ?</summary><p>Avec leur nom et leur numéro de téléphone. L’invitation par texto choisit déjà leur nom ; ils n’ont qu’à entrer leur numéro.</p></details>
-      <details><summary>Comment se passe l’achat ?</summary><p>L’organisateur paie 50 $ plus taxes par carte de crédit, sur une page de paiement sécurisée (Stripe). Il indique le nom de son groupe et reçoit un reçu par courriel. Le groupe passe à 16 joueurs dans les 24 heures.</p></details>
+      <details><summary>Comment les joueurs se connectent-ils ?</summary><p>Avec leur numéro de cellulaire : ils reçoivent un code à 6 chiffres par texto. L’invitation choisit déjà leur nom ; aucun mot de passe à retenir.</p></details>
+      <details><summary>Comment se passe l’achat ?</summary><p>L’organisateur paie 79 $ plus taxes par carte de crédit (49 $ au prix fondateur, avant le 31 mars 2027), sur une page de paiement sécurisée (Stripe). Il indique le nom de son groupe et reçoit un reçu par courriel. Le groupe passe à 16 joueurs dans les 24 heures.</p></details>
       <details><summary>Est-ce un abonnement qui se renouvelle tout seul ?</summary><p>Non. Vous payez une saison à la fois. Aucun montant n’est prélevé sans votre accord.</p></details>
       <details><summary>Et si ça ne fait pas l’affaire ?</summary><p>Vous avez 30 jours après l’achat pour demander un remboursement complet, sans justification. Écrivez à <a href="mailto:bonjour@fanion.ai">bonjour@fanion.ai</a>.</p></details>
       <details><summary>L’app gère-t-elle l’argent des gageures ?</summary><p>Non. Le 19e calcule qui doit quoi selon vos règles, mais ne touche jamais à l’argent. Vous réglez entre vous, comme d’habitude.</p></details>
