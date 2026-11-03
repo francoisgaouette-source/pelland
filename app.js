@@ -587,6 +587,7 @@
     return `
       <div class="hero"><h1>${esc(groupName())}${canOrganize() ? ' <button class="hero-edit" id="renameGroup" type="button" aria-label="Modifier le nom du groupe">Modifier</button>' : ''}</h1><p>${APP} · le golf entre amis${Store.myGroups().length > 1 ? ' · <button class="linkbtn" id="switchGroup" type="button">Changer de groupe</button>' : ''}</p></div>
       ${Store.needLogin ? '' : groupInfo(true)}
+      ${onboardCard()}
       <div class="tiles">
         <button class="tile" data-go="courses"><span class="pin">⛳</span><div><strong>Terrains</strong><span>Ajouter ou corriger un terrain</span></div></button>
         <button class="tile" data-go="players"><span class="pin"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M15.5 2.5 9 17.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M9 17.2c-.4 1.2-1.6 2.2-3.4 2.4l-2.1.2c-.6.1-.9.7-.6 1.2.2.3.5.5.9.5h4.6c1.6 0 2.7-.9 3.1-2.2l.3-.9" fill="currentColor"/><circle cx="18.5" cy="19.5" r="1.8" fill="currentColor"/></svg></span><div><strong>Joueurs</strong><span>Ajouter ou retirer des joueurs</span></div></button>
@@ -652,6 +653,50 @@
       ${meOwner ? '' : `<p class="note">Seul le propriétaire du groupe${own ? ', ' + esc(own.name) + ',' : ''} peut changer de forfait.</p>`}`}
       <div class="sheet-actions">${!pl.paid && meOwner ? `<a class="btn" href="${buyUrl()}" target="_blank" rel="noopener">Passer au Groupe</a>` : ''}<button class="btn ghost" data-close type="button">${!pl.paid && meOwner ? 'Plus tard' : 'Compris'}</button></div>`, sh => { sh.querySelector('[data-close]').onclick = closeSheet; });
   }
+
+  // ---------------- Bien démarrer : 4 premiers pas pour un nouveau groupe (propriétaire et organisateur) ----------------
+  // Le progrès est gardé sur le groupe (onb), donc le même sur tous les téléphones ; l'écran d'accueil est propre à chaque téléphone.
+  async function markStep(key) {
+    const gr = curGroup(); if ((gr.onb || {})[key]) return;
+    const ng = { ...gr, onb: { ...(gr.onb || {}), [key]: Date.now() } };
+    S.groups = (S.groups || []).map(g => g.id === ng.id ? ng : g);
+    try { await Store.saveGroup(ng); } catch (e) { }
+  }
+  const standalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  function onboardSteps() {
+    const onb = curGroup().onb || {}, me = meId();
+    const withPhone = (S.players || []).filter(p => p.id !== me && (p.phone || p.authEmail)).length;
+    return [
+      { k: 'joueurs', done: withPhone >= 3, t: 'Ajoutez vos joueurs', d: withPhone ? `${withPhone} joueur${withPhone > 1 ? 's' : ''} avec cellulaire : il en faut 3 pour un premier quatuor.` : 'Avec leur cellulaire : chacun reçoit son invitation par texto.', go: 'players', b: 'Joueurs' },
+      { k: 'offre', done: !!onb.offre || (S.offres || []).length > 0, t: 'Offrez une première date', d: 'Vos joueurs répondent par texto ; l’app forme les quatuors.', go: 'quatuors', b: 'Offrir' },
+      { k: 'partie', done: !!onb.partie, t: 'Jouez une première partie', d: 'Choisissez le terrain et le jeu ; l’app compte tout, en direct.', go: 'setup', b: 'Commencer' },
+      { k: 'ecran', done: standalone() || !!ls.get('pelland.onb.ecran', 0), t: 'Ajoutez l’app à votre écran d’accueil', d: 'Elle s’ouvre ensuite comme une vraie app.', act: 'ecran', b: 'Comment' },
+    ];
+  }
+  function onboardCard() {
+    if (Store.needLogin || !canOrganize() || ls.get('pelland.onb.hide.' + Store.gid, 0)) return '';
+    const st = onboardSteps(), n = st.filter(x => x.done).length;
+    if (n === st.length) return '';
+    const next = st.find(x => !x.done);
+    return `<section class="card onboard"><div class="onb-head"><h3>Bien démarrer</h3><span class="onb-count">${n} / ${st.length}</span></div>
+      <div class="onb-bar"><i style="width:${Math.round(n / st.length * 100)}%"></i></div>
+      <ol class="onb-list">${st.map(x => `<li class="${x.done ? 'done' : x === next ? 'next' : ''}"><span class="onb-dot">${x.done ? '✓' : ''}</span><div><b>${esc(x.t)}</b>${x === next ? `<small>${esc(x.d)}</small>` : ''}</div>${x.done ? '' : x === next ? `<button class="btn small" ${x.go ? `data-go="${x.go}"` : `data-onbact="${x.act}"`} type="button">${esc(x.b)}</button>` : `<button class="onb-more" ${x.go ? `data-go="${x.go}"` : `data-onbact="${x.act}"`} type="button" aria-label="${esc(x.b)}">›</button>`}</li>`).join('')}</ol>
+      <p class="note onb-foot">Une question ? Écrivez à <a href="mailto:bonjour@fanion.ai">bonjour@fanion.ai</a> · <button class="linkbtn" data-onbhide type="button">Masquer</button></p></section>`;
+  }
+  document.addEventListener('click', e => {
+    const t = e.target.closest && e.target.closest('[data-onbact],[data-onbhide]'); if (!t) return;
+    e.preventDefault();
+    if (t.hasAttribute('data-onbhide')) { ls.set('pelland.onb.hide.' + Store.gid, 1); return render(); }
+    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    openSheet(`<h3>Le 19e sur votre écran d’accueil</h3>
+      <ol class="info-list">${ios ? '<li>Ouvrez Le 19e dans <b>Safari</b>.</li><li>Touchez le bouton <b>Partager</b> (le carré avec une flèche vers le haut).</li><li>Choisissez <b>Sur l’écran d’accueil</b>, puis <b>Ajouter</b>.</li>'
+        : '<li>Ouvrez Le 19e dans <b>Chrome</b>.</li><li>Touchez le menu <b>⋮</b> en haut à droite.</li><li>Choisissez <b>Ajouter à l’écran d’accueil</b> (ou <b>Installer l’application</b>).</li>'}</ol>
+      <p class="note">L’icône du fanion apparaît avec vos autres apps. Partagez ces étapes avec vos joueurs.</p>
+      <div class="sheet-actions"><button class="btn" data-ecranok type="button">C’est fait</button><button class="btn ghost" data-close type="button">Plus tard</button></div>`, sh => {
+      sh.querySelector('[data-close]').onclick = closeSheet;
+      sh.querySelector('[data-ecranok]').onclick = () => { ls.set('pelland.onb.ecran', 1); closeSheet(); render(); };
+    });
+  });
 
   // ---------------- Parrainage : le propriétaire partage son lien ; les groupes créés avec ce lien sont comptés ----------------
   function refLink(code) { return location.origin + location.pathname + '?ref=' + encodeURIComponent(code || Store.gid); }
@@ -1672,7 +1717,7 @@
           if (!dates.length) return toast('Ajoutez au moins une date.');
           if (!f.deadline) return toast('Choisissez la date butoir.');
           const o = { id: Date.now().toString(36), course: f.course, place: f.place || '', dates, deadline: new Date(f.deadline + 'T23:59:59').getTime(), by: ls.get('pelland.me', '') || '', groupId: Store.gid, createdAt: Date.now() };
-          try { await Store.saveOffre(o); S.offres = [o].concat(S.offres || []); S.newOffre = null; render(); offreSms(o); }
+          try { await Store.saveOffre(o); S.offres = [o].concat(S.offres || []); S.newOffre = null; markStep('offre'); render(); offreSms(o); }
           catch (e) { toast('Enregistrement impossible : ' + e.message); }
         };
       }
@@ -1951,7 +1996,7 @@
         const g = { id, createdAt: Date.now(), ownerUid: Store.uid, course: pv.c, courseId: pv.c.id, mode: d.mode, responsable: rIdx >= 0 ? rIdx : 0,
           format: jeu ? 'perso' : fmtG, custom: jeu ? JSON.parse(JSON.stringify(jeu)) : null, players: pv.ps, teams: neuf ? null : draftTeams(d, pv.ps), teamMode: neuf ? null : d.teamMode, stake: money(d.stake), leadChangeValue: money(d.leadChangeValue), perPoint: String(d.perPoint || '').trim() === '' ? 1 : money(d.perPoint), par3Value: String(d.par3Value ?? '').trim() === '' ? 5 : money(d.par3Value), currentHole: d.holes === 'back' ? 10 : 1, firstHole: d.holes === 'back' ? 10 : 1, lastHole: d.holes === 'front' ? 9 : 18, scores: {}, events: {}, status: 'en cours' };
         try {
-          await Store.saveGame(g);
+          await Store.saveGame(g); markStep('partie');
           // Responsable choisi = un autre joueur que moi : la partie lui est confiée (il la prend en l'ouvrant)
           const mi = myIdx(g); if (Store.uid && g.responsable !== mi) { g.ownerUid = ''; await Store.saveGame(g); }
           S.draft = null; openGame(id); toast(g.ownerUid ? 'Partie créée.' : `Partie créée : ${g.players[g.responsable].name} est le responsable.`);
