@@ -91,10 +91,15 @@
   var tps = r(prix * 0.05), tvq = r(prix * 0.09975), tot = r(prix + tps + tvq);
   document.getElementById('bPrix').textContent = f(prix); document.getElementById('bTps').textContent = f(tps); document.getElementById('bTvq').textContent = f(tvq); document.getElementById('bTot').textContent = f(tot);
   document.getElementById('payTxt').textContent = 'Payer ' + f(tot);
+  // Arrivé depuis l'app : on transmet l'identifiant du groupe à Stripe (client_reference_id) pour activer le bon groupe
+  var qs = new URLSearchParams(location.search), gid = (qs.get('groupe') || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 190), gname = qs.get('nom') || '';
+  if (gid) { var sub = document.querySelector('.box.order .sub'); if (sub) sub.textContent = 'Pour le groupe « ' + (gname || gid) + ' » · jusqu’à 16 joueurs'; }
+  var withRef = function (u) { if (!u || !gid) return u; return u + (u.indexOf('?') > -1 ? '&' : '?') + 'client_reference_id=' + encodeURIComponent(gid); };
   var pay = document.getElementById('pay'), agree = document.getElementById('agree');
   if (Q.email) document.querySelectorAll('a.mail, #soonMail').forEach(function (a) { a.href = 'mailto:' + Q.email; if (a.id === 'soonMail' || a.textContent.indexOf('@') > -1) a.textContent = Q.email; });
   if (Q.appUrl) document.getElementById('appLink').href = Q.appUrl;
   if (!link) { document.getElementById('soon').hidden = false; agree.disabled = true; return; }
+  link = withRef(link);
   function sync() { var ok = agree.checked; pay.setAttribute('aria-disabled', ok ? 'false' : 'true'); pay.href = ok ? link : '#'; }
   agree.addEventListener('change', sync); sync();
 })();

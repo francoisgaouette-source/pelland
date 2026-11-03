@@ -257,13 +257,16 @@
       this.setGroup(entry.gid);
     },
     // Nouveau groupe : crée le compte du premier membre, le groupe et le joueur
-    async createGroup(groupName, name, phone) {
+    // Parrainage : ?ref=<code> (un groupe ou un centre) est gardé 90 jours sur ce téléphone, puis noté sur le groupe créé
+    refCode() { const r = ls.get('pelland.ref', null); return r && r.until > Date.now() ? r.code : ''; },
+    async createGroup(groupName, name, phone, ref) {
       const digits = String(phone || '').replace(/\D/g, '');
       if (!groupName.trim()) throw new Error('Donnez un nom au groupe.');
       if (!name.trim()) throw new Error('Entrez votre prénom et nom.');
       if (digits.length < 7) throw new Error('Entrez votre numéro de téléphone (10 chiffres).');
       const pid = slug(name) + '-' + Math.random().toString(36).slice(2, 6);
       const gr = { id: slug(groupName) + '-' + Math.random().toString(36).slice(2, 6), name: groupName.trim(), owner: pid, createdAt: Date.now() };
+      const rc = String(ref || this.refCode() || '').replace(/[^a-z0-9_-]/gi, '').slice(0, 60); if (rc) gr.ref = rc;
       if (this.mode === 'firebase') {
         const email = pid.replace(/[^a-z0-9-]/gi, '') + '-' + Date.now().toString(36) + '@pelland.golf';
         const c = await firebase.auth().createUserWithEmailAndPassword(email, digits);
@@ -593,6 +596,7 @@
         <button class="tile" data-go="live"><span class="pin">⏵</span><div><strong>Parties en cours</strong><span>Les parties qui ont lieu en ce moment</span></div></button>
         <button class="tile" data-go="history"><span class="pin">≡</span><div><strong>Parties jouées</strong><span>Les parties terminées</span></div></button>
       </div>
+      ${referralCard()}
       ${viralCard('home')}
       ${Store.mode === 'firebase' && Store.email ? `<p class="note">Connecté : <b>${esc(ls.get('pelland.me', '') || '')}</b> · <button class="linkbtn" id="logout" type="button">Se déconnecter</button></p>` : ''}
       <p class="note">${Store.mode === 'firebase' ? 'Base partagée active : les autres joueurs suivent la partie en direct dans Parties en cours.' : 'Mode local : les parties restent sur ce téléphone.'}</p>
@@ -603,13 +607,14 @@
   // Forfait gardé dans players/_groupe_<g> : plan = 'groupe' (16 joueurs, payé) et paidUntil (ms). Sans forfait : Gratuit, 4 joueurs.
   function planOf(gr) {
     gr = gr || curGroup();
+    if (gr.id === 'pelland') return { name: 'Fondateur', max: 16, until: null, paid: true };  // la gang à Pelland : groupe fondateur
     if (gr.plan === 'groupe' && (!gr.paidUntil || gr.paidUntil > Date.now())) return { name: 'Groupe', max: 16, until: gr.paidUntil || null, paid: true };
     return { name: 'Gratuit', max: 4, until: null, paid: false, expired: gr.plan === 'groupe' };
   }
   function groupInfo(compact) {
     const own = (S.players || []).find(p => p.id === ownerId()), pl = planOf(), n = (S.players || []).length, over = n > pl.max;
     const until = pl.until ? ' · jusqu’au ' + new Date(pl.until).toLocaleDateString('fr-CA', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-    const buy = !pl.paid && meId() && meId() === ownerId() ? ` <a class="linkbtn" href="https://fanion.ai/achat.html" target="_blank" rel="noopener">Passer au Groupe</a>` : '';
+    const buy = !pl.paid && meId() && meId() === ownerId() ? ` <a class="linkbtn" href="${buyUrl()}" target="_blank" rel="noopener">Passer au Groupe</a>` : '';
     const orgId = (curGroup().organizers || [])[0], org = (S.players || []).find(p => p.id === orgId);
     const meOwner = !!meId() && meId() === ownerId();
     return `<div class="grp-info${compact ? ' compact' : ''}">
@@ -632,6 +637,38 @@
     });
   }
   document.addEventListener('click', e => { const t = e.target.closest && e.target.closest('[data-pickorg]'); if (t) { e.preventDefault(); pickOrganizerSheet(); } });
+
+  // Lien d'achat : le site transmet l'identifiant du groupe à Stripe, pour activer le bon groupe
+  function buyUrl() { return 'https://fanion.ai/achat.html?groupe=' + encodeURIComponent(Store.gid) + '&nom=' + encodeURIComponent(groupName()); }
+  // Places qui restent dans le forfait (Gratuit : 4 joueurs ; Groupe : 16)
+  function roomLeft() { return planOf().max - (S.players || []).length; }
+  function limitSheet(wanted) {
+    const pl = planOf(), own = (S.players || []).find(p => p.id === ownerId()), meOwner = !!meId() && meId() === ownerId();
+    const left = Math.max(0, roomLeft());
+    openSheet(`<h3>${pl.paid ? 'Le groupe est complet' : 'Passez au forfait Groupe'}</h3>
+      <p>${pl.paid ? `Le forfait ${pl.name} permet ${pl.max} joueurs.` : `Le forfait Gratuit permet ${pl.max} joueurs, pour essayer avec un quatuor.`}${wanted ? ` Vous voulez en ajouter ${wanted}, il reste ${left} place${left > 1 ? 's' : ''}.` : ''}</p>
+      ${pl.paid ? '<p class="note">Pour une ligue de plus de 16 joueurs, écrivez à bonjour@fanion.ai.</p>'
+        : `<ul class="info-list"><li>Jusqu’à 16 joueurs</li><li>Dates offertes, disponibilités et quatuors</li><li>49 $ + taxes pour la saison, au prix fondateur</li></ul>
+      ${meOwner ? '' : `<p class="note">Seul le propriétaire du groupe${own ? ', ' + esc(own.name) + ',' : ''} peut changer de forfait.</p>`}`}
+      <div class="sheet-actions">${!pl.paid && meOwner ? `<a class="btn" href="${buyUrl()}" target="_blank" rel="noopener">Passer au Groupe</a>` : ''}<button class="btn ghost" data-close type="button">${!pl.paid && meOwner ? 'Plus tard' : 'Compris'}</button></div>`, sh => { sh.querySelector('[data-close]').onclick = closeSheet; });
+  }
+
+  // ---------------- Parrainage : le propriétaire partage son lien ; les groupes créés avec ce lien sont comptés ----------------
+  function refLink(code) { return location.origin + location.pathname + '?ref=' + encodeURIComponent(code || Store.gid); }
+  function referralCard() {
+    if (Store.needLogin || !meId() || meId() !== ownerId()) return '';
+    const mine = (S.groups || []).filter(g => g.ref === Store.gid), paid = mine.filter(g => planOf(g).paid && g.id !== 'pelland').length;
+    return `<section class="card referral"><h3>Parrainez un autre groupe</h3>
+      <p>Pour chaque groupe qui s’inscrit avec votre lien et passe au forfait Groupe, <b>votre prochaine saison est offerte</b>.</p>
+      <div class="ref-stats"><span><b>${mine.length}</b> groupe${mine.length > 1 ? 's' : ''} inscrit${mine.length > 1 ? 's' : ''}</span><span><b>${paid}</b> au forfait Groupe</span></div>
+      <div class="row"><button class="btn small" data-refshare type="button">Partager mon lien</button><button class="btn ghost small" data-refcopy type="button">Copier</button></div></section>`;
+  }
+  document.addEventListener('click', async e => {
+    const t = e.target.closest && e.target.closest('[data-refshare],[data-refcopy]'); if (!t) return;
+    const url = refLink(), text = `On organise notre golf avec ${APP} : invitations par texto, quatuors, pointage et gageures calculées. Crée ton groupe, c’est gratuit pour un quatuor :`;
+    if (t.hasAttribute('data-refshare') && navigator.share) { try { await navigator.share({ title: APP, text, url }); } catch (x) { } return; }
+    try { await navigator.clipboard.writeText(text + ' ' + url); toast('Lien copié.'); } catch (x) { openSheet(`<h3>Votre lien</h3><p class="note">Copiez-le :</p><input type="text" readonly value="${esc(url)}" onclick="this.select()"><div class="sheet-actions"><button class="btn" data-close type="button">Fermer</button></div>`, sh => { sh.querySelector('[data-close]').onclick = closeSheet; }); }
+  });
 
   // ---------------- Effet viral : chaque joueur invité peut lancer son propre groupe, gratuit ----------------
   // Montré aux membres qui ne sont pas propriétaires d'un groupe (à l'accueil, et à la fin d'une partie).
@@ -658,7 +695,7 @@
       const b = sh.querySelector('#vgGo');
       b.onclick = async () => {
         const msg = sh.querySelector('#vgMsg'); b.disabled = true; msg.textContent = 'Création…';
-        try { await Store.createGroup(sh.querySelector('#vgName').value, sh.querySelector('#vgMe').value, sh.querySelector('#vgPhone').value); ls.set('pelland.lastGame', null); location.href = location.pathname; }
+        try { await Store.createGroup(sh.querySelector('#vgName').value, sh.querySelector('#vgMe').value, sh.querySelector('#vgPhone').value, Store.gid); ls.set('pelland.lastGame', null); location.href = location.pathname; }
         catch (e) { msg.textContent = e.message; b.disabled = false; }
       };
       setTimeout(() => { const i = sh.querySelector('#vgName'); if (i) i.focus(); }, 50);
@@ -1300,7 +1337,11 @@
     const groups = S.groups || [{ id: 'pelland', name: 'La gang à Pelland' }];
     const inv = invited && S.players.find(p => p.id === invited);
     if (!S.loginGroup) S.loginGroup = inv ? (inv.groupId || 'pelland') : Store.gid;
+    const refQ = new URLSearchParams(location.search).get('ref');
+    if (refQ && !invited && S.newGroupForm === undefined) S.newGroupForm = true;
+    const refGroup = refQ && (S.groups || []).find(g => g.id === refQ);
     if (S.newGroupForm) return `<div class="hero"><h1>${APP}</h1><p>Le golf entre amis : pointage, jeux et parties à venir.</p></div>
+      ${refQ ? `<div class="ref-hello">${refGroup ? `Recommandé par <b>${esc(refGroup.name)}</b>. ` : ''}Créez votre groupe : c’est gratuit pour un quatuor, et vos joueurs reçoivent l’invitation par texto.</div>` : ''}
       <section class="card"><h2>Créer un groupe</h2>
         <label>Nom du groupe<input id="ngName" type="text" placeholder="ex. Les lève-tôt du samedi"></label>
         <label>Votre prénom et nom<input id="ngMe" type="text" autocapitalize="words"></label>
@@ -1368,12 +1409,14 @@
     const seen = new Set(S.players.map(p => L.norm(p.name)));
     const items = list.map(x => { const dup = seen.has(L.norm(x.name)); seen.add(L.norm(x.name)); const bad = x.phone && x.phone.length !== 10; return { ...x, dup, bad, on: !dup && !bad }; });
     const draw = sh => {
-      const n = items.filter(x => x.on).length;
+      const n = items.filter(x => x.on).length, room = roomLeft(), over = n > room;
       sh.innerHTML = `<h3>Importer des joueurs</h3><p class="note">${items.length} ligne${items.length > 1 ? 's' : ''} lue${items.length > 1 ? 's' : ''} dans « ${esc(file.name)} ». Décochez ceux à ne pas ajouter.</p>
         <div class="imp-list">${items.map((x, i) => `<label class="imp-row ${x.dup || x.bad ? 'warnrow' : ''}"><input type="checkbox" data-imp="${i}" ${x.on ? 'checked' : ''} ${x.dup ? 'disabled' : ''}><span><b>${esc(x.name)}</b><small>${x.phone ? esc(fmtPhone(x.phone)) : 'Pas de numéro'}${x.dup ? ' · déjà dans le groupe' : x.bad ? ' · numéro à vérifier' : ''}</small></span></label>`).join('')}</div>
+        ${over ? `<div class="warn">Votre forfait ${planOf().name} permet ${planOf().max} joueurs : il reste ${Math.max(0, room)} place${room > 1 ? 's' : ''}. Décochez-en ${n - Math.max(0, room)} ou <button class="linkbtn" data-limit type="button">passez au forfait Groupe</button>.</div>` : ''}
         <p class="note">Les invitations par texto s’envoient ensuite depuis la liste, avec le bouton ☎ de chaque joueur.</p>
-        <div class="row"><button class="btn small" id="impGo" type="button" ${n ? '' : 'disabled'}>Importer (${n})</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`;
+        <div class="row"><button class="btn small" id="impGo" type="button" ${n && !over ? '' : 'disabled'}>Importer (${n})</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`;
       sh.querySelectorAll('[data-imp]').forEach(c => c.onchange = () => { items[+c.dataset.imp].on = c.checked; draw(sh); });
+      const lm = sh.querySelector('[data-limit]'); if (lm) lm.onclick = () => { closeSheet(); setTimeout(() => limitSheet(n), 50); };
       sh.querySelector('[data-close]').onclick = closeSheet;
       sh.querySelector('#impGo').onclick = async () => {
         const todo = items.filter(x => x.on); let ok = 0, phErr = 0;
@@ -1690,6 +1733,7 @@
         const near = duplicateMap(S.players.concat([{ id: '__new', name: n }]))['__new'];
         if (near && S.confirmAdd !== n) { S.confirmAdd = n; return toast(`Ressemble à ${near.join(', ')}. Touchez Ajouter de nouveau pour confirmer.`); }
         S.confirmAdd = null;
+        if (roomLeft() <= 0) return limitSheet();
         try { const np = await Store.savePlayer(n); const ph = $('#newPhone').value.trim(); if (ph) await Store.setPhone(np, ph); S.players = await Store.listPlayers(); render(); if (ph) inviteText(n, ph, np.id); else setTimeout(() => $('#newPlayer') && $('#newPlayer').focus(), 50); }
         catch (e) { toast('Ajout impossible : ' + e.message); }
       };
@@ -2561,6 +2605,10 @@
   // Réseau perdu / retrouvé : on l'indique, Firebase envoie les scores en attente tout seul
   window.addEventListener('offline', () => { render(); toast('Hors ligne : les scores sont gardés et seront envoyés au retour du réseau.'); });
   window.addEventListener('online', () => { render(); toast('Réseau retrouvé : scores envoyés.'); });
+  (function captureRef() {
+    const r = new URLSearchParams(location.search).get('ref');
+    if (r && /^[a-z0-9_-]{2,60}$/i.test(r)) ls.set('pelland.ref', { code: r, until: Date.now() + 90 * 864e5 });
+  })();
   (async function start() {
     $('#view').innerHTML = '<p class="note">Démarrage…</p>';
     await Store.init();

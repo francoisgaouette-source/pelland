@@ -1,0 +1,21 @@
+
+.crumbs { font-size: 15px; color: var(--pencil); margin: 0 0 14px; } .crumbs a { color: var(--pencil); }
+.facts { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 28px; padding: 0; list-style: none; }
+.facts li { background: var(--white); border: 1.5px solid var(--line); border-radius: 999px; padding: 6px 14px; font-size: 16px; }
+.rules ol { padding-left: 22px; } .rules li { margin: 8px 0; }
+.example { background: var(--white); border-left: 5px solid var(--flag); border-radius: 10px; padding: 16px 20px; margin: 14px 0; }
+.example p { margin: 0 0 8px; font-weight: 600; } .example ul { margin: 0; padding-left: 20px; }
+.money-ex { background: #e6efe9; border-radius: 10px; padding: 14px 18px; }
+.cta { background: var(--pine); color: #dfe7e1; border-radius: 16px; padding: 26px 28px; margin: 44px 0 10px; }
+.cta h2 { color: var(--white); margin: 0 0 8px; } .cta p { margin: 0 0 16px; }
+.cta a.btn { display: inline-block; background: var(--flag); color: var(--pine); font-weight: 700; text-decoration: none; padding: 12px 20px; border-radius: 10px; }
+.cta a.sec { color: #dfe7e1; margin-left: 14px; white-space: nowrap; display: inline-block; margin-top: 10px; }
+.rnav a { margin-left: 18px; } @media (max-width: 520px) { .rnav .login { display: none; } .mark { font-size: 26px; } }
+.faq details { background: var(--white); border: 1.5px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 8px 0; }
+.faq summary { font-weight: 600; cursor: pointer; } .faq p { margin: 8px 0 0; }
+.games { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin: 18px 0 0; }
+.games a { display: block; background: var(--white); border: 1.5px solid var(--line); border-radius: 14px; padding: 18px 20px; text-decoration: none; color: var(--ink); }
+.games a:hover { border-color: var(--fairway); }
+.games b { display: block; font-family: var(--display); font-size: 26px; line-height: 1.1; margin-bottom: 4px; }
+.games span { color: var(--pencil); font-size: 16px; }
+.games small { display: block; color: var(--fairway); font-weight: 600; margin-top: 8px; font-size: 14px; }

@@ -49,3 +49,12 @@ Stripe vous envoie un courriel avec le nom du groupe. Pour l’instant, l’acti
 - Compléter les éléments entre [crochets] dans `conditions.html` et `confidentialite.html`, et les faire valider par un avocat.
 - Remplacer bonjour@fanion.ai dans `config.js` et dans les pages si l’adresse change.
 - Mettre le site en ligne (ex. GitHub Pages ou Netlify) sous votre nom de domaine.
+
+## Savoir quel groupe a payé
+
+Le bouton « Passer au Groupe » de l'app ouvre la page Acheter avec l'identifiant du groupe. La page le transmet à Stripe : dans chaque paiement, le champ **client_reference_id** contient l'identifiant du groupe à activer (document `players/_groupe_<identifiant>` dans Firestore : ajouter `plan: "groupe"` et `paidUntil`).
+
+## Parrainage et affiches
+
+- Chaque propriétaire partage son lien depuis l'accueil de l'app (`?ref=<groupe>`). Les groupes créés avec ce lien portent le champ `ref` dans leur document `_groupe_`.
+- Pour un centre de simulateurs : ouvrez `fanion.ai/affiche.html`, entrez le nom du centre et un code (ex. `vieux-port`), puis imprimez. Les groupes créés à partir de l'affiche portent `ref: "vieux-port"`.
