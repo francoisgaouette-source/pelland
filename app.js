@@ -598,6 +598,7 @@
         <button class="tile" data-go="history"><span class="pin">≡</span><div><strong>Parties jouées</strong><span>Les parties terminées</span></div></button>
       </div>
       ${referralCard()}
+      ${Store.needLogin ? '' : `<button class="caddie-tile" data-caddie type="button"><span class="cad-ico" aria-hidden="true">?</span><span><b>Une question ?</b><small>Demandez au Caddie : l’app, les règles des jeux, les forfaits.</small></span></button>`}
       ${viralCard('home')}
       ${Store.mode === 'firebase' && Store.email ? `<p class="note">Connecté : <b>${esc(ls.get('pelland.me', '') || '')}</b> · <button class="linkbtn" id="logout" type="button">Se déconnecter</button></p>` : ''}
       <p class="note">${Store.mode === 'firebase' ? 'Base partagée active : les autres joueurs suivent la partie en direct dans Parties en cours.' : 'Mode local : les parties restent sur ce téléphone.'}</p>
@@ -681,7 +682,7 @@
     return `<section class="card onboard"><div class="onb-head"><h3>Bien démarrer</h3><span class="onb-count">${n} / ${st.length}</span></div>
       <div class="onb-bar"><i style="width:${Math.round(n / st.length * 100)}%"></i></div>
       <ol class="onb-list">${st.map(x => `<li class="${x.done ? 'done' : x === next ? 'next' : ''}"><span class="onb-dot">${x.done ? '✓' : ''}</span><div><b>${esc(x.t)}</b>${x === next ? `<small>${esc(x.d)}</small>` : ''}</div>${x.done ? '' : x === next ? `<button class="btn small" ${x.go ? `data-go="${x.go}"` : `data-onbact="${x.act}"`} type="button">${esc(x.b)}</button>` : `<button class="onb-more" ${x.go ? `data-go="${x.go}"` : `data-onbact="${x.act}"`} type="button" aria-label="${esc(x.b)}">›</button>`}</li>`).join('')}</ol>
-      <p class="note onb-foot">Une question ? Écrivez à <a href="mailto:bonjour@fanion.ai">bonjour@fanion.ai</a> · <button class="linkbtn" data-onbhide type="button">Masquer</button></p></section>`;
+      <p class="note onb-foot">Une question ? <button class="linkbtn" data-caddie type="button">Demandez au Caddie</button> · <button class="linkbtn" data-onbhide type="button">Masquer</button></p></section>`;
   }
   document.addEventListener('click', e => {
     const t = e.target.closest && e.target.closest('[data-onbact],[data-onbhide]'); if (!t) return;
@@ -2453,6 +2454,56 @@
   }
   // Textos : par le service Fanion (Twilio, via fanion.ai) quand il est en place ; sinon, Messages s'ouvre sur le téléphone
   const SMS_API = 'https://fanion.ai/api/sms';
+  // ---------------- Le Caddie : l'agent qui répond aux questions (API Claude, par le serveur Fanion) ----------------
+  const CADDIE_API = 'https://fanion.ai/api/caddie';
+  const SCREENS = { home: 'Accueil', players: 'Joueurs', quatuors: 'Parties à préparer', setup: 'Nouvelle partie', jeux: 'Les jeux', courses: 'Terrains', live: 'Parties en cours', history: 'Parties jouées' };
+  let caddieReady = null;
+  async function caddieStatus() {
+    if (caddieReady !== null) return caddieReady;
+    try { const r = await fetch(CADDIE_API + '/status'); caddieReady = !!(await r.json()).ready; } catch (e) { caddieReady = false; }
+    return caddieReady;
+  }
+  function caddieMsg(m) {
+    let t = String(m.content || ''), go = null;
+    t = t.replace(/\[\[ecran:([a-z]+)\]\]/g, (x, k) => { if (SCREENS[k]) go = k; return ''; }).trim();
+    const html = esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+    return `<div class="cad-msg ${m.role === 'assistant' ? 'bot' : 'me'}">${html}${go && m.role === 'assistant' ? `<button class="btn small cad-go" data-cadgo="${go}" type="button">Aller à : ${SCREENS[go]}</button>` : ''}</div>`;
+  }
+  async function openCaddie() {
+    S.caddie = S.caddie || [{ role: 'assistant', content: 'Bonjour ! Je suis le Caddie. Posez-moi vos questions sur l’app, les règles des jeux ou les forfaits.' }];
+    const ready = Store.mode === 'firebase' && await caddieStatus();
+    const draw = sh => {
+      sh.innerHTML = `<h3>Le Caddie</h3>
+        <div class="cad-log" id="cadLog">${S.caddie.map(caddieMsg).join('')}${S.caddieBusy ? '<div class="cad-msg bot busy">…</div>' : ''}</div>
+        ${ready ? `<form class="cad-form" id="cadForm"><input id="cadIn" type="text" placeholder="Votre question" autocomplete="off" ${S.caddieBusy ? 'disabled' : ''}><button class="btn small" type="submit" ${S.caddieBusy ? 'disabled' : ''}>Envoyer</button></form>
+          ${S.caddie.length < 2 ? `<div class="cad-sugg">${['Comment inviter mes joueurs ?', 'Comment marche la press ?', 'Combien coûte le forfait Groupe ?'].map(q => `<button class="chip" data-cadq="${esc(q)}" type="button">${esc(q)}</button>`).join('')}</div>` : ''}`
+        : '<p class="note">Le Caddie arrive bientôt. En attendant, écrivez-nous : nous répondons rapidement.</p>'}
+        <div class="sheet-actions"><a class="btn ghost" href="${caddieMail()}">Écrire à l’équipe</a><button class="btn ghost" data-close type="button">Fermer</button></div>`;
+      sh.querySelector('[data-close]').onclick = closeSheet;
+      sh.querySelectorAll('[data-cadgo]').forEach(b => b.onclick = () => { closeSheet(); go(b.dataset.cadgo); });
+      sh.querySelectorAll('[data-cadq]').forEach(b => b.onclick = () => ask(b.dataset.cadq, sh));
+      const f = sh.querySelector('#cadForm'); if (f) f.onsubmit = e => { e.preventDefault(); const v = sh.querySelector('#cadIn').value.trim(); if (v) ask(v, sh); };
+      const log = sh.querySelector('#cadLog'); if (log) log.scrollTop = log.scrollHeight;
+      const i = sh.querySelector('#cadIn'); if (i && !S.caddieBusy) setTimeout(() => i.focus(), 50);
+    };
+    const ask = async (q, sh) => {
+      S.caddie.push({ role: 'user', content: q }); S.caddieBusy = true; draw(sh);
+      try {
+        const tok = await firebase.auth().currentUser.getIdToken();
+        const r = await fetch(CADDIE_API, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ messages: S.caddie.slice(1) }) });
+        const d = await r.json().catch(() => ({}));
+        S.caddie.push({ role: 'assistant', content: r.ok && d.text ? d.text : (d.error || 'Je n’ai pas pu répondre.') + ' Vous pouvez écrire à l’équipe avec le bouton ci-dessous.' });
+      } catch (e) { S.caddie.push({ role: 'assistant', content: 'Pas de réseau pour l’instant. Réessayez dans un moment.' }); }
+      S.caddieBusy = false; if (!$('#sheetWrap').hidden) draw(sh);
+    };
+    openSheet('', sh => draw(sh));
+  }
+  function caddieMail() {
+    const conv = (S.caddie || []).slice(1).map(m => (m.role === 'user' ? 'Moi : ' : 'Caddie : ') + m.content.replace(/\[\[ecran:[a-z]+\]\]/g, '')).join('\n\n');
+    const body = `Groupe : ${groupName()}\nJoueur : ${ls.get('pelland.me', '') || ''}\n\n${conv ? 'Ma conversation avec le Caddie :\n\n' + conv + '\n\n' : ''}Ma question :\n`;
+    return 'mailto:bonjour@fanion.ai?subject=' + encodeURIComponent('Le 19e – question') + '&body=' + encodeURIComponent(body.slice(0, 1800));
+  }
+  document.addEventListener('click', e => { const t = e.target.closest && e.target.closest('[data-caddie]'); if (t) { e.preventDefault(); openCaddie(); } });
   async function smsService() {
     if (S.smsReady != null) return S.smsReady;
     try { const r = await fetch(SMS_API + '/status'); S.smsReady = r.ok && !!(await r.json()).ready; } catch (e) { S.smsReady = false; }

@@ -1,6 +1,7 @@
-// Fanion : sert le site (dossier site/) et l'envoi de textos /api/sms par Twilio.
+// Fanion : sert le site (dossier site/), l'envoi de textos /api/sms (Twilio) et le Caddie /api/caddie (API Claude).
 // Secrets à entrer dans Cloudflare (Workers & Pages → pelland → Settings → Variables and secrets) :
 //   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM (ex. +15145550000)
+//   ANTHROPIC_API_KEY (le Caddie : l'agent qui répond aux questions dans l'app)
 // Sécurité : seuls les membres connectés (jeton Firebase) peuvent texter, et seulement les numéros
 // de leur propre groupe (collection Firestore « phones », champ groupId). Maximum 30 numéros par envoi.
 
@@ -32,7 +33,7 @@ async function verifyToken(tok) {
   const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64u(sig), new TextEncoder().encode(h + '.' + p));
   const now = Date.now() / 1000;
   if (!ok || pay.aud !== PROJECT || pay.iss !== 'https://securetoken.google.com/' + PROJECT || pay.exp < now) throw new Error('jeton invalide');
-  if ((pay.firebase || {}).sign_in_provider !== 'password') throw new Error('membre requis');
+  if (!['password', 'phone'].includes((pay.firebase || {}).sign_in_provider)) throw new Error('membre requis');
   return pay;
 }
 
@@ -59,11 +60,75 @@ async function sendSms(env, to, body) {
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.message || 'Twilio ' + r.status); }
 }
 
+// --- Le Caddie : répond aux questions des membres sur l'app et les jeux ---
+const CADDIE_MODEL = 'claude-haiku-5-5';
+const CADDIE_SYSTEM = `Tu es le Caddie, l'assistant de l'app Le 19e (par Fanion, fanion.ai), une app québécoise pour organiser un groupe de golf entre amis.
+Tu parles français québécois simple et chaleureux, tu vouvoies, tu réponds court (3 à 6 phrases, ou une petite liste d'étapes). Tu ne parles que de l'app, des jeux de golf et du golf entre amis.
+Si tu ne sais pas, ou si la personne veut parler à quelqu'un, un remboursement, un problème de paiement ou de compte : dis-lui d'écrire à bonjour@fanion.ai (le bouton « Écrire à l'équipe » sous la conversation envoie la conversation). N'invente jamais une fonction qui n'existe pas.
+Pour amener la personne au bon écran, ajoute à la fin une ligne [[ecran:CLE]] (une seule), avec CLE parmi : home (accueil), players (Joueurs), quatuors (Parties à préparer), setup (Nouvelle partie), jeux (Les jeux), courses (Terrains), live (Parties en cours), history (Parties jouées).
+
+L'APP
+- Connexion : choisir son nom, entrer son cellulaire, recevoir un code à 6 chiffres par texto. Le numéro doit être celui inscrit pour ce joueur dans Joueurs ; sinon, un membre le corrige avec le bouton ☎ du joueur. Si le code ne vient pas : vérifier le numéro, attendre une minute, « Renvoyer le code ».
+- Ajouter l'app à l'écran d'accueil : iPhone, dans Safari, bouton Partager puis « Sur l'écran d'accueil ». Android, dans Chrome, menu ⋮ puis « Ajouter à l'écran d'accueil ».
+- Rôles : le propriétaire détient le forfait et nomme l'organisateur ; l'organisateur prépare les parties. Sans organisateur nommé, c'est le propriétaire. Changer l'organisateur : accueil, case Organisateur, « Changer » (propriétaire seulement).
+- Joueurs : ajouter un nom et un cellulaire ; une invitation par texto est prête à envoyer (elle part de l'app Messages du téléphone : il faut toucher Envoyer). Import Excel ou CSV : deux colonnes, le nom et le cellulaire. Renommer : toucher le nom. Retirer : « Retirer », ou « Sélectionner » pour plusieurs.
+- Parties à préparer : offrir des dates (terrain, dates, date limite) ; les joueurs répondent par lien texto ; l'app forme les groupes de 4 (en variant ou au hasard) ; bouton « Rappel » pour relancer ceux qui n'ont pas répondu.
+- Nouvelle partie : terrain, joueurs, équipes (Meilleur + Pire par défaut : le plus bas index avec le plus haut), handicap (bas handicap ou plein), jeu (18 trous, aller 1-9 ou retour 10-18), montants. Le responsable (★) entre les scores ; les autres suivent en direct dans Parties en cours. On peut changer de responsable pendant la partie.
+- Pendant la partie : toucher un trou pour entrer les scores ; Press et Reroll avant le départ du trou, ou après avec « Modifier le trou » ; « Modifier les montants » pour changer les mises ; « Texto aux joueurs » ; « Terminer la partie » à la fin (elle va dans Parties jouées).
+- Hors réseau : les scores restent sur le téléphone et partent au retour du signal.
+- Handicap de parcours = index × slope ÷ 113 + (évaluation − normale), arrondi. Les coups vont d'abord aux trous les plus difficiles.
+- Plusieurs groupes : un joueur peut en avoir plusieurs ; « Changer de groupe » sur l'accueil. Créer son propre groupe : « Créer mon groupe ».
+- Parrainage : le propriétaire partage son lien depuis l'accueil ; chaque groupe parrainé qui passe au forfait Groupe lui donne sa prochaine saison.
+
+FORFAITS (par saison de 12 mois, pas d'abonnement automatique)
+- Gratuit : 1 groupe, jusqu'à 4 joueurs, tous les jeux.
+- Groupe : jusqu'à 16 joueurs, 79 $ + taxes ; prix fondateur 49 $ + taxes pour les groupes inscrits avant le 31 mars 2027, garanti les saisons suivantes. Achat : accueil, « Passer au Groupe » (propriétaire). Activation dans les 24 heures. Remboursement complet sur demande dans les 30 jours.
+- Ligue (bientôt) : jusqu'à 64 joueurs, 199 $ + taxes.
+
+LES JEUX (tout au net, avec handicap ; montants par joueur)
+- Game à Pelland (4 joueurs, Rouges contre Bleus) : plus bas net du trou = 2 points pour son équipe ; plus haut net = 2 points à l'équipe adverse ; égalité entre équipes : rien ; skin = 1 point (si son détenteur ne fait pas la normale au brut, le point va à l'autre équipe) ; oiselet brut = 1 point ; cabane (oiselet brut + skin + plus haut net adverse) = 12 points ; press = points ×2, reroll = ×4. Argent : la game (montant de départ) à l'équipe qui mène à la fin + chaque revirement (l'équipe qui mène perd son avance : égalité ou dépassement) + l'écart × le montant par point + les normales 3 (skin + normale gagne le montant, sinon reporté).
+- Nassau : trois paris en meilleure balle (aller, retour, total) ; chaque pari vaut la mise.
+- Skins : le seul meilleur net du trou gagne le skin ; égalité, reporté au suivant ; chaque autre joueur paie le montant par skin.
+- Wolf : le loup tourne à chaque trou ; avec partenaire ±1 par joueur ; seul ±2 par adversaire ; seul à l'aveugle ±3.
+- Best Ball : meilleur net de chaque équipe ; écart de trous gagnés × montant.
+- Sixes : équipes qui changent tous les 6 trous ; chaque tranche vaut la mise.
+- 9 points (3 joueurs) : 5-3-1 par trou ; égalités 4-4-1, 5-2-2, 3-3-3 ; différence de points × montant avec chaque joueur.
+- Jeux maison : dans Les jeux, « Ajouter un jeu ».
+Les règles détaillées sont sur fanion.ai/regles/.`;
+
+const RATE = new Map();
+function tooMany(uid) {
+  const now = Date.now(), r = (RATE.get(uid) || []).filter(t => now - t < 3600e3);
+  r.push(now); RATE.set(uid, r); return r.length > 40;
+}
+async function caddie(env, messages) {
+  const msgs = (messages || []).slice(-12).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content || '').slice(0, 1500) })).filter(m => m.content);
+  while (msgs.length && msgs[0].role !== 'user') msgs.shift();
+  if (!msgs.length) throw new Error('question manquante');
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    body: JSON.stringify({ model: env.CADDIE_MODEL || CADDIE_MODEL, max_tokens: 700, system: CADDIE_SYSTEM, messages: msgs })
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error((d.error && d.error.message) || 'API ' + r.status);
+  return (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
+}
+
 export default {
   async fetch(req, env) {
     const url = new URL(req.url), origin = req.headers.get('Origin') || '';
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req);
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(origin) });
+    if (url.pathname === '/api/caddie/status') return json({ ready: !!env.ANTHROPIC_API_KEY }, 200, origin);
+    if (url.pathname === '/api/caddie' && req.method === 'POST') {
+      if (!env.ANTHROPIC_API_KEY) return json({ error: 'Le Caddie n’est pas encore configuré.' }, 503, origin);
+      const tk = (req.headers.get('Authorization') || '').replace(/^Bearer /, '');
+      let who; try { who = await verifyToken(tk); } catch (e) { return json({ error: 'Connexion requise.' }, 401, origin); }
+      if (tooMany(who.user_id || who.sub)) return json({ error: 'Beaucoup de questions d’un coup : réessayez dans quelques minutes.' }, 429, origin);
+      let data; try { data = await req.json(); } catch (e) { return json({ error: 'requête invalide' }, 400, origin); }
+      try { return json({ text: await caddie(env, data.messages) }, 200, origin); } catch (e) { return json({ error: e.message }, 502, origin); }
+    }
     const ready = !!(env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_FROM);
     if (url.pathname === '/api/sms/status') return json({ ready }, 200, origin);
     if (url.pathname !== '/api/sms' || req.method !== 'POST') return json({ error: 'introuvable' }, 404, origin);
