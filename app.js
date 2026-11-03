@@ -608,14 +608,14 @@
   }
   function groupInfo(compact) {
     const own = (S.players || []).find(p => p.id === ownerId()), pl = planOf(), n = (S.players || []).length, over = n > pl.max;
-    const until = pl.until ? ' · jusqu’au ' + new Date(pl.until).toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
-    const buy = !pl.paid && meId() && meId() === ownerId() ? ` <a class="linkbtn" href="https://fanion.ai/achat.html" target="_blank" rel="noopener">Passer au forfait Groupe</a>` : '';
+    const until = pl.until ? ' · jusqu’au ' + new Date(pl.until).toLocaleDateString('fr-CA', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+    const buy = !pl.paid && meId() && meId() === ownerId() ? ` <a class="linkbtn" href="https://fanion.ai/achat.html" target="_blank" rel="noopener">Passer au Groupe</a>` : '';
     const orgId = (curGroup().organizers || [])[0], org = (S.players || []).find(p => p.id === orgId);
     const meOwner = !!meId() && meId() === ownerId();
     return `<div class="grp-info${compact ? ' compact' : ''}">
       <div><span>Propriétaire</span><b>${own ? esc(own.name) : 'Aucun'}</b><small>Détient le forfait</small></div>
       <div><span>Organisateur</span><b>${org ? esc(org.name) : own ? esc(own.name) : '—'}</b><small>Prépare les parties</small>${meOwner ? '<button class="linkbtn" data-pickorg type="button">Changer</button>' : ''}</div>
-      <div><span>Forfait</span><b>${pl.name}${pl.expired ? ' (saison terminée)' : ''}</b><small class="${over ? 'over' : ''}">${n} / ${pl.max} joueurs${until}</small>${buy}</div>
+      <div class="plan-line"><span>Forfait</span><b>${pl.name}${pl.expired ? ' (saison terminée)' : ''}</b><small class="${over ? 'over' : ''}">${n} / ${pl.max} joueurs${until}</small>${buy}</div>
     </div>`;
   }
 
