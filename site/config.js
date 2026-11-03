@@ -10,7 +10,7 @@ window.FANION = {
   prixFondateur: 49,
   finFondateur: '2027-03-31',
   // Adresse de l'app
-  appUrl: 'https://francoisgaouette-source.github.io/pelland/',
+  appUrl: 'https://app.fanion.ai/',
   // Courriel de contact
   email: 'bonjour@fanion.ai'
 };
