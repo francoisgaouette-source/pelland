@@ -131,6 +131,14 @@ service cloud.firestore {
       allow delete: if dansGroupe(resource.data.get('groupId', 'pelland')) && resource.data.ownerUid == request.auth.uid;
     }
 
+    // ---------- Compétitions (membre-membre) : seulement le groupe ----------
+    match /comps/{id} {
+      allow get, list: if dansGroupe(resource.data.groupId);
+      allow create: if dansGroupe(request.resource.data.groupId);
+      allow update: if dansGroupe(resource.data.groupId) && request.resource.data.groupId == resource.data.groupId;
+      allow delete: if dansGroupe(resource.data.groupId);
+    }
+
     // ---------- Présences à une partie ----------
     match /presence/{gameId} {
       allow read, write: if dansGroupe(get(/databases/$(database)/documents/games/$(gameId)).data.get('groupId', 'pelland'));

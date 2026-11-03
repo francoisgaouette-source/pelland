@@ -407,6 +407,30 @@
       if (this.mode === 'firebase') { await this.db.collection('games').doc(id).delete(); return; }
       const all = ls.get('pelland.games', {}); delete all[id]; ls.set('pelland.games', all);
     },
+    // Compétitions : comps/<id> = { groupId, format, name, date, course, tee, allowance, flights, teams:[{id, p:[{name,index}]}], scores:{ <équipe>: { <trou>: [s1, s2] } } }
+    async listComps() {
+      if (this.mode === 'firebase') { try { const sn = await this.db.collection('comps').where('groupId', '==', this.gid).get(); return sn.docs.map(d => d.data()).sort((a, b) => (b.date || '').localeCompare(a.date || '')); } catch (e) { return []; } }
+      return Object.values(ls.get('pelland.comps', {})).filter(c => c.groupId === this.gid).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    },
+    async saveComp(c) {
+      if (this.mode === 'firebase') { const { scores, ...rest } = c; await this.db.collection('comps').doc(c.id).set(rest, { merge: true }); return; }
+      const all = ls.get('pelland.comps', {}); all[c.id] = { ...(all[c.id] || {}), ...c }; ls.set('pelland.comps', all);
+    },
+    // Un score à la fois, fusionné, pour que deux équipes puissent entrer leurs scores en même temps
+    async setCompScore(id, tid, h, arr) {
+      if (this.mode === 'firebase') { await this.db.collection('comps').doc(id).set({ scores: { [tid]: { [h]: arr } } }, { merge: true }); return; }
+      const all = ls.get('pelland.comps', {}); const c = all[id]; if (!c) return; c.scores = c.scores || {}; c.scores[tid] = c.scores[tid] || {}; c.scores[tid][h] = arr; ls.set('pelland.comps', all);
+    },
+    async deleteComp(id) {
+      if (this.mode === 'firebase') { await this.db.collection('comps').doc(id).delete(); return; }
+      const all = ls.get('pelland.comps', {}); delete all[id]; ls.set('pelland.comps', all);
+    },
+    watchComp(id, cb) {
+      if (this.mode === 'firebase') return this.db.collection('comps').doc(id).onSnapshot(d => { if (d.exists) cb(d.data()); }, e => toast('Lecture impossible : ' + e.message));
+      const get = () => { const c = ls.get('pelland.comps', {})[id]; if (c) cb(c); };
+      get(); const on = e => { if (e.key === 'pelland.comps') get(); }; window.addEventListener('storage', on);
+      return () => window.removeEventListener('storage', on);
+    },
     async listGames() {
       if (this.mode === 'firebase') {
         const snap = await this.db.collection('games').where('groupId', '==', this.gid).get();
@@ -545,6 +569,8 @@
   function go(view, opts = {}) {
     if (S.unwatch && view !== 'game') { S.unwatch(); S.unwatch = null; S.game = null; }
     if (S.unwatchPres && view !== 'game') { S.unwatchPres(); S.unwatchPres = null; }
+    if (S.unwatchComp && view !== 'comp' && view !== 'compEdit') { S.unwatchComp(); S.unwatchComp = null; }
+    if (view === 'comps') S.compList = null;
     if (view !== 'game' && view !== 'setup' && Voice.wake) Voice.setWake(false);
     S.view = view; Object.assign(S, opts);
     if (view === 'setup' && !S.offres) Store.listOffres().then(l => { S.offres = l; if (S.view === 'setup') render(); });
@@ -565,7 +591,7 @@
     const showDock = false; // plus d'interface vocale
     document.body.classList.toggle('view-game', S.view === 'game');
     $('#dock').hidden = !showDock; document.body.classList.toggle('no-dock', !showDock);
-    const R = { home: vHome, jeux: vJeux, jeuEdit: vJeuEdit, quatuors: vQuatuors, offre: vOffre, setup: vSetup, game: vGame, join: vJoin, history: vHistory, live: vHistory, courses: vCourses, course: vCourse, players: vPlayers, login: vLogin }[S.view];
+    const R = { home: vHome, jeux: vJeux, jeuEdit: vJeuEdit, quatuors: vQuatuors, offre: vOffre, setup: vSetup, game: vGame, join: vJoin, history: vHistory, live: vHistory, courses: vCourses, course: vCourse, players: vPlayers, login: vLogin, comps: vComps, compEdit: vCompEdit, comp: vComp }[S.view];
     v.innerHTML = R();
     bind[S.view] && bind[S.view](v);
   }
@@ -596,6 +622,7 @@
         ${canOrganize() ? '' : '<!--'}<button class="tile" data-go="setup"><span class="pin">+</span><div><strong>Nouvelle partie</strong><span>Terrain, joueurs, index, tertres, handicap</span></div></button>${canOrganize() ? '' : '-->'}
         <button class="tile" data-go="live"><span class="pin">⏵</span><div><strong>Parties en cours</strong><span>Les parties qui ont lieu en ce moment</span></div></button>
         <button class="tile" data-go="history"><span class="pin">≡</span><div><strong>Parties jouées</strong><span>Les parties terminées</span></div></button>
+        <button class="tile" data-go="comps"><span class="pin"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M7 4h10v3a5 5 0 0 1-10 0V4z" fill="currentColor"/><path d="M7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M12 12v4M8 20h8l-1-4H9z" fill="currentColor" stroke="currentColor" stroke-width="1.2"/></svg></span><div><strong>Compétitions</strong><span>Membre-membre : équipes de 2, flites et classement en direct</span></div></button>
       </div>
       ${referralCard()}
       ${Store.needLogin ? '' : `<button class="caddie-tile" data-caddie type="button"><span class="cad-ico" aria-hidden="true">?</span><span><b>Une question ?</b><small>Demandez au Caddie : l’app, les règles des jeux, les forfaits.</small></span></button>`}
@@ -2453,6 +2480,208 @@
     return { nums, missing };
   }
   // Textos : par le service Fanion (Twilio, via fanion.ai) quand il est en place ; sinon, Messages s'ouvre sur le téléphone
+  // =====================================================================
+  // Compétitions : membre-membre (équipes de 2, meilleure balle nette en coups, flites, classement en direct)
+  // =====================================================================
+  const FLITES = ['A', 'B', 'C', 'D'];
+  const toParTxt = x => x === 0 ? 'Par' : (x > 0 ? '+' : '−') + Math.abs(x);
+  const parseIdx = v => { const n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isNaN(n) ? null : n; };
+  function compTee(c) { return (c.course.tees || []).find(t => t.name === c.tee) || (c.course.tees || [])[0]; }
+  // Handicap de jeu de chaque joueur : handicap de parcours × allocation (85 % en meilleure balle, selon le système mondial)
+  function compPlayers(c, t) {
+    const tee = compTee(c), par = L.teePar(c.course, tee);
+    return t.p.map(p => { const idx = parseIdx(p.index); const ch = idx == null || !tee ? 0 : L.courseHandicap(idx, tee, par); return { ...p, ch, ph: Math.round(ch * (c.allowance || 85) / 100) }; });
+  }
+  // Résultat d'une équipe : score net de la meilleure balle à chaque trou, total par rapport à la normale
+  function compTeamResult(c, t) {
+    const ps = compPlayers(c, t), tee = compTee(c), sc = (c.scores || {})[t.id] || {};
+    let toPar = 0, thru = 0, net = 0, pts = 0; const holes = [];
+    for (let h = 1; h <= 18; h++) {
+      const par = L.holePar(c.course, tee, h), si = c.course.holes[h - 1].si, s = sc[h] || [];
+      const nets = ps.map((p, i) => s[i] == null || s[i] === '' ? null : Number(s[i]) - L.strokesOnHole(p.ph, si)).filter(x => x != null);
+      const best = nets.length ? Math.min(...nets) : null;
+      // Stableford : 2 points pour la normale nette, 1 de plus par coup sous la normale, 1 de moins par coup au-dessus (minimum 0)
+      const sp = best == null ? null : Math.max(0, 2 + par - best);
+      holes.push({ h, par, si, best, s, sp });
+      if (best != null) { thru++; toPar += best - par; net += best; pts += sp; }
+    }
+    return { t, ps, toPar, thru, net, pts, holes, ph: ps.reduce((a, p) => a + p.ph, 0) };
+  }
+  // Flites : les équipes sont classées par handicap d'équipe (somme des handicaps de jeu), puis réparties également
+  function compFlights(c) {
+    const res = (c.teams || []).map(t => compTeamResult(c, t)).sort((a, b) => a.ph - b.ph);
+    const n = Math.max(1, Math.min(c.flights || 1, res.length || 1)), out = [];
+    let k = 0; for (let f = 0; f < n; f++) { const size = Math.floor(res.length / n) + (f < res.length % n ? 1 : 0); out.push({ name: n > 1 ? 'Flite ' + FLITES[f] : 'Classement', teams: res.slice(k, k + size) }); k += size; }
+    out.forEach(fl => {
+      const key = r => c.format === 'stableford' ? -r.pts : r.toPar;
+      fl.teams.sort((a, b) => (a.thru ? 0 : 1) - (b.thru ? 0 : 1) || key(a) - key(b) || b.thru - a.thru);
+      let pos = 0; fl.teams.forEach((r, i) => { if (i === 0 || key(r) !== key(fl.teams[i - 1]) || !r.thru) pos = i + 1; r.pos = r.thru ? pos : null; r.tie = r.thru && fl.teams.filter(x => x.thru && key(x) === key(r)).length > 1; });
+    });
+    return out;
+  }
+  const teamLabel = t => t.p.map(p => esc(p.name || '?')).join(' · ');
+  // Match play entre deux équipes (meilleure balle nette) : les coups se donnent à partir du plus bas handicap de jeu des quatre joueurs
+  function compMatch(c, A, B) {
+    const pa = compPlayers(c, A), pb = compPlayers(c, B), base = Math.min(...pa.concat(pb).map(p => p.ph));
+    const sa = (c.scores || {})[A.id] || {}, sb = (c.scores || {})[B.id] || {};
+    const best = (ps, s, si) => { const n = ps.map((p, i) => s[i] == null || s[i] === '' ? null : Number(s[i]) - L.strokesOnHole(p.ph - base, si)).filter(x => x != null); return n.length ? Math.min(...n) : null; };
+    let d = 0, played = 0, last = 0;
+    for (let h = 1; h <= 18; h++) {
+      const si = c.course.holes[h - 1].si, x = best(pa, sa[h] || [], si), y = best(pb, sb[h] || [], si);
+      if (x == null || y == null) continue;
+      played++; last = h; if (x < y) d++; else if (y < x) d--;
+      if (Math.abs(d) > 18 - h) break;   // match décidé
+    }
+    const left = 18 - last, done = played > 0 && (Math.abs(d) > left || (last === 18 && played === 18));
+    const lead = d > 0 ? A : d < 0 ? B : null;
+    const txt = !played ? 'À jouer' : d === 0 ? (done ? 'Match nul' : `Égal après ${last}`) : done && left > 0 ? `${Math.abs(d)} et ${left}` : done ? `${Math.abs(d)} UP` : `${Math.abs(d)} UP après ${last}`;
+    return { A, B, d, played, last, done, lead, txt, pts: done ? (d > 0 ? [1, 0] : d < 0 ? [0, 1] : [0.5, 0.5]) : [0, 0] };
+  }
+  function compStandings(c, fl) {
+    const T = fl.teams.map(r => ({ r, pts: 0, w: 0, h: 0, l: 0, diff: 0 })), M = [];
+    for (let i = 0; i < T.length; i++) for (let j = i + 1; j < T.length; j++) {
+      const m = compMatch(c, T[i].r.t, T[j].r.t); M.push(m);
+      T[i].pts += m.pts[0]; T[j].pts += m.pts[1];
+      if (m.done) { if (m.d > 0) { T[i].w++; T[j].l++; } else if (m.d < 0) { T[j].w++; T[i].l++; } else { T[i].h++; T[j].h++; } }
+      T[i].diff += m.d; T[j].diff -= m.d;
+    }
+    T.sort((a, b) => b.pts - a.pts || b.diff - a.diff);
+    T.forEach((x, k) => { x.pos = k && x.pts === T[k - 1].pts && x.diff === T[k - 1].diff ? T[k - 1].pos : k + 1; });
+    return { T, M };
+  }
+  const fmtPt = x => String(x).replace('.5', ',5');
+  const sumHtml = (c, r) => `<span>${r.thru ? `Après ${r.thru} trou${r.thru > 1 ? 's' : ''}` : 'Aucun score'}</span><b class="${c.format !== 'stableford' && r.toPar < 0 ? 'under' : ''}">${!r.thru ? '' : c.format === 'stableford' ? r.pts + ' pts' : toParTxt(r.toPar)}</b>`;
+
+  function vComps() {
+    $('#barTitle').textContent = 'Compétitions';
+    if (S.compList == null) { Store.listComps().then(l => { S.compList = l; if (S.view === 'comps') render(); }); return '<p class="note">Chargement…</p>'; }
+    return `<p class="note">Membre-membre : équipes de deux, match play, Stableford ou coups en meilleure balle nette, flites selon le handicap d’équipe et classement en direct pour tout le groupe.</p>
+      ${canOrganize() ? '<button class="btn" data-compnew type="button">Nouvelle compétition</button>' : ''}
+      <div class="list">${S.compList.map(c => `<button class="item" data-comp="${esc(c.id)}"><b>${esc(c.name)}</b><span>${esc(c.date ? new Date(c.date + 'T12:00').toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' }) : '')} · ${esc(c.course.name)} · ${(c.teams || []).length} équipes</span></button>`).join('') || '<p class="note">Aucune compétition pour l’instant.</p>'}</div>`;
+  }
+
+  function newCompDraft() {
+    const c0 = S.courses[0] || L.PINEGROVE;
+    return { name: 'Membre-membre ' + new Date().getFullYear(), date: new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10), courseId: c0.id, tee: (c0.tees[0] || {}).name, allowance: 90, flights: 2, format: 'match',
+      teams: [0, 1, 2, 3].map(() => ({ id: Math.random().toString(36).slice(2, 8), p: [{ name: '', index: '' }, { name: '', index: '' }] })) };
+  }
+  function vCompEdit() {
+    const d = S.compDraft; $('#barTitle').textContent = d.id ? 'Modifier la compétition' : 'Nouvelle compétition';
+    const course = S.courses.find(x => x.id === d.courseId) || S.courses[0];
+    return `<section class="card"><h2>La compétition</h2>
+        <label>Nom<input id="cmName" type="text" value="${esc(d.name)}"></label>
+        <label>Date<input id="cmDate" type="date" value="${esc(d.date)}"></label>
+        <label>Terrain<select id="cmCourse">${S.courses.map(x => `<option value="${esc(x.id)}" ${x.id === d.courseId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>
+        <label>Tertre<select id="cmTee">${(course.tees || []).map(t => `<option ${t.name === d.tee ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></label>
+        <label>Format<select id="cmFmt"><option value="match" ${d.format !== 'coups' ? 'selected' : ''}>Match play : chaque équipe contre toutes les autres de sa flite</option><option value="coups" ${d.format === 'coups' ? 'selected' : ''}>Meilleure balle en coups : le plus bas total net</option><option value="stableford" ${d.format === 'stableford' ? 'selected' : ''}>Stableford : le plus de points (meilleure balle)</option></select></label>
+        <div class="row"><label style="flex:1">Allocation du handicap<select id="cmAllow">${[85, 90, 100].map(a => `<option value="${a}" ${a === d.allowance ? 'selected' : ''}>${a} %${a === (d.format === 'match' ? 90 : 85) ? ' (recommandé)' : ''}</option>`).join('')}</select></label>
+        <label style="flex:1">Nombre de flites<select id="cmFl">${[1, 2, 3, 4].map(n => `<option ${n === d.flights ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div>
+        <p class="note">${d.format === 'coups' ? 'Meilleure balle nette en coups : chaque joueur reçoit' : d.format === 'stableford' ? 'Stableford, meilleure balle nette (normale nette 2 points, oiselet 3, boguey 1) : chaque joueur reçoit' : 'Match play, meilleure balle nette : match gagné 1 point, nul ½. Chaque joueur reçoit'} ${d.allowance} % de son handicap de parcours${d.format === 'match' ? ', et les coups se donnent à partir du plus bas des quatre joueurs du match' : ''}. Les équipes sont réparties dans les flites selon leur handicap d’équipe.</p></section>
+      <section class="card"><h2>Les équipes (${d.teams.length})</h2>
+        <datalist id="cmNames">${(S.players || []).map(p => `<option value="${esc(p.name)}">`).join('')}</datalist>
+        <div class="cm-teams">${d.teams.map((t, i) => `<div class="cm-team"><div class="cm-th"><b>Équipe ${i + 1}</b><button class="linkbtn" data-cmdel="${i}" type="button">Retirer</button></div>
+          ${t.p.map((p, j) => `<div class="cm-p"><input data-cmn="${i}.${j}" type="text" list="cmNames" placeholder="Joueur ${j + 1}" value="${esc(p.name)}" autocapitalize="words"><input data-cmi="${i}.${j}" type="text" inputmode="decimal" placeholder="Index" value="${esc(p.index)}"></div>`).join('')}</div>`).join('')}</div>
+        <button class="btn ghost small" id="cmAdd" type="button">+ Ajouter une équipe</button></section>
+      <div class="row"><button class="btn" id="cmSave" type="button">${d.id ? 'Enregistrer' : 'Créer la compétition'}</button><button class="btn ghost" id="cmCancel" type="button">Annuler</button></div>`;
+  }
+
+  function vComp() {
+    const c = S.comp; if (!c) return '<p class="note">Chargement…</p>';
+    $('#barTitle').textContent = c.name;
+    const tab = S.compTab || 'class', fl = compFlights(c);
+    const head = `<div class="cm-head"><span>${esc(c.date ? new Date(c.date + 'T12:00').toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' }) : '')}</span><span>${esc(c.course.name)} · tertre ${esc(c.tee)}</span><span>${c.format === 'coups' ? 'Meilleure balle nette en coups' : c.format === 'stableford' ? 'Stableford, meilleure balle nette' : 'Match play, meilleure balle nette'} · ${c.allowance} % du handicap</span></div>
+      <div class="seg cm-tabs">${[['class', 'Classement'], ['score', 'Pointage'], ['teams', 'Équipes']].map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-ctab="${k}" type="button">${l}</button>`).join('')}</div>`;
+    if (tab === 'class' && (c.format || 'match') === 'match') return head + fl.map(f => { const st = compStandings(c, f); return `<section class="card cm-board"><h3>${esc(f.name)}</h3>
+        <table class="cm-lb"><thead><tr><th>Pos.</th><th>Équipe</th><th>G-N-P</th><th>Pts</th></tr></thead>
+        <tbody>${st.T.map(x => `<tr class="${x.pos === 1 && x.pts ? 'lead' : ''}"><td>${x.pos}</td><td>${teamLabel(x.r.t)}<small>Hcp d’équipe ${x.r.ph} · trous ${x.diff > 0 ? '+' : x.diff < 0 ? '−' : ''}${Math.abs(x.diff)}</small></td><td>${x.w}-${x.h}-${x.l}</td><td class="tp">${fmtPt(x.pts)}</td></tr>`).join('')}</tbody></table>
+        <h4 class="cm-mh">Les matchs</h4><ul class="cm-matches">${st.M.map(m => `<li class="${m.done ? 'done' : ''}"><span>${teamLabel(m.A)} <i>contre</i> ${teamLabel(m.B)}</span><b>${m.lead ? `${esc(m.lead.p.map(p => (p.name || '?').split(' ')[0]).join(' et '))} : ` : ''}${esc(m.txt)}</b></li>`).join('')}</ul></section>`; }).join('') +
+      '<p class="note">Chaque équipe affronte toutes les équipes de sa flite en match play, meilleure balle nette. Match gagné : 1 point ; nul : ½. G-N-P = gagnés, nuls, perdus. Égalité de points : on départage par les trous gagnés. Les coups se donnent à partir du plus bas handicap de jeu des quatre joueurs du match.</p>';
+    if (tab === 'class') return head + fl.map(f => `<section class="card cm-board"><h3>${esc(f.name)}</h3>
+        <table class="cm-lb"><thead><tr><th>Pos.</th><th>Équipe</th><th>Trous</th><th>${c.format === 'stableford' ? 'Pts' : 'Total'}</th></tr></thead>
+        <tbody>${f.teams.map(r => `<tr class="${r.pos === 1 ? 'lead' : ''}"><td>${r.pos ? (r.tie ? 'É' : '') + r.pos : '—'}</td><td>${teamLabel(r.t)}<small>Hcp d’équipe ${r.ph}${c.format === 'stableford' && r.thru ? ' · ' + toParTxt(r.toPar) : ''}</small></td><td>${r.thru === 18 ? 'F' : r.thru || '—'}</td><td class="tp ${c.format !== 'stableford' && r.toPar < 0 ? 'under' : ''}">${!r.thru ? '—' : c.format === 'stableford' ? r.pts : toParTxt(r.toPar)}</td></tr>`).join('')}</tbody></table></section>`).join('') +
+      `<p class="note">${c.format === 'stableford' ? 'Stableford, meilleure balle nette : à chaque trou, le meilleur joueur de l’équipe compte. Normale nette 2 points, oiselet net 3, aigle net 4, boguey net 1, double boguey ou pire 0. Le plus de points gagne. ' : ''}É = égalité. F = parcours terminé. Le classement se met à jour en direct pendant que les équipes entrent leurs scores.</p>`;
+    if (tab === 'teams') return head + `<div class="list">${fl.map(f => f.teams.map(r => `<div class="item"><b>${teamLabel(r.t)}</b><span>${esc(f.name)} · ${r.ps.map(p => `${esc(p.name)} : index ${String(p.index).replace('.', ',')}, hcp de jeu ${p.ph}`).join(' · ')}</span></div>`).join('')).join('')}</div>
+      ${canOrganize() ? `<div class="row"><button class="btn ghost small" data-cedit type="button">Modifier les équipes</button>${S.confirmDelComp ? '<button class="btn small" data-cdelok type="button" style="background:var(--red)">Confirmer l’effacement</button>' : '<button class="btn ghost small" data-cdel type="button">Effacer la compétition</button>'}</div>` : ''}`;
+    // Pointage d'une équipe
+    const teams = (c.teams || []), tid = S.compTeam && teams.find(t => t.id === S.compTeam) ? S.compTeam : (teams[0] || {}).id, t = teams.find(x => x.id === tid);
+    if (!t) return head + '<p class="note">Aucune équipe.</p>';
+    const r = compTeamResult(c, t);
+    return head + `<label>Équipe<select id="cmTeamSel">${teams.map(x => `<option value="${esc(x.id)}" ${x.id === tid ? 'selected' : ''}>${teamLabel(x)}</option>`).join('')}</select></label>
+      <div class="cm-sum">${sumHtml(c, r)}</div>
+      <div class="card-scroll"><table class="sc cm-sc"><thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${r.ps.map(p => `<th>${esc((p.name || '?').split(' ')[0])}<small>${p.ph}</small></th>`).join('')}<th>Équipe</th></tr></thead>
+      <tbody>${r.holes.map(hh => `<tr><td>${hh.h}</td><td>${hh.par}</td><td>${hh.si}</td>${r.ps.map((p, i) => { const k = L.strokesOnHole(p.ph, hh.si); return `<td class="cm-in">${k > 0 ? `<i class="dots">${'•'.repeat(Math.min(k, 3))}</i>` : ''}<input data-cms="${hh.h}.${i}" type="text" inputmode="numeric" maxlength="2" value="${hh.s[i] == null ? '' : esc(hh.s[i])}" aria-label="Trou ${hh.h}, ${esc(p.name)}"></td>`; }).join('')}<td class="cm-best ${hh.best != null && hh.best < hh.par ? 'under' : ''}">${hh.best == null ? '' : hh.best}${c.format === 'stableford' && hh.sp != null ? `<small>${hh.sp} pt${hh.sp > 1 ? 's' : ''}</small>` : ''}</td></tr>`).join('')}</tbody></table></div>
+      <p class="note">Entrez les scores bruts. Les points (•) sont les coups reçus avec le plein handicap de jeu ; la colonne Équipe montre le meilleur score net du trou.${c.format !== 'match' ? '' : ' En match play, l’app recalcule les coups de chaque match à partir du plus bas handicap des quatre joueurs.'}</p>`;
+  }
+
+  function openComp(id) {
+    if (S.unwatchComp) { S.unwatchComp(); S.unwatchComp = null; }
+    S.comp = null; S.compTab = S.compTab || 'class'; S.confirmDelComp = false;
+    go('comp');
+    // Pendant qu'on entre des scores, l'écran ne se redessine pas (on garderait la case active) ; le classement, lui, suit en direct
+    S.unwatchComp = Store.watchComp(id, c => { const first = !S.comp; S.comp = c; if (S.view !== 'comp') return; if (!first && (S.compTab || 'class') === 'score') return; render(); });
+  }
+
+  Object.assign(bind, {
+    comps(v) {
+      v.querySelectorAll('[data-comp]').forEach(b => b.onclick = () => openComp(b.dataset.comp));
+      const n = v.querySelector('[data-compnew]'); if (n) n.onclick = () => go('compEdit', { compDraft: newCompDraft() });
+    },
+    compEdit(v) {
+      const d = S.compDraft;
+      const sync = () => {
+        d.format = $('#cmFmt').value; d.name = $('#cmName').value; d.date = $('#cmDate').value; d.allowance = +$('#cmAllow').value; d.flights = +$('#cmFl').value; d.tee = $('#cmTee').value;
+        v.querySelectorAll('[data-cmn]').forEach(i => { const [a, b] = i.dataset.cmn.split('.'); d.teams[a].p[b].name = i.value.trim(); });
+        v.querySelectorAll('[data-cmi]').forEach(i => { const [a, b] = i.dataset.cmi.split('.'); d.teams[a].p[b].index = i.value.trim(); });
+      };
+      // Nom choisi dans la liste du groupe : on reprend le dernier index connu de ce joueur
+      v.querySelectorAll('[data-cmn]').forEach(i => i.onchange = () => { const last = (ls.get('pelland.lastPlayers', []) || []).find(p => p && L.norm(p.name || '') === L.norm(i.value)); const ix = v.querySelector(`[data-cmi="${i.dataset.cmn}"]`); if (last && last.index && ix && !ix.value) ix.value = last.index; });
+      $('#cmCourse').onchange = e => { sync(); d.courseId = e.target.value; const c = S.courses.find(x => x.id === d.courseId); d.tee = ((c && c.tees[0]) || {}).name; render(); };
+      $('#cmAllow').onchange = () => { sync(); render(); };
+      $('#cmFmt').onchange = () => { sync(); d.allowance = d.format === 'match' ? 90 : 85; render(); };
+      $('#cmAdd').onclick = () => { sync(); d.teams.push({ id: Math.random().toString(36).slice(2, 8), p: [{ name: '', index: '' }, { name: '', index: '' }] }); render(); };
+      v.querySelectorAll('[data-cmdel]').forEach(b => b.onclick = () => { sync(); d.teams.splice(+b.dataset.cmdel, 1); render(); });
+      $('#cmCancel').onclick = () => d.id ? openComp(d.id) : go('comps', { compList: null });
+      $('#cmSave').onclick = async () => {
+        sync();
+        if (!d.name.trim()) return toast('Donnez un nom à la compétition.');
+        const teams = d.teams.filter(t => t.p.some(p => p.name));
+        for (const t of teams) for (const p of t.p) {
+          if (!p.name) return toast('Chaque équipe a besoin de deux joueurs.');
+          if (parseIdx(p.index) == null) return toast(`Entrez l’index de ${p.name} (ex. 12,4).`);
+        }
+        if (teams.length < 2) return toast('Il faut au moins deux équipes.');
+        const course = S.courses.find(x => x.id === d.courseId) || S.courses[0];
+        const c = { ...(d.id ? S.comp : {}), id: d.id || Date.now().toString(36), groupId: Store.gid, kind: 'membre-membre', format: d.format || 'match', name: d.name.trim(), date: d.date, courseId: course.id,
+          course: JSON.parse(JSON.stringify(course)), tee: d.tee, allowance: d.allowance, flights: d.flights, teams, by: ls.get('pelland.me', '') || '', createdAt: (S.comp && d.id && S.comp.createdAt) || Date.now() };
+        try { await Store.saveComp(c); S.compList = null; openComp(c.id); toast(d.id ? 'Compétition modifiée.' : 'Compétition créée.'); } catch (e) { toast('Enregistrement impossible : ' + e.message); }
+      };
+    },
+    comp(v) {
+      v.querySelectorAll('[data-ctab]').forEach(b => b.onclick = () => { S.compTab = b.dataset.ctab; render(); });
+      const sel = v.querySelector('#cmTeamSel'); if (sel) sel.onchange = () => { S.compTeam = sel.value; render(); };
+      const ed = v.querySelector('[data-cedit]'); if (ed) ed.onclick = () => { const c = S.comp; go('compEdit', { compDraft: { id: c.id, format: c.format || 'match', name: c.name, date: c.date, courseId: c.courseId, tee: c.tee, allowance: c.allowance, flights: c.flights, teams: JSON.parse(JSON.stringify(c.teams)) } }); };
+      const dl = v.querySelector('[data-cdel]'); if (dl) dl.onclick = () => { S.confirmDelComp = true; render(); };
+      const dok = v.querySelector('[data-cdelok]'); if (dok) dok.onclick = async () => { try { await Store.deleteComp(S.comp.id); if (S.unwatchComp) { S.unwatchComp(); S.unwatchComp = null; } go('comps', { compList: null }); toast('Compétition effacée.'); } catch (e) { toast('Impossible : ' + e.message); } };
+      const all = [...v.querySelectorAll('[data-cms]')];
+      all.forEach((inp, k) => inp.addEventListener('input', () => { const x = inp.value.trim(); if ((x.length === 1 && x !== '1') || x.length === 2) { const nx = all[k + 1]; if (nx) nx.focus(); } }));
+      v.querySelectorAll('[data-cms]').forEach(inp => {
+        inp.onchange = async () => {
+          const [h, i] = inp.dataset.cms.split('.').map(Number), c = S.comp, tid = S.compTeam && c.teams.find(t => t.id === S.compTeam) ? S.compTeam : c.teams[0].id;
+          const raw = inp.value.trim(), val = raw === '' ? null : parseInt(raw, 10);
+          if (raw !== '' && !(val >= 1 && val <= 15)) { toast('Score invalide.'); inp.value = ''; return; }
+          const cur = ((c.scores || {})[tid] || {})[h] || [null, null], arr = [cur[0] == null ? null : cur[0], cur[1] == null ? null : cur[1]]; arr[i] = val;
+          c.scores = c.scores || {}; c.scores[tid] = c.scores[tid] || {}; c.scores[tid][h] = arr;
+          // Mise à jour sur place (sans redessiner l'écran, pour ne pas perdre la case où l'on tape)
+          const t = c.teams.find(x => x.id === tid), r = compTeamResult(c, t), hh = r.holes[h - 1];
+          const cell = inp.closest('tr').querySelector('.cm-best'); cell.textContent = hh.best == null ? '' : hh.best; cell.classList.toggle('under', hh.best != null && hh.best < hh.par);
+          if (c.format === 'stableford') cell.innerHTML = hh.best == null ? '' : `${hh.best}<small>${hh.sp} pt${hh.sp > 1 ? 's' : ''}</small>`;
+          const sm = v.querySelector('.cm-sum'); if (sm) sm.innerHTML = sumHtml(c, r);
+          try { await Store.setCompScore(c.id, tid, h, arr); } catch (e) { toast('Score non enregistré : ' + e.message); }
+        };
+      });
+    }
+  });
+
   const SMS_API = 'https://fanion.ai/api/sms';
   // ---------------- Le Caddie : l'agent qui répond aux questions (API Claude, par le serveur Fanion) ----------------
   const CADDIE_API = 'https://fanion.ai/api/caddie';
@@ -2689,6 +2918,8 @@
   // =====================================================================
   $('#back').onclick = () => {
     if (S.view === 'course') go(S.draft ? 'setup' : 'courses', { editCourse: null });
+    else if (S.view === 'comp') go('comps');
+    else if (S.view === 'compEdit') { if (S.compDraft && S.compDraft.id) openComp(S.compDraft.id); else go('comps'); }
     else go('home');
   };
   $('#micBtn').onclick = () => Voice.ptt();

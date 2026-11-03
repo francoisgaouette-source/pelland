@@ -694,3 +694,29 @@ textarea { font-family: inherit; line-height: 1.4; resize: vertical; }
 .cad-form { display: flex; gap: 8px; } .cad-form input { flex: 1; min-width: 0; }
 .cad-sugg { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
 .cad-sugg .chip { background: #fff; border: 1px solid #c5d0c9; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 14px; cursor: pointer; }
+/* Compétitions */
+.cm-teams { display: grid; gap: 12px; margin-bottom: 12px; }
+.cm-team { border: 1px solid var(--line, #dde3df); border-radius: 12px; padding: 10px 12px; }
+.cm-th { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.cm-p { display: grid; grid-template-columns: 1fr 84px; gap: 8px; margin: 6px 0; }
+.cm-head { display: flex; flex-direction: column; gap: 2px; color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+.cm-tabs { display: flex; gap: 6px; margin: 0 0 14px; } .cm-tabs button { flex: 1; padding: 9px 6px; border-radius: 10px; border: 1px solid #c5d0c9; background: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+.cm-tabs button.on { background: #1f6b46; border-color: #1f6b46; color: #fff; }
+.cm-board h3 { margin: 0 0 8px; }
+.cm-lb { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.cm-lb th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 4px 6px; border-bottom: 1px solid var(--line, #dde3df); }
+.cm-lb td { padding: 9px 6px; border-bottom: 1px solid #eef1ef; vertical-align: top; } .cm-lb td small { display: block; color: var(--muted); font-size: 12px; }
+.cm-lb td:first-child { font-weight: 700; width: 44px; } .cm-lb td:nth-child(3) { width: 52px; text-align: center; } .cm-lb th:nth-child(3) { text-align: center; }
+.cm-lb td.tp { font-weight: 800; font-size: 18px; text-align: right; width: 60px; } .cm-lb th:last-child { text-align: right; }
+.cm-lb tr.lead td { background: #fdf3d6; }
+.under { color: #b3402b; }
+.cm-sum { display: flex; justify-content: space-between; align-items: baseline; margin: 10px 2px; } .cm-sum b { font-size: 24px; }
+.cm-sc th small { display: block; font-weight: 500; color: var(--muted); font-size: 11px; }
+.cm-sc td.cm-in { position: relative; padding: 2px; } .cm-sc td.cm-in input { width: 46px; text-align: center; padding: 6px 2px; font-size: 17px; }
+.cm-sc td.cm-in .dots { position: absolute; top: 0; right: 4px; font-style: normal; font-size: 11px; color: #1f6b46; line-height: 1; }
+.cm-sc td.cm-best { font-weight: 800; font-size: 17px; text-align: center; }
+.cm-mh { margin: 14px 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.cm-matches { list-style: none; margin: 0; padding: 0; } .cm-matches li { display: flex; flex-direction: column; padding: 7px 0; border-top: 1px solid #eef1ef; font-size: 14px; }
+.cm-matches li i { color: var(--muted); font-style: normal; } .cm-matches li b { font-size: 14px; } .cm-matches li.done b { color: #1f6b46; }
+.cm-sc td.cm-best small { display: block; font-size: 11px; font-weight: 600; color: #1f6b46; }
+.cm-tabs button { text-align: center; }
