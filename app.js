@@ -596,6 +596,19 @@
   // Qui peut organiser : le propriétaire et les organisateurs qu'il nomme (tout le monde tant qu'il n'y a pas de propriétaire)
   const canOrganize = () => isOrganizer(meId());
   // ---------------- Accueil ----------------
+  // Membres invités (ni propriétaire ni organisateur) : ces tuiles sont grisées ; survol ou toucher = explication
+  const LOCKED = {
+    courses: 'Réservé à l’organisateur : il ajoute et corrige les terrains du groupe.',
+    players: 'Réservé à l’organisateur : il ajoute les joueurs et leur cellulaire.',
+    jeux: 'Réservé à l’organisateur : il choisit les jeux, les règles et les montants du groupe.',
+    quatuors: 'Réservé à l’organisateur : il offre les dates et forme les quatuors. Vous répondez avec le lien reçu par texto.',
+    setup: 'Réservé à l’organisateur : il crée les parties. Vous les suivez en direct dans Parties en cours.',
+  };
+  function lockTiles(html) {
+    if (canOrganize()) return html;
+    return html.replace(/<button class="tile" data-go="(courses|players|jeux|quatuors|setup)"/g, (m, k) => `<button class="tile locked" data-locked="${k}" aria-disabled="true" data-tip="${esc(LOCKED[k])}"`);
+  }
+  document.addEventListener('click', e => { const t = e.target.closest && e.target.closest('[data-locked]'); if (t) { e.preventDefault(); toast(LOCKED[t.dataset.locked]); } });
   function vHome() {
     $('#barTitle').textContent = APP;
     const last = ls.get('pelland.lastGame', null);
@@ -605,16 +618,16 @@
       <div class="hero"><h1><span class="hero-k">Groupe :</span> ${esc(groupName())}${canOrganize() ? ' <button class="hero-edit" id="renameGroup" type="button" aria-label="Modifier le nom du groupe">Modifier</button>' : ''}</h1><p>${APP} · le golf entre amis${(S.myPlayers || []).length > 1 ? ` · <button class="linkbtn" id="switchGroup" type="button">Changer de groupe (${S.myPlayers.length})</button>` : ''}</p></div>
       ${Store.needLogin ? '' : groupInfo(true)}
       ${onboardCard()}
-      <div class="tiles">
+      ${lockTiles(`<div class="tiles">
         <button class="tile" data-go="courses"><span class="pin">⛳</span><div><strong>Terrains</strong><span>Ajouter ou corriger un terrain</span></div></button>
         <button class="tile" data-go="players"><span class="pin"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M15.5 2.5 9 17.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M9 17.2c-.4 1.2-1.6 2.2-3.4 2.4l-2.1.2c-.6.1-.9.7-.6 1.2.2.3.5.5.9.5h4.6c1.6 0 2.7-.9 3.1-2.2l.3-.9" fill="currentColor"/><circle cx="18.5" cy="19.5" r="1.8" fill="currentColor"/></svg></span><div><strong>Joueurs</strong><span>Ajouter ou retirer des joueurs</span></div></button>
         <button class="tile" data-go="jeux"><span class="pin" style="font-family:var(--display);font-weight:700">$</span><div><strong>Les jeux</strong><span>Règles et argent</span></div></button>
         <button class="tile" data-go="quatuors"><span class="pin" style="font-family:var(--display);font-weight:700">4</span><div><strong>Parties à préparer</strong><span>Dates offertes, disponibilités et groupes de 4</span></div></button>
-        ${canOrganize() ? '' : '<!--'}<button class="tile" data-go="setup"><span class="pin">+</span><div><strong>Nouvelle partie</strong><span>Terrain, joueurs, index, tertres, handicap</span></div></button>${canOrganize() ? '' : '-->'}
+        <button class="tile" data-go="setup"><span class="pin">+</span><div><strong>Nouvelle partie</strong><span>Terrain, joueurs, index, tertres, handicap</span></div></button>
         <button class="tile" data-go="live"><span class="pin">⏵</span><div><strong>Parties en cours</strong><span>Les parties qui ont lieu en ce moment</span></div></button>
         <button class="tile" data-go="history"><span class="pin">≡</span><div><strong>Parties jouées</strong><span>Les parties terminées</span></div></button>
         <button class="tile" data-go="comps"><span class="pin"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M7 4h10v3a5 5 0 0 1-10 0V4z" fill="currentColor"/><path d="M7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M12 12v4M8 20h8l-1-4H9z" fill="currentColor" stroke="currentColor" stroke-width="1.2"/></svg></span><div><strong>Compétitions</strong><span>Membre-membre : équipes de 2, flites et classement en direct</span></div></button>
-      </div>
+      </div>`)}
       ${referralCard()}
       ${Store.needLogin ? '' : `<button class="caddie-tile" data-caddie type="button"><span class="cad-ico" aria-hidden="true">?</span><span><b>Une question ?</b><small>Demandez au Caddie : l’app, les règles des jeux, les forfaits.</small></span></button>`}
       ${viralCard('home')}
