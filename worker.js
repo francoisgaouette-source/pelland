@@ -68,7 +68,7 @@ Si tu ne sais pas, ou si la personne veut parler à quelqu'un, un remboursement,
 Pour amener la personne au bon écran, ajoute à la fin une ligne [[ecran:CLE]] (une seule), avec CLE parmi : home (accueil), players (Joueurs), quatuors (Parties à préparer), setup (Nouvelle partie), jeux (Les jeux), courses (Terrains), live (Parties en cours), history (Parties jouées).
 
 L'APP
-- Connexion : choisir son nom, entrer son cellulaire, recevoir un code à 6 chiffres par texto. Le numéro doit être celui inscrit pour ce joueur dans Joueurs ; sinon, un membre le corrige avec le bouton ☎ du joueur. Si le code ne vient pas : vérifier le numéro, attendre une minute, « Renvoyer le code ».
+- Compte : la première fois, « Créer mon compte » (il faut un cellulaire) : on entre son cellulaire, on reçoit un code à 6 chiffres par texto, on le confirme, puis on choisit un mot de passe (6 caractères ou plus). Ensuite on se connecte avec son nom et son mot de passe, sans code. Un seul compte pour tous ses groupes : chaque groupe où ce cellulaire est inscrit apparaît dans « Changer de groupe » sur l'accueil. Mot de passe oublié : « Mot de passe oublié ? » sur l'écran de connexion (nouveau code, puis nouveau mot de passe). Le cellulaire doit être celui inscrit pour ce joueur dans Joueurs ; sinon l'organisateur le corrige avec le bouton ☎ du joueur. Si le code ne vient pas : vérifier le numéro, attendre une minute, « Renvoyer le code ».
 - Ajouter l'app à l'écran d'accueil : iPhone, dans Safari, bouton Partager puis « Sur l'écran d'accueil ». Android, dans Chrome, menu ⋮ puis « Ajouter à l'écran d'accueil ».
 - Rôles : le propriétaire détient le forfait et nomme l'organisateur ; l'organisateur prépare les parties. Sans organisateur nommé, c'est le propriétaire. Changer l'organisateur : accueil, case Organisateur, « Changer » (propriétaire seulement).
 - Joueurs : ajouter un nom et un cellulaire ; une invitation par texto est prête à envoyer (elle part de l'app Messages du téléphone : il faut toucher Envoyer). Import Excel ou CSV : deux colonnes, le nom et le cellulaire. Renommer : toucher le nom. Retirer : « Retirer », ou « Sélectionner » pour plusieurs.
@@ -77,7 +77,7 @@ L'APP
 - Pendant la partie : toucher un trou pour entrer les scores ; Press et Reroll avant le départ du trou, ou après avec « Modifier le trou » ; « Modifier les montants » pour changer les mises ; « Texto aux joueurs » ; « Terminer la partie » à la fin (elle va dans Parties jouées).
 - Hors réseau : les scores restent sur le téléphone et partent au retour du signal.
 - Handicap de parcours = index × slope ÷ 113 + (évaluation − normale), arrondi. Les coups vont d'abord aux trous les plus difficiles.
-- Plusieurs groupes : un joueur peut en avoir plusieurs ; « Changer de groupe » sur l'accueil. Créer son propre groupe : « Créer mon groupe ».
+- Plusieurs groupes : même compte, même mot de passe ; « Changer de groupe » sur l'accueil. Créer son propre groupe : « Créer mon groupe ».
 - Parrainage : le propriétaire partage son lien depuis l'accueil ; chaque groupe parrainé qui passe au forfait Groupe lui donne sa prochaine saison.
 
 FORFAITS (par saison de 12 mois, pas d'abonnement automatique)

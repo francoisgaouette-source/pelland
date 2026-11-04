@@ -2,8 +2,8 @@ rules_version = '2';
 // Règles de sécurité Firestore — Le 19e (Fanion).
 // Principe : chaque membre ne voit et ne modifie que les données de SON groupe.
 // - Un membre = un compte « courriel / mot de passe » relié à son joueur par auth/{uid} = { playerId, groupId }.
-//   Ce lien est vérifié : le courriel du compte est celui inscrit sur la fiche du joueur,
-//   ou, pour une connexion par code texto, le numéro qui a reçu le code est celui du joueur.
+//   Ce lien est vérifié : le cellulaire confirmé du compte est celui du joueur (comptes actuels),
+//   ou le courriel du compte est celui inscrit sur la fiche du joueur (anciens comptes, fondateur d'un groupe).
 // - La collection players ne contient plus que les noms et les groupes (lisibles pour l'écran de connexion) ; aucun numéro.
 // - Les terrains sont communs à tous les groupes.
 service cloud.firestore {
@@ -15,12 +15,15 @@ service cloud.firestore {
     function courriel() {
       return request.auth.token.get('email', '');
     }
-    // Connexion par code texto : le numéro qui a reçu le code est celui inscrit pour ce joueur
+    // Le cellulaire confirmé du compte (par code texto) est celui inscrit pour ce joueur
+    function monNumero() {
+      return request.auth.token.get('phone_number', '');
+    }
     function bonNumero(playerId) {
-      return request.auth.token.firebase.sign_in_provider == 'phone'
+      return monNumero() != ''
         && exists(/databases/$(database)/documents/phones/$(playerId))
-        && (('+1' + get(/databases/$(database)/documents/phones/$(playerId)).data.phone) == request.auth.token.phone_number
-            || ('+' + get(/databases/$(database)/documents/phones/$(playerId)).data.phone) == request.auth.token.phone_number);
+        && (get(/databases/$(database)/documents/phones/$(playerId)).data.get('e164', '') == monNumero()
+            || ('+1' + get(/databases/$(database)/documents/phones/$(playerId)).data.phone) == monNumero());
     }
     function lien() {
       return get(/databases/$(database)/documents/auth/$(request.auth.uid)).data;
@@ -108,10 +111,14 @@ service cloud.firestore {
 
     // ---------- Numéros de téléphone complets : seulement le groupe du joueur ----------
     match /phones/{playerId} {
-      // lecture d'un numéro ou de la liste du groupe (requête « groupId == mon groupe »)
-      allow get, list: if dansGroupe(resource.data.groupId);
+      // lecture d'un numéro ou de la liste du groupe (requête « groupId == mon groupe »),
+      // ou de ses propres inscriptions dans tous les groupes (requête « e164 == mon cellulaire »)
+      allow get, list: if dansGroupe(resource.data.groupId)
+        || (membre() && monNumero() != '' && resource.data.get('e164', '') == monNumero())
+        || (membre() && monNumero() != '' && resource.data.phone == monNumero().replace('^[+]1', ''));
       allow create, update: if dansGroupe(request.resource.data.groupId)
-        && groupeDe(joueur(playerId)) == request.resource.data.groupId;
+        && groupeDe(joueur(playerId)) == request.resource.data.groupId
+        && request.resource.data.get('e164', '+1' + request.resource.data.phone) == '+1' + request.resource.data.phone;
       allow delete: if dansGroupe(resource.data.groupId);
     }
 

@@ -26,7 +26,7 @@
           this.db = firebase.firestore();
           // Connexion des membres : nom + numéro de téléphone (compte Firebase « courriel / mot de passe »)
           const user = await new Promise(res => { const off = firebase.auth().onAuthStateChanged(u => { off(); res(u); }); });
-          if (user && !user.isAnonymous) { this.uid = user.uid; this.email = user.email || user.phoneNumber; this.phoneUser = !user.email && !!user.phoneNumber; }
+          if (user && !user.isAnonymous) this.setUser(user);
           else { if (user && user.isAnonymous) { try { await firebase.auth().signOut(); } catch (e) { } } this.needLogin = true; }
           try { await this.db.enablePersistence({ synchronizeTabs: true }); } catch (e) { /* déjà active ou non supportée */ }
           this.mode = 'firebase';
@@ -50,24 +50,95 @@
       if (this.mode === 'firebase' && !this.needLogin) {
         // Compte qui n'est plus relié à aucun joueur (ex. numéro changé depuis) : on revient à l'écran de connexion
         if (await this.ensureMember() === false) { try { await firebase.auth().signOut(); } catch (e) { } this.uid = null; this.email = null; this.needLogin = true; }
-        else { await this.migrateGroups(); await this.migrateData(); }
+        else { await this.migrateGroups(); await this.migrateData(); await this.migratePhones(); }
       }
       if (!this.needLogin) await this.ensureSeed();
     },
-    // Sécurité : auth/{uid} = { playerId, groupId } relie le compte à son joueur et à son groupe.
-    // Les règles Firestore vérifient que le courriel du compte est bien celui du joueur, puis limitent chaque membre à son groupe.
+    // ---------- Comptes ----------
+    // Un compte par personne, créé une seule fois : cellulaire confirmé par un code texto, puis un mot de passe.
+    // Le compte Firebase porte le numéro (fournisseur « phone ») et un courriel interne opaque (fournisseur « password »).
+    // Ensuite : nom + mot de passe. Le compte donne accès à tous les groupes où ce cellulaire est inscrit (phones.e164).
+    // auth/{uid} = { playerId, groupId } : le joueur et le groupe actifs ; les règles vérifient que le numéro du compte est celui du joueur.
+    phoneE164(phone) { let d = String(phone || '').replace(/\D/g, ''); if (d.length === 10) d = '1' + d; return d.length === 11 ? '+' + d : ''; },
+    async acctEmail(e164) {
+      const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('fanion-v1:' + e164));
+      return 'm' + [...new Uint8Array(h)].slice(0, 12).map(b => b.toString(16).padStart(2, '0')).join('') + '@membres.fanion.ai';
+    },
+    setUser(u) { this.uid = u ? u.uid : null; this.email = u ? (u.email || u.phoneNumber) : null; this.e164 = u ? u.phoneNumber || null : null; },
     async ensureMember(player) {
-      if (this.mode !== 'firebase' || !this.uid || !this.email) return;
+      if (this.mode !== 'firebase' || !this.uid) return;
       try {
-        // Connexion par code texto : le lien compte → joueur est dans auth/{uid}
-        if (this.phoneUser && !player) { const a = await this.db.collection('auth').doc(this.uid).get(); if (!a.exists) return false; if (this.gid !== a.data().groupId) this.setGroup(a.data().groupId); return true; }
-        if (!player) { const sn = await this.db.collection('players').where('authEmail', '==', this.email).limit(1).get(); if (!sn.empty) player = { ...sn.docs[0].data(), id: sn.docs[0].id }; }
-        if (!player) return false;
-        const g = player.groupId || 'pelland', ref = this.db.collection('auth').doc(this.uid), cur = await ref.get();
-        if (!cur.exists || cur.data().groupId !== g || cur.data().playerId !== player.id) await ref.set({ playerId: player.id, groupId: g, at: Date.now() });
-        if (this.gid !== g) this.setGroup(g);
-        return true;
+        if (player) { await this.linkTo(player); return true; }
+        const a = await this.db.collection('auth').doc(this.uid).get();
+        if (a.exists) { if (this.gid !== a.data().groupId) this.setGroup(a.data().groupId); return true; }
+        // Ancien compte (avant les comptes avec mot de passe) : retrouvé par son courriel
+        if (this.email && !this.e164) { const sn = await this.db.collection('players').where('authEmail', '==', this.email).limit(1).get(); if (!sn.empty) { await this.linkTo({ ...sn.docs[0].data(), id: sn.docs[0].id }); return true; } }
+        const mine = await this.myPlayers(); if (mine.length) { await this.linkTo(mine[0]); return true; }
+        return false;
       } catch (e) { console.warn('membre', e.message); return null; }
+    },
+    // Tous les joueurs (un par groupe) inscrits avec le cellulaire de ce compte
+    async myPlayers() {
+      if (this.mode !== 'firebase' || !this.e164) return [];
+      const docs = {};
+      (await this.db.collection('phones').where('e164', '==', this.e164).get()).docs.forEach(d => { docs[d.id] = d; });
+      // Numéros enregistrés avant le format international : retrouvés par les 10 chiffres
+      try { (await this.db.collection('phones').where('phone', '==', this.e164.replace(/^\+1/, '')).get()).docs.forEach(d => { docs[d.id] = d; }); } catch (e) { }
+      const out = [];
+      for (const d of Object.values(docs)) { try { const p = await this.db.collection('players').doc(d.id).get(); if (p.exists) out.push({ ...p.data(), id: p.id }); } catch (e) { } }
+      return out;
+    },
+    // Rend ce joueur (et son groupe) actif pour ce compte
+    async linkTo(player) {
+      const g = player.groupId || 'pelland';
+      try { await this.db.collection('auth').doc(this.uid).set({ playerId: player.id, groupId: g, at: Date.now() }); }
+      catch (e) { throw Object.assign(new Error('Votre cellulaire n’est pas celui inscrit pour ' + player.name + '. Demandez à l’organisateur de le vérifier dans Joueurs.'), { code: 'local/nolink' }); }
+      this.setGroup(g); ls.set('pelland.me', player.name);
+    },
+    async sendCode(phone) {
+      const num = this.phoneE164(phone);
+      if (!num) throw Object.assign(new Error('Entrez votre numéro de cellulaire (10 chiffres).'), { code: 'local/phone' });
+      firebase.auth().languageCode = 'fr';
+      // reCAPTCHA invisible (exigé par Firebase) dans un conteneur fixe, hors de l'écran redessiné
+      let box = document.getElementById('recap'); if (!box) { box = document.createElement('div'); box.id = 'recap'; document.body.appendChild(box); }
+      if (!this._captcha) this._captcha = new firebase.auth.RecaptchaVerifier('recap', { size: 'invisible' });
+      try { return await firebase.auth().signInWithPhoneNumber(num, this._captcha); }
+      catch (e) { try { this._captcha.clear(); } catch (x) { } this._captcha = null; throw e; }
+    },
+    async confirmCode(confirmation, code) {
+      const c = String(code || '').replace(/\D/g, '');
+      if (c.length !== 6) throw Object.assign(new Error('Entrez le code à 6 chiffres reçu par texto.'), { code: 'local/code' });
+      const cred = await confirmation.confirm(c);
+      this.setUser(cred.user);
+      return await this.myPlayers();
+    },
+    // Mot de passe du compte (création ou oubli) ; puis le compte est inscrit sur chacun de ses joueurs (champ acct) pour la connexion par nom
+    async setPassword(pw, players) {
+      if (String(pw || '').length < 6) throw Object.assign(new Error('Le mot de passe doit avoir au moins 6 caractères.'), { code: 'local/pw' });
+      const u = firebase.auth().currentUser, email = await this.acctEmail(u.phoneNumber);
+      if (u.providerData.some(p => p.providerId === 'password')) await u.updatePassword(pw);
+      else await u.linkWithCredential(firebase.auth.EmailAuthProvider.credential(email, pw));
+      await u.getIdToken(true); this.setUser(firebase.auth().currentUser);
+      for (const p of players || []) {
+        try {
+          await this.linkTo(p); await this.db.collection('players').doc(p.id).set({ acct: email }, { merge: true });
+          await this.db.collection('phones').doc(p.id).set({ e164: u.phoneNumber }, { merge: true });
+        } catch (e) { console.warn('lien', p.id, e.message); }
+      }
+      return email;
+    },
+    async loginPassword(player, pw) {
+      if (!player.acct) throw Object.assign(new Error(player.name + ' n’a pas encore de compte. Touchez « Créer mon compte ».'), { code: 'local/noacct' });
+      try { const c = await firebase.auth().signInWithEmailAndPassword(player.acct, pw); this.setUser(c.user); }
+      catch (e) { throw Object.assign(new Error(/too-many/.test(e.code || '') ? 'Trop d’essais. Réessayez dans quelques minutes, ou touchez « Mot de passe oublié ».' : 'Mot de passe incorrect.'), { code: 'local/badpw' }); }
+      await this.linkTo(player);
+      this.needLogin = false;
+      await this.ensureSeed();
+    },
+    // Ajoute le numéro au format international (e164) aux numéros du groupe, pour que chacun retrouve ses groupes avec son compte
+    async migratePhones() {
+      const k = 'pelland.migr.e164.' + this.gid; if (ls.get(k, 0)) return;
+      try { const ph = await this.db.collection('phones').where('groupId', '==', this.gid).get(); for (const d of ph.docs) { const x = d.data(); if (!x.e164 && x.phone) await d.ref.set({ e164: this.phoneE164(x.phone) }, { merge: true }); } ls.set(k, 1); } catch (e) { }
     },
     // Une fois : ajoute le groupe aux anciennes parties et aux numéros (nécessaire avant de publier les nouvelles règles)
     async migrateGroups() {
@@ -79,84 +150,17 @@
         ls.set('pelland.migr.groups', 1);
       } catch (e) { ls.set('pelland.migr.groups', 1); /* règles déjà publiées : plus rien à faire */ }
     },
-    // ---------- Connexion par code texto (Firebase envoie le code) ----------
-    phoneE164(phone) { let d = String(phone || '').replace(/\D/g, ''); if (d.length === 10) d = '1' + d; return d.length === 11 ? '+' + d : ''; },
-    async sendCode(phone, buttonId) {
-      const num = this.phoneE164(phone);
-      if (!num) throw Object.assign(new Error('Entrez votre numéro de cellulaire (10 chiffres).'), { code: 'local/phone' });
-      firebase.auth().languageCode = 'fr';
-      // reCAPTCHA invisible (exigé par Firebase) dans un conteneur fixe, hors de l'écran redessiné
-      let box = document.getElementById('recap'); if (!box) { box = document.createElement('div'); box.id = 'recap'; document.body.appendChild(box); }
-      if (!this._captcha) this._captcha = new firebase.auth.RecaptchaVerifier('recap', { size: 'invisible' });
-      try { return await firebase.auth().signInWithPhoneNumber(num, this._captcha); }
-      catch (e) { try { this._captcha.clear(); } catch (x) { } this._captcha = null; throw e; }
-    },
-    // Relie le compte « téléphone » au joueur ; les règles vérifient que c'est bien son numéro
-    async linkPhonePlayer(player) {
-      const g = player.groupId || 'pelland';
-      try { await this.db.collection('auth').doc(this.uid).set({ playerId: player.id, groupId: g, at: Date.now() }); }
-      catch (e) { throw Object.assign(new Error('Ce numéro n’est pas celui inscrit pour ' + player.name + '. Demandez à un membre de le vérifier dans Joueurs.'), { code: 'local/nolink' }); }
-      this.setGroup(g);
-    },
-    async loginWithCode(player, confirmation, code) {
-      const c = String(code || '').replace(/\D/g, '');
-      if (c.length !== 6) throw Object.assign(new Error('Entrez le code à 6 chiffres reçu par texto.'), { code: 'local/code' });
-      const cred = await confirmation.confirm(c);
-      this.uid = cred.user.uid; this.email = cred.user.phoneNumber; this.phoneUser = true;
-      try { await this.linkPhonePlayer(player); }
-      catch (e) { try { await firebase.auth().signOut(); } catch (x) { } this.uid = null; this.email = null; this.phoneUser = false; throw e; }
-      this.needLogin = false;
-      ls.set('pelland.me', player.name);
-      this.rememberGroup(player.groupId || 'pelland', null, player.id, player.name);
-      await this.ensureSeed();
-    },
-    // Ancienne méthode (transition) : le numéro sert de mot de passe
-    async login(player, phone) {
-      const digits = String(phone || '').replace(/\D/g, '');
-      if (digits.length < 7) throw new Error('Entrez votre numéro de téléphone (10 chiffres).');
-      this.setGroup(player.groupId || 'pelland');
-      const auth = firebase.auth();
-      if (player.authEmail) {
-        try { const c = await auth.signInWithEmailAndPassword(player.authEmail, digits); this.uid = c.user.uid; this.email = c.user.email; }
-        catch (e) { throw new Error('Numéro de téléphone incorrect pour ' + player.name + '.'); }
-        await this.ensureMember(player); this.migrateGroups();
-        this.savePhone(player.id, digits, false, player.groupId || 'pelland');
-      } else {
-        const all = await this.listPlayers();
-        if (all.some(x => x.authEmail)) throw new Error('Le téléphone de ' + player.name + ' n\'est pas encore enregistré. Demandez à un membre de l\'ajouter dans Joueurs.');
-        // Premier membre : son compte est créé avec ce numéro
-        const email = player.id.replace(/[^a-z0-9-]/gi, '') + '-' + Date.now().toString(36) + '@pelland.golf';
-        const c = await auth.createUserWithEmailAndPassword(email, digits);
-        this.uid = c.user.uid; this.email = email;
-        await this.db.collection('players').doc(player.id).set({ authEmail: email, phoneHint: digits.slice(-2) }, { merge: true });
-        await this.ensureMember({ ...player, authEmail: email });
-        this.savePhone(player.id, digits, false, player.groupId || 'pelland');
-      }
-      this.needLogin = false;
-      ls.set('pelland.me', player.name);
-      this.rememberGroup(player.groupId || 'pelland', null, player.id, player.name);
-      await this.ensureSeed();
-    },
     async logout() { try { await firebase.auth().signOut(); } catch (e) { } ls.set('pelland.me', null); location.reload(); },
-    // Ajoute ou change le téléphone d'un joueur (crée son compte sans déconnecter le membre actuel)
+    // Ajoute ou change le cellulaire d'un joueur. Le joueur crée ensuite lui-même son compte (code texto + mot de passe).
     async setPhone(player, phone) {
-      const digits = String(phone || '').replace(/\D/g, '');
-      if (digits.length < 7) throw new Error('Numéro de téléphone invalide (10 chiffres).');
-      if (this.mode !== 'firebase') { const list = ls.get('pelland.players', []); const x = list.find(q => q.id === player.id); if (x) { x.phoneHint = digits.slice(-2); x.phone = digits; x.authEmail = 'local'; } ls.set('pelland.players', list); return; }
-      const sec = firebase.apps.find(a => a.name === 'invite') || firebase.initializeApp(this.cfg, 'invite');
-      const email = player.id.replace(/[^a-z0-9-]/gi, '') + '-' + Date.now().toString(36) + '@pelland.golf';
-      await sec.auth().createUserWithEmailAndPassword(email, digits);
-      try { await sec.auth().signOut(); } catch (e) { }
-      await this.db.collection('players').doc(player.id).set({ authEmail: email, phoneHint: digits.slice(-2) }, { merge: true });
-      if (player.authEmail && player.authEmail === this.email) {
-        // Mon propre numéro : je passe au nouveau compte pour rester relié à mon joueur
-        const c = await firebase.auth().signInWithEmailAndPassword(email, digits); this.uid = c.user.uid; this.email = email;
-        await this.ensureMember({ ...player, authEmail: email });
-      }
+      const digits = String(phone || '').replace(/\D/g, '').replace(/^1(\d{10})$/, '$1');
+      if (digits.length !== 10) throw new Error('Numéro de cellulaire invalide (10 chiffres).');
+      if (this.mode !== 'firebase') { const list = ls.get('pelland.players', []); const x = list.find(q => q.id === player.id); if (x) { x.phoneHint = digits.slice(-2); x.phone = digits; } ls.set('pelland.players', list); return; }
       await this.savePhone(player.id, digits, true, player.groupId || this.gid);
+      await this.db.collection('players').doc(player.id).set({ phoneHint: digits.slice(-2) }, { merge: true });
     },
     // Numéro complet : gardé à part, lisible seulement par les membres connectés
-    async savePhone(id, digits, strict, groupId) { try { await this.db.collection('phones').doc(id).set({ phone: digits, groupId: groupId || this.gid }); this.phonesBlocked = false; } catch (e) { console.warn('phones', e.message); this.phonesBlocked = true; if (strict) throw new Error('Numéro non conservé : publiez la règle « phones » dans Firebase (Firestore → Règles).'); } },
+    async savePhone(id, digits, strict, groupId) { try { await this.db.collection('phones').doc(id).set({ phone: digits, e164: this.phoneE164(digits), groupId: groupId || this.gid }); this.phonesBlocked = false; } catch (e) { console.warn('phones', e.message); this.phonesBlocked = true; if (strict) throw new Error('Numéro non conservé : publiez la règle « phones » dans Firebase (Firestore → Règles).'); } },
     async ensureSeed() {
       const list = await this.listCourses();
       if (!list.find(c => c.id === L.PINEGROVE.id)) await this.saveCourse(L.PINEGROVE);
@@ -233,51 +237,32 @@
       l.unshift({ gid, name: name || old.name || gid, playerId, playerName: playerName || '', owner: !!(owner || old.owner) });
       ls.set('pelland.mygroups', l.slice(0, 12));
     },
-    async switchGroup(entry, phone) {
-      const digits = String(phone || '').replace(/\D/g, '');
-      if (this.mode === 'firebase' && this.phoneUser) {
-        // Connecté par code : même compte pour tous les groupes où ce numéro est inscrit
-        const d = await this.db.collection('players').doc(entry.playerId).get();
-        if (!d.exists) throw new Error('Vous ne faites plus partie de ce groupe.');
-        const pl = { ...d.data(), id: d.id };
-        await this.linkPhonePlayer(pl); ls.set('pelland.me', pl.name); return;
-      }
-      if (digits.length < 7) throw new Error('Entrez votre numéro de téléphone (10 chiffres).');
-      if (this.mode === 'firebase') {
-        const d = await this.db.collection('players').doc(entry.playerId).get();
-        if (!d.exists) throw new Error('Vous ne faites plus partie de ce groupe.');
-        const pl = { ...d.data(), id: d.id };
-        if (!pl.authEmail) throw new Error('Votre téléphone n’est pas encore enregistré dans ce groupe.');
-        try { await firebase.auth().signOut(); } catch (e) { }
-        try { const c = await firebase.auth().signInWithEmailAndPassword(pl.authEmail, digits); this.uid = c.user.uid; this.email = c.user.email; }
-        catch (e) { throw new Error('Numéro de téléphone incorrect pour ce groupe.'); }
-        await this.ensureMember(pl);
-        ls.set('pelland.me', pl.name);
-      } else ls.set('pelland.me', entry.playerName || ls.get('pelland.me', ''));
-      this.setGroup(entry.gid);
+    async switchGroup(entry) {
+      if (this.mode !== 'firebase') { ls.set('pelland.me', entry.playerName || ls.get('pelland.me', '')); this.setGroup(entry.gid); return; }
+      const d = await this.db.collection('players').doc(entry.playerId).get();
+      if (!d.exists) throw new Error('Vous ne faites plus partie de ce groupe.');
+      await this.linkTo({ ...d.data(), id: d.id });
     },
     // Nouveau groupe : crée le compte du premier membre, le groupe et le joueur
     // Parrainage : ?ref=<code> (un groupe ou un centre) est gardé 90 jours sur ce téléphone, puis noté sur le groupe créé
     refCode() { const r = ls.get('pelland.ref', null); return r && r.until > Date.now() ? r.code : ''; },
-    async createGroup(groupName, name, phone, ref) {
-      const digits = String(phone || '').replace(/\D/g, '');
-      if (!groupName.trim()) throw new Error('Donnez un nom au groupe.');
-      if (!name.trim()) throw new Error('Entrez votre prénom et nom.');
-      if (digits.length < 7) throw new Error('Entrez votre numéro de téléphone (10 chiffres).');
+    // Nouveau groupe, créé par la personne connectée (son compte a déjà son cellulaire confirmé et son mot de passe)
+    async createGroup(groupName, name, ref) {
+      if (!String(groupName || '').trim()) throw new Error('Donnez un nom au groupe.');
+      if (!String(name || '').trim()) throw new Error('Entrez votre prénom et nom.');
       const pid = slug(name) + '-' + Math.random().toString(36).slice(2, 6);
       const gr = { id: slug(groupName) + '-' + Math.random().toString(36).slice(2, 6), name: groupName.trim(), owner: pid, createdAt: Date.now() };
       const rc = String(ref || this.refCode() || '').replace(/[^a-z0-9_-]/gi, '').slice(0, 60); if (rc) gr.ref = rc;
       if (this.mode === 'firebase') {
-        const email = pid.replace(/[^a-z0-9-]/gi, '') + '-' + Date.now().toString(36) + '@pelland.golf';
-        const c = await firebase.auth().createUserWithEmailAndPassword(email, digits);
-        this.uid = c.user.uid; this.email = email;
+        const u = firebase.auth().currentUser;
+        if (!u || !u.phoneNumber || !u.email) throw new Error('Créez d’abord votre compte avec votre cellulaire (déconnectez-vous, puis « Créer mon compte »).');
+        const digits = u.phoneNumber.replace(/\D/g, '').slice(-10);
         await this.saveGroup(gr);
-        await this.db.collection('players').doc(pid).set({ id: pid, name: name.trim(), groupId: gr.id, authEmail: email, phoneHint: digits.slice(-2), updatedAt: Date.now() });
-        await this.ensureMember({ id: pid, groupId: gr.id, authEmail: email });
+        await this.db.collection('players').doc(pid).set({ id: pid, name: name.trim(), groupId: gr.id, authEmail: u.email, acct: u.email, phoneHint: digits.slice(-2), updatedAt: Date.now() });
+        await this.linkTo({ id: pid, name: name.trim(), groupId: gr.id });
         await this.savePhone(pid, digits, false, gr.id);
-      } else { await this.saveGroup(gr); const list = ls.get('pelland.players', []); list.push({ id: pid, name: name.trim(), groupId: gr.id, phone: digits, phoneHint: digits.slice(-2), authEmail: 'local' }); ls.set('pelland.players', list); }
+      } else { await this.saveGroup(gr); const list = ls.get('pelland.players', []); list.push({ id: pid, name: name.trim(), groupId: gr.id, authEmail: 'local', acct: 'local' }); ls.set('pelland.players', list); }
       this.setGroup(gr.id); this.needLogin = false; ls.set('pelland.me', name.trim());
-      this.rememberGroup(gr.id, gr.name, pid, name.trim(), true);
       await this.ensureSeed();
       return gr;
     },
@@ -611,7 +596,7 @@
     const info = ls.get('pelland.lastGameInfo', null);
     const lastDate = info && info.id === last && info.createdAt ? new Date(info.createdAt).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' }) : null;
     return `
-      <div class="hero"><h1>${esc(groupName())}${canOrganize() ? ' <button class="hero-edit" id="renameGroup" type="button" aria-label="Modifier le nom du groupe">Modifier</button>' : ''}</h1><p>${APP} · le golf entre amis${Store.myGroups().length > 1 ? ' · <button class="linkbtn" id="switchGroup" type="button">Changer de groupe</button>' : ''}</p></div>
+      <div class="hero"><h1>${esc(groupName())}${canOrganize() ? ' <button class="hero-edit" id="renameGroup" type="button" aria-label="Modifier le nom du groupe">Modifier</button>' : ''}</h1><p>${APP} · le golf entre amis${(S.myPlayers || []).length > 1 ? ' · <button class="linkbtn" id="switchGroup" type="button">Changer de groupe</button>' : ''}</p></div>
       ${Store.needLogin ? '' : groupInfo(true)}
       ${onboardCard()}
       <div class="tiles">
@@ -757,36 +742,34 @@
   }
   function myPhone() { const me = (S.players || []).find(p => p.id === meId()); return (me && me.phone) || ''; }
   function newGroupSheet() {
-    rememberCurrent();
     openSheet(`<h3>Créer mon groupe</h3>
       <label>Nom du groupe<input id="vgName" type="text" autocapitalize="sentences" placeholder="ex. Les lève-tôt du samedi"></label>
       <label>Votre prénom et nom<input id="vgMe" type="text" autocapitalize="words" value="${esc(ls.get('pelland.me', '') || '')}"></label>
-      <label>Votre numéro de téléphone<input id="vgPhone" type="tel" inputmode="tel" value="${esc(myPhone() ? fmtPhone(myPhone()) : '')}" placeholder="450 555-1234"></label>
-      <p class="note" id="vgMsg">Vous en serez le propriétaire. Ajoutez ensuite vos joueurs dans Joueurs : ils reçoivent l’invitation par texto. Gratuit jusqu’à 4 joueurs.</p>
+      <p class="note" id="vgMsg">Même compte et même mot de passe : vous passerez d’un groupe à l’autre à l’accueil. Ajoutez ensuite vos joueurs dans Joueurs ; ils reçoivent l’invitation par texto. Gratuit jusqu’à 4 joueurs.</p>
       <div class="row"><button class="btn small" id="vgGo" type="button">Créer le groupe</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`, sh => {
       sh.querySelector('[data-close]').onclick = closeSheet;
       const b = sh.querySelector('#vgGo');
       b.onclick = async () => {
         const msg = sh.querySelector('#vgMsg'); b.disabled = true; msg.textContent = 'Création…';
-        try { await Store.createGroup(sh.querySelector('#vgName').value, sh.querySelector('#vgMe').value, sh.querySelector('#vgPhone').value, Store.gid); ls.set('pelland.lastGame', null); location.href = location.pathname; }
+        try { await Store.createGroup(sh.querySelector('#vgName').value, sh.querySelector('#vgMe').value, Store.gid); ls.set('pelland.lastGame', null); location.href = location.pathname; }
         catch (e) { msg.textContent = e.message; b.disabled = false; }
       };
       setTimeout(() => { const i = sh.querySelector('#vgName'); if (i) i.focus(); }, 50);
     });
   }
   function rememberCurrent() { if (!Store.needLogin && meId()) Store.rememberGroup(Store.gid, groupName(), meId(), ls.get('pelland.me', ''), meId() === ownerId()); }
-  function switchGroupSheet() {
-    rememberCurrent();
-    const l = Store.myGroups();
+  async function switchGroupSheet() {
+    let l = [];
+    try { l = (await Store.myPlayers()).map(p => ({ gid: p.groupId || 'pelland', playerId: p.id, playerName: p.name, name: ((S.groups || []).find(g => g.id === (p.groupId || 'pelland')) || {}).name || p.groupId })); } catch (e) { }
+    if (!l.length) l = Store.myGroups();
     openSheet(`<h3>Mes groupes</h3>
       <div class="pick-list">${l.map((x, i) => `<button class="btn ${x.gid === Store.gid ? '' : 'ghost'} small" data-gsw="${i}" type="button" ${x.gid === Store.gid ? 'disabled' : ''}>${esc(x.name)}${x.gid === Store.gid ? ' · actuel' : ''}</button>`).join('')}</div>
-      ${Store.phoneUser ? '<input id="gswPhone" type="hidden" value="">' : `<label>Votre numéro de téléphone<input id="gswPhone" type="tel" inputmode="tel" value="${esc(myPhone() ? fmtPhone(myPhone()) : '')}" placeholder="450 555-1234"></label>`}
-      <p class="note" id="gswMsg">${Store.phoneUser ? 'Touchez un groupe pour y passer.' : 'Entrez votre numéro pour passer à l’autre groupe.'}</p>
+      <p class="note" id="gswMsg">Les groupes où votre cellulaire est inscrit. Touchez-en un pour y passer.</p>
       <div class="row"><button class="btn ghost small" data-viral type="button">Créer un autre groupe</button><button class="btn ghost small" data-close type="button">Fermer</button></div>`, sh => {
       sh.querySelector('[data-close]').onclick = closeSheet;
       sh.querySelectorAll('[data-gsw]').forEach(b => b.onclick = async () => {
-        const msg = sh.querySelector('#gswMsg'); msg.textContent = 'Connexion…';
-        try { await Store.switchGroup(l[+b.dataset.gsw], sh.querySelector('#gswPhone').value); ls.set('pelland.lastGame', null); location.href = location.pathname; }
+        const msg = sh.querySelector('#gswMsg'); msg.textContent = 'Changement…';
+        try { await Store.switchGroup(l[+b.dataset.gsw]); ls.set('pelland.lastGame', null); location.href = location.pathname; }
         catch (e) { msg.textContent = e.message; }
       });
     });
@@ -1406,37 +1389,55 @@
   function vLogin() {
     $('#barTitle').textContent = APP;
     $('#back').hidden = true;
-    const me = ls.get('pelland.me', ''), invited = new URLSearchParams(location.search).get('joueur');
+    const qs = new URLSearchParams(location.search), me = ls.get('pelland.me', ''), invited = qs.get('joueur'), refQ = qs.get('ref');
     const groups = S.groups || [{ id: 'pelland', name: 'La gang à Pelland' }];
     const inv = invited && S.players.find(p => p.id === invited);
     if (!S.loginGroup) S.loginGroup = inv ? (inv.groupId || 'pelland') : Store.gid;
-    const refQ = new URLSearchParams(location.search).get('ref');
-    if (refQ && !invited && S.newGroupForm === undefined) S.newGroupForm = true;
-    const refGroup = refQ && (S.groups || []).find(g => g.id === refQ);
-    if (S.newGroupForm) return `<div class="hero"><h1>${APP}</h1><p>Le golf entre amis : pointage, jeux et parties à venir.</p></div>
-      ${refQ ? `<div class="ref-hello">${refGroup ? `Recommandé par <b>${esc(refGroup.name)}</b>. ` : ''}Créez votre groupe : c’est gratuit pour un quatuor, et vos joueurs reçoivent l’invitation par texto.</div>` : ''}
-      <section class="card"><h2>Créer un groupe</h2>
-        <label>Nom du groupe<input id="ngName" type="text" placeholder="ex. Les lève-tôt du samedi"></label>
-        <label>Votre prénom et nom<input id="ngMe" type="text" autocapitalize="words"></label>
-        <label>Votre numéro de téléphone<input id="ngPhone" type="tel" inputmode="tel" placeholder="450 555-1234"></label>
+    // Arrivée par une invitation sans compte, ou par un lien de parrainage : on commence par créer le compte
+    if (S.acct === undefined) S.acct = (inv && !inv.acct) ? { step: 'phone', welcome: inv.name } : (refQ && !invited) ? { step: 'phone', forGroup: true } : null;
+    const hero = `<div class="hero"><h1>${APP}</h1><p>Le golf entre amis : pointage, jeux et parties à venir.</p></div>`;
+    const A = S.acct;
+    if (A) {
+      const refGroup = refQ && groups.find(g => g.id === refQ);
+      const title = A.reset ? 'Nouveau mot de passe' : A.forGroup ? 'Créer un groupe' : 'Créer mon compte';
+      const steps = ['Cellulaire', 'Code', 'Mot de passe'].concat(A.forGroup ? ['Groupe'] : []);
+      const at = { phone: 0, code: 1, pw: 2, group: 3 }[A.step] || 0;
+      let body = '';
+      if (A.step === 'phone') body = `<p class="acct-need"><b>Il faut un cellulaire.</b> On vous envoie un code par texto pour confirmer que c’est bien vous. Ensuite, vous choisissez un mot de passe : plus besoin de code.</p>
+        <label>Votre numéro de cellulaire<input id="acPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="450 555-1234" value="${esc(A.phone || '')}"></label>
+        <button class="btn" id="acSend" type="button">Recevoir le code</button>`;
+      else if (A.step === 'code') body = `<p class="note">Code envoyé par texto au <b>${esc(fmtPhone(A.phone))}</b>.</p>
+        <label>Code à 6 chiffres<input id="acCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456"></label>
+        <button class="btn" id="acConfirm" type="button">Confirmer</button>
+        <p class="note" style="text-align:center"><button class="linkbtn" id="acResend" type="button">Renvoyer le code</button> · <button class="linkbtn" id="acPhoneBack" type="button">Changer de numéro</button></p>`;
+      else if (A.step === 'pw') body = `${(A.matches || []).length ? `<p class="note">Votre cellulaire est inscrit dans : <b>${A.matches.map(p => esc((groups.find(g => g.id === (p.groupId || 'pelland')) || {}).name || p.groupId)).join(', ')}</b>.</p>` : A.forGroup ? '' : '<div class="warn">Ce cellulaire n’est inscrit dans aucun groupe pour l’instant. Demandez à votre organisateur de vous ajouter dans Joueurs, ou créez votre propre groupe après votre mot de passe.</div>'}
+        <label>Mot de passe<input id="acPw" type="password" autocomplete="new-password" placeholder="6 caractères ou plus"></label>
+        <label>Confirmez le mot de passe<input id="acPw2" type="password" autocomplete="new-password"></label>
+        <button class="btn" id="acSetPw" type="button">${A.reset ? 'Enregistrer' : 'Créer mon compte'}</button>`;
+      else if (A.step === 'group') body = `<label>Nom du groupe<input id="ngName" type="text" placeholder="ex. Les lève-tôt du samedi"></label>
+        <label>Votre prénom et nom<input id="ngMe" type="text" autocapitalize="words" value="${esc(A.name || '')}"></label>
         <button class="btn" id="ngCreate" type="button">Créer le groupe</button>
-        <button class="linkbtn" id="ngBack" type="button">Retour à la connexion</button>
-        <p class="note" id="ngMsg">Vous serez le premier membre. Vous ajouterez ensuite les joueurs dans Joueurs ; ils recevront un texto d’invitation.</p>
-      </section>`;
+        <p class="note">Vous en serez le propriétaire. Ajoutez ensuite vos joueurs dans Joueurs : ils reçoivent l’invitation par texto. Gratuit jusqu’à 4 joueurs.</p>`;
+      return hero + `${A.welcome ? `<div class="ref-hello">Bienvenue, <b>${esc(A.welcome)}</b> ! Créez votre compte une seule fois : il servira pour tous vos groupes.</div>` : ''}
+        ${A.forGroup && refQ ? `<div class="ref-hello">${refGroup ? `Recommandé par <b>${esc(refGroup.name)}</b>. ` : ''}Créez votre groupe : c’est gratuit pour un quatuor, et vos joueurs reçoivent l’invitation par texto.</div>` : ''}
+        <section class="card"><h2>${title}</h2>
+        <ol class="acct-steps">${steps.map((t, i) => `<li class="${i < at ? 'done' : i === at ? 'on' : ''}">${t}</li>`).join('')}</ol>
+        ${body}
+        <p class="note" id="acMsg">${esc(A.msg || '')}</p>
+        ${A.step === 'phone' || A.step === 'code' ? '<p class="note" style="text-align:center"><button class="linkbtn" id="acCancel" type="button">J’ai déjà un compte : me connecter</button></p>' : ''}</section>`;
+    }
     const inGroup = S.players.filter(p => (p.groupId || 'pelland') === S.loginGroup);
-    return `<div class="hero"><h1>${APP}</h1><p>Le golf entre amis : pointage, jeux et parties à venir.</p></div>
-      <section class="card"><h2>Connexion</h2>
+    const pickId = S.loginPick || (invited && inGroup.some(p => p.id === invited) ? invited : (inGroup.find(p => p.name === me) || {}).id);
+    const pick = inGroup.find(p => p.id === pickId);
+    return hero + `<section class="card"><h2>Connexion</h2>
         ${groups.length > 1 ? `<label>Votre groupe<select id="loginGroup">${groups.map(gr => `<option value="${esc(gr.id)}" ${gr.id === S.loginGroup ? 'selected' : ''}>${esc(gr.name)}</option>`).join('')}</select></label>` : ''}
-        <label>Votre nom<select id="loginName"><option value="">— Choisir —</option>${inGroup.map(p => `<option value="${esc(p.id)}" ${(S.loginPick ? p.id === S.loginPick : invited ? p.id === invited : p.name === me) ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
-        ${S.code ? `<p class="note">Code envoyé par texto au <b>${esc(fmtPhone(S.code.phone))}</b>.</p>
-        <label>Code à 6 chiffres<input id="loginCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456"></label>
-        <button class="btn" id="codeBtn" type="button">Entrer</button>
-        <p class="note" style="text-align:center"><button class="linkbtn" id="codeAgain" type="button">Renvoyer le code</button> · <button class="linkbtn" id="codeBack" type="button">Changer de numéro</button></p>`
-        : `<label>Votre numéro de cellulaire<input id="loginPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="450 555-1234" value="${esc(S.loginPhone || '')}"></label>
-        ${S.pwMode ? '<button class="btn" id="loginBtn" type="button">Entrer</button>' : '<button class="btn" id="sendCode" type="button">Recevoir un code par texto</button>'}`}
-        <p class="note" id="loginMsg">${esc(S.loginMsg || (S.code ? 'Le code arrive en quelques secondes.' : S.pwMode ? 'Entrez votre numéro de cellulaire.' : 'Vous recevrez un code à 6 chiffres. Votre numéro reste visible seulement par votre groupe.'))}</p>
-        ${S.pwMode && !S.pwForced ? '<p class="note" style="text-align:center"><button class="linkbtn" id="useCode" type="button">Recevoir plutôt un code par texto</button></p>' : ''}
-        ${S.allowPw && !S.pwMode && !S.code ? '<p class="note" style="text-align:center"><button class="linkbtn" id="usePw" type="button">Entrer avec mon numéro comme avant</button></p>' : ''}
+        <label>Votre nom<select id="loginName"><option value="">— Choisir —</option>${inGroup.map(p => `<option value="${esc(p.id)}" ${p.id === pickId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
+        ${pick && !pick.acct ? `<div class="warn"><b>${esc(pick.name)}</b> n’a pas encore de compte. Il faut un cellulaire : on vous envoie un code, puis vous choisissez un mot de passe.</div>
+          <button class="btn" id="goCreate" type="button">Créer mon compte</button>`
+        : `<label>Mot de passe<input id="loginPw" type="password" autocomplete="current-password"></label>
+          <button class="btn" id="loginBtn" type="button">Entrer</button>`}
+        <p class="note" id="loginMsg">${esc(S.loginMsg || '')}</p>
+        ${pick && !pick.acct ? '' : '<p class="note" style="text-align:center"><button class="linkbtn" id="forgotPw" type="button">Mot de passe oublié ?</button> · <button class="linkbtn" id="goCreate2" type="button">Première fois ? Créer mon compte</button></p>'}
       </section>
       <p class="note" style="text-align:center">Nouveau groupe d’amis ? <button class="linkbtn" id="newGroup" type="button">Créer un groupe</button></p>`;
   }
@@ -1633,66 +1634,67 @@
   // =====================================================================
   const bind = {
     login(v) {
-      const go2 = async () => {
-        const id = $('#loginName').value, ph = $('#loginPhone').value;
-        const pl = S.players.find(p => p.id === id);
-        const msg = $('#loginMsg');
-        if (!pl) { msg.textContent = 'Choisissez votre nom.'; return; }
-        $('#loginBtn').disabled = true; msg.textContent = 'Connexion…';
-        try { await Store.login(pl, ph); const q = new URLSearchParams(location.search); q.delete('joueur'); location.href = location.pathname + (q.toString() ? '?' + q : ''); }
-        catch (e) { msg.textContent = e.message; $('#loginBtn').disabled = false; }
-      };
-      const ng = $('#newGroup'); if (ng) ng.onclick = () => { S.newGroupForm = true; render(); };
-      const nb = $('#ngBack'); if (nb) nb.onclick = () => { S.newGroupForm = false; render(); };
-      const nc = $('#ngCreate'); if (nc) nc.onclick = async () => {
-        const msg = $('#ngMsg'); nc.disabled = true; msg.textContent = 'Création…';
-        try { await Store.createGroup($('#ngName').value, $('#ngMe').value, $('#ngPhone').value); location.href = location.pathname; }
-        catch (e) { msg.textContent = e.message && e.message.includes('auth/') ? 'Création impossible : ' + e.message : e.message; nc.disabled = false; }
-      };
-      const lg = $('#loginGroup'); if (lg) lg.onchange = e => { S.loginGroup = e.target.value; S.code = null; render(); };
-      const ln = $('#loginName'); if (ln) ln.onchange = () => { S.loginPick = ln.value; if (S.code) { S.code = null; render(); } };
-      const say = (t, again) => { S.loginMsg = t; if (again) render(); else { const m = $('#loginMsg'); if (m) m.textContent = t; } };
-      // Codes d'erreur qui veulent dire « la connexion par code n'est pas disponible ici » : on passe à l'ancienne méthode
-      const UNAVAILABLE = /operation-not-allowed|unauthorized-domain|captcha|app-credential|internal-error|quota-exceeded|admin-restricted|network-request-failed/;
-      const phoneErr = e => {
+      const done = () => { const q = new URLSearchParams(location.search); q.delete('joueur'); q.delete('ref'); location.href = location.pathname + (q.toString() ? '?' + q : ''); };
+      const say = t => { const m = $('#acMsg') || $('#loginMsg'); if (m) m.textContent = t; };
+      const errTxt = e => {
         const c = (e && e.code) || '';
         if (c.startsWith('local/')) return e.message;
         if (/invalid-phone-number|missing-phone-number/.test(c)) return 'Numéro invalide : entrez vos 10 chiffres.';
         if (/too-many-requests/.test(c)) return 'Trop d’essais pour ce numéro. Réessayez dans quelques minutes.';
         if (/invalid-verification-code/.test(c)) return 'Code incorrect. Vérifiez le texto et réessayez.';
         if (/code-expired|session-expired/.test(c)) return 'Code expiré : touchez « Renvoyer le code ».';
+        if (/requires-recent-login/.test(c)) return 'Pour votre sécurité, recommencez avec un nouveau code.';
+        if (/referer|blocked/.test(c + (e.message || ''))) return 'Connexion bloquée par la clé Firebase : l’adresse de l’app doit être autorisée (Google Cloud → Identifiants).';
         return 'Erreur : ' + (c || e.message);
       };
-      const send = async () => {
-        const pl = S.players.find(p => p.id === $('#loginName').value);
-        if (!pl) return say('Choisissez votre nom.');
-        const ph = S.code ? S.code.phone : $('#loginPhone').value; S.loginPhone = ph; S.loginPick = pl.id;
-        const b = $('#sendCode') || $('#codeAgain'); if (b) b.disabled = true; say('Envoi du code…');
-        try { const conf = await Store.sendCode(ph, b.id); S.code = { conf, phone: String(ph).replace(/\D/g, ''), player: pl.id }; S.loginMsg = ''; S.allowPw = false; render(); setTimeout(() => { const i = $('#loginCode'); if (i) i.focus(); }, 50); }
-        catch (e) {
-          if (UNAVAILABLE.test((e && e.code) || '')) { S.pwMode = true; S.pwForced = true; S.code = null; say('La connexion par code n’est pas encore activée : entrez avec votre numéro comme avant.', true); return; }
-          if (b) b.disabled = false; say(phoneErr(e));
-        }
-      };
+      const A = S.acct;
+      const start = o => { S.acct = { step: 'phone', ...o }; S.loginMsg = ''; render(); setTimeout(() => { const i = $('#acPhone'); if (i) i.focus(); }, 50); };
+      // ----- Connexion : nom + mot de passe -----
+      const lg = $('#loginGroup'); if (lg) lg.onchange = e => { S.loginGroup = e.target.value; S.loginPick = null; render(); };
+      const ln = $('#loginName'); if (ln) ln.onchange = () => { S.loginPick = ln.value; S.loginMsg = ''; render(); };
       const enter = async () => {
-        const pl = S.players.find(p => p.id === S.code.player); const b = $('#codeBtn'); if (b.disabled) return; b.disabled = true; say('Connexion…');
-        try { await Store.loginWithCode(pl, S.code.conf, $('#loginCode').value); const q = new URLSearchParams(location.search); q.delete('joueur'); location.href = location.pathname + (q.toString() ? '?' + q : ''); }
-        catch (e) {
-          b.disabled = false;
-          // Numéro pas encore inscrit dans le groupe (anciens comptes) : on offre l'ancienne méthode
-          if (e.code === 'local/nolink' && pl.authEmail) { S.code = null; S.allowPw = true; say(e.message, true); return; }
-          say(phoneErr(e));
-        }
+        const pl = S.players.find(p => p.id === $('#loginName').value); if (!pl) return say('Choisissez votre nom.');
+        const b = $('#loginBtn'); b.disabled = true; say('Connexion…');
+        try { await Store.loginPassword(pl, $('#loginPw').value); done(); } catch (e) { b.disabled = false; say(errTxt(e)); }
       };
-      const sc = $('#sendCode'); if (sc) sc.onclick = send;
-      const ca = $('#codeAgain'); if (ca) ca.onclick = send;
-      const cb = $('#codeBack'); if (cb) cb.onclick = () => { S.code = null; S.loginMsg = ''; render(); };
-      const cbt = $('#codeBtn'); if (cbt) cbt.onclick = enter;
-      const ci = $('#loginCode'); if (ci) { ci.onkeydown = e => { if (e.key === 'Enter') enter(); }; ci.oninput = () => { if (ci.value.replace(/\D/g, '').length === 6) enter(); }; }
-      const up = $('#usePw'); if (up) up.onclick = () => { S.pwMode = true; S.loginMsg = ''; render(); };
-      const uc = $('#useCode'); if (uc) uc.onclick = () => { S.pwMode = false; S.loginMsg = ''; render(); };
-      const lp = $('#loginPhone'); if (lp) lp.onkeydown = e => { if (e.key === 'Enter') (S.pwMode ? go2 : send)(); };
-      if ($('#loginBtn')) $('#loginBtn').onclick = go2;
+      if ($('#loginBtn')) { $('#loginBtn').onclick = enter; $('#loginPw').onkeydown = e => { if (e.key === 'Enter') enter(); }; }
+      [['#goCreate', {}], ['#goCreate2', {}], ['#forgotPw', { reset: true }], ['#newGroup', { forGroup: true }]].forEach(([id, o]) => { const b = $(id); if (b) b.onclick = () => start(o); });
+      if (!A) return;
+      // ----- Création de compte : cellulaire → code → mot de passe (→ groupe) -----
+      const cancel = $('#acCancel'); if (cancel) cancel.onclick = () => { S.acct = null; S.loginMsg = ''; render(); };
+      const send = async () => {
+        const ph = A.step === 'code' ? A.phone : $('#acPhone').value;
+        const b = $('#acSend') || $('#acResend'); if (b) b.disabled = true; say('Envoi du code…');
+        try { A.conf = await Store.sendCode(ph); A.phone = String(ph).replace(/\D/g, '').replace(/^1(\d{10})$/, '$1'); A.step = 'code'; A.msg = 'Le code arrive en quelques secondes.'; render(); setTimeout(() => { const i = $('#acCode'); if (i) i.focus(); }, 50); }
+        catch (e) { if (b) b.disabled = false; say(errTxt(e)); }
+      };
+      const sb = $('#acSend'); if (sb) { sb.onclick = send; $('#acPhone').onkeydown = e => { if (e.key === 'Enter') send(); }; }
+      const rs = $('#acResend'); if (rs) rs.onclick = send;
+      const pb = $('#acPhoneBack'); if (pb) pb.onclick = () => { A.step = 'phone'; A.msg = ''; render(); };
+      const confirm = async () => {
+        const b = $('#acConfirm'); if (b.disabled) return; b.disabled = true; say('Vérification…');
+        try { A.matches = await Store.confirmCode(A.conf, $('#acCode').value); A.step = 'pw'; A.msg = ''; render(); setTimeout(() => { const i = $('#acPw'); if (i) i.focus(); }, 50); }
+        catch (e) { b.disabled = false; say(errTxt(e)); }
+      };
+      const cf = $('#acConfirm'); if (cf) { cf.onclick = confirm; const ci = $('#acCode'); ci.onkeydown = e => { if (e.key === 'Enter') confirm(); }; ci.oninput = () => { if (ci.value.replace(/\D/g, '').length === 6) confirm(); }; }
+      const sp = $('#acSetPw'); if (sp) sp.onclick = async () => {
+        const p1 = $('#acPw').value, p2 = $('#acPw2').value;
+        if (p1.length < 6) return say('Le mot de passe doit avoir au moins 6 caractères.');
+        if (p1 !== p2) return say('Les deux mots de passe ne sont pas pareils.');
+        sp.disabled = true; say('Enregistrement…');
+        try {
+          // Le joueur choisi (invitation ou nom sélectionné) devient le groupe actif à la fin
+          const pref = (A.matches || []).find(p => p.id === (new URLSearchParams(location.search).get('joueur') || S.loginPick));
+          const order = pref ? (A.matches || []).filter(p => p !== pref).concat([pref]) : (A.matches || []);
+          await Store.setPassword(p1, order);
+          if (A.forGroup || !order.length) { A.step = 'group'; A.forGroup = true; A.name = (pref || order[0] || {}).name || ''; A.msg = ''; render(); return; }
+          Store.needLogin = false; done();
+        } catch (e) { sp.disabled = false; say(errTxt(e)); }
+      };
+      const nc = $('#ngCreate'); if (nc) nc.onclick = async () => {
+        nc.disabled = true; say('Création…');
+        try { await Store.createGroup($('#ngName').value, $('#ngMe').value); done(); } catch (e) { nc.disabled = false; say(e.message); }
+      };
     },
     offre(v) {
       commonNav(v);
@@ -2319,7 +2321,7 @@
   }
   function inviteSms(name, d, id) {
     const url = location.origin + location.pathname + (id ? '?joueur=' + encodeURIComponent(id) : '');
-    const body = `Salut ${name.split(' ')[0]} ! Tu as été invité à te joindre au groupe « ${groupName()} » sur ${APP}, l’app de golf entre amis. Ouvre l’app : ${url} — ton nom est déjà choisi : entre ton numéro (${fmtPhone(d)}) et tu recevras un code par texto pour te connecter. Sur iPhone : bouton Partager, puis « Sur l’écran d’accueil ».`;
+    const body = `Salut ${name.split(' ')[0]} ! Tu as été invité à te joindre au groupe « ${groupName()} » sur ${APP}, l’app de golf entre amis. Ouvre l’app : ${url} — ton nom est déjà choisi. La première fois, crée ton compte avec ton cellulaire (${fmtPhone(d)}) : tu reçois un code par texto, puis tu choisis un mot de passe. Sur iPhone : bouton Partager, puis « Sur l’écran d’accueil ».`;
     openSms([d], body);
   }
   // Lignes de la carte selon les trous joués (18, aller ou retour)
@@ -2961,6 +2963,7 @@
     try { S.quatuors = await Store.listQuatuors(); } catch (e) { S.quatuors = []; }
     try { S.jeux = await Store.listJeux(); } catch (e) { S.jeux = []; }
     try { S.groups = await Store.listGroups(); } catch (e) { S.groups = []; }
+    Store.myPlayers().then(l => { S.myPlayers = l; if (S.view === 'home' && l.length > 1) render(); }).catch(() => { });
     const params = new URLSearchParams(location.search);
     const code = (params.get('partie') || params.get('code') || '').toUpperCase();
     const offreId = params.get('offre');

@@ -720,3 +720,9 @@ textarea { font-family: inherit; line-height: 1.4; resize: vertical; }
 .cm-matches li i { color: var(--muted); font-style: normal; } .cm-matches li b { font-size: 14px; } .cm-matches li.done b { color: #1f6b46; }
 .cm-sc td.cm-best small { display: block; font-size: 11px; font-weight: 600; color: #1f6b46; }
 .cm-tabs button { text-align: center; }
+/* Création de compte */
+.acct-steps { list-style: none; display: flex; gap: 6px; padding: 0; margin: 4px 0 14px; counter-reset: s; }
+.acct-steps li { flex: 1; counter-increment: s; font-size: 12px; font-weight: 600; color: var(--muted); text-align: center; border-top: 4px solid #dfe6e1; padding-top: 6px; }
+.acct-steps li::before { content: counter(s) ". "; }
+.acct-steps li.done { border-color: #1f6b46; color: #1f6b46; } .acct-steps li.on { border-color: #e3a90b; color: var(--ink, #16201a); }
+.acct-need { background: #f3f7f4; border-radius: 10px; padding: 10px 12px; margin: 0 0 12px; line-height: 1.4; }
