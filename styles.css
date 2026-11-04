@@ -744,3 +744,6 @@ textarea { font-family: inherit; line-height: 1.4; resize: vertical; }
 .tile.locked:hover > *, .tile.locked:focus-visible > * { opacity: .7; }
 .tile.locked:hover::after, .tile.locked:focus-visible::after { opacity: 1; }
 .grp-info.compact { margin-top: 4px; }
+.home-h { margin: 22px 2px 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-family: var(--body, inherit); font-weight: 700; }
+.pin.step-n { font-family: var(--display); font-weight: 800; font-size: 24px; background: #e3a90b; color: #14231b; }
+.tile.locked .pin.step-n { background: #9aa7a0; color: #fff; }
