@@ -743,3 +743,4 @@ textarea { font-family: inherit; line-height: 1.4; resize: vertical; }
 .tile.locked::after { content: attr(data-tip); position: absolute; left: 12px; right: 12px; bottom: calc(100% + 6px); background: #14231b; color: #fff; font-size: 14px; line-height: 1.35; padding: 8px 10px; border-radius: 10px; opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 5; text-align: left; filter: none; }
 .tile.locked:hover > *, .tile.locked:focus-visible > * { opacity: .7; }
 .tile.locked:hover::after, .tile.locked:focus-visible::after { opacity: 1; }
+.grp-info.compact { margin-top: 4px; }
