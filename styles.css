@@ -754,12 +754,4 @@ textarea { font-family: inherit; line-height: 1.4; resize: vertical; }
 .grp-info .role-tag.own { background: #1f6b46; color: #fff; }
 .grp-info .role-tag.org { background: #fdf3d6; color: #6b4e00; border: 1px solid #ecd28b; }
 .grp-info > .who-act { grid-column: 1 / -1; margin-top: -4px; } .grp-info > .who-act .linkbtn { font-size: 13px; }
-
-/* Statut d'invitation des joueurs */
-.inv-tag { display: inline-block; white-space: nowrap; margin-top: 4px; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
-.inv-tag.ok { background: #e3f3e8; color: #1f6b3a; }
-.inv-tag.wait { background: #fdf1d6; color: #8a5a00; }
-.inv-tag.none { background: transparent; color: var(--muted); border: 1px dashed currentColor; font-weight: 600; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .inv-tag.ok { background: #1d3b28; color: #8fd6a6; } :root:not([data-theme="light"]) .inv-tag.wait { background: #3d3115; color: #f0c56a; } }
-:root[data-theme="dark"] .inv-tag.ok { background: #1d3b28; color: #8fd6a6; } :root[data-theme="dark"] .inv-tag.wait { background: #3d3115; color: #f0c56a; }
-.inv-sum { display: block; font-size: 14px; margin-top: 2px; } .inv-sum b { font-size: 14px !important; }
+.pick-list .pick-off { opacity: .5; cursor: not-allowed; } .pick-list .btn small { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
