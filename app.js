@@ -562,6 +562,7 @@
     if (S.unwatchComp && view !== 'comp' && view !== 'compEdit') { S.unwatchComp(); S.unwatchComp = null; }
     if (view === 'comps') S.compList = null;
     if (view === 'compte') S.acctGroups = null;
+    if (view === 'players') S.pFocused = false;
     if (view !== 'game' && view !== 'setup' && Voice.wake) Voice.setWake(false);
     S.view = view; Object.assign(S, opts);
     if (view === 'setup' && !S.offres) Store.listOffres().then(l => { S.offres = l; if (S.view === 'setup') render(); });
@@ -619,7 +620,7 @@
       <div class="hero"><h1><span class="hero-k">Groupe :</span> ${esc(groupName())}${canOrganize() ? ' <button class="hero-edit" id="renameGroup" type="button" aria-label="Modifier le nom du groupe">Modifier</button>' : ''}</h1><p>${APP} · le golf entre amis${(S.myPlayers || []).length > 1 ? ` · <button class="linkbtn" id="switchGroup" type="button">Changer de groupe (${S.myPlayers.length})</button>` : ''}</p></div>
       <h3 class="home-h">Les étapes</h3>
       ${lockTiles(`<div class="tiles steps">
-        <button class="tile" data-go="players"><span class="pin step-n">1</span><div><strong>Inviter des joueurs</strong><span>Ajoutez vos joueurs et leur cellulaire : ils reçoivent l’invitation par texto</span></div></button>
+        <button class="tile" data-go="players" data-pmode="inviter"><span class="pin step-n">1</span><div><strong>Inviter des joueurs</strong><span>Ajoutez vos joueurs et leur cellulaire : ils reçoivent l’invitation par texto</span></div></button>
         <button class="tile" data-go="quatuors"><span class="pin step-n">2</span><div><strong>Parties à préparer</strong><span>Offrez des dates ; les joueurs répondent et l’app forme les quatuors</span></div></button>
         <button class="tile" data-go="setup"><span class="pin step-n">3</span><div><strong>Créer une partie</strong><span>Terrain, joueurs, jeu et montants</span></div></button>
         <button class="tile" data-go="live"><span class="pin step-n">4</span><div><strong>Parties en cours</strong><span>Suivez les parties en direct</span></div></button>
@@ -1577,8 +1578,9 @@
   // Peut être retiré en lot : ni le propriétaire, ni soi-même
   const canRemove = p => p.id !== ownerId() && p.id !== meId();
   function vPlayers() {
-    $('#barTitle').textContent = 'Joueurs';
-    return `${groupInfo()}<section class="card"><h2>Ajouter un joueur</h2>
+    const inviter = S.pMode === 'inviter';
+    $('#barTitle').textContent = inviter ? 'Inviter des joueurs' : 'Banque de joueurs';
+    return `${inviter ? '<p class="note">Entrez le nom et le cellulaire : un texto d’invitation est prêt à envoyer. La personne crée ensuite son compte avec son cellulaire.</p>' : groupInfo()}<section class="card"><h2>${inviter ? 'Inviter un joueur' : 'Ajouter un joueur'}</h2>
         <input id="newPlayer" type="text" placeholder="Prénom et nom" autocapitalize="words">
         <div class="row" style="flex-wrap:nowrap"><input id="newPhone" type="tel" inputmode="tel" placeholder="Cellulaire" style="flex:1;min-width:0"><button class="btn small" id="addPlayer" type="button">Ajouter</button></div>
         ${canOrganize() ? `<div class="import-row"><label class="btn ghost small" for="xlsFile">Importer un fichier Excel</label><input id="xlsFile" type="file" accept=".xlsx,.xls,.csv,.ods" hidden><span class="note">Deux colonnes : le nom et le cellulaire.</span></div>` : ''}
@@ -1861,6 +1863,7 @@
       });
     },
     players(v) {
+      if (S.pMode === 'inviter' && !S.pFocused) { S.pFocused = true; setTimeout(() => { const i = $('#newPlayer'); if (i) i.focus(); }, 80); }
       v.querySelectorAll('[data-org]').forEach(b => b.onclick = async () => {
         // un seul organisateur (en plus du propriétaire) : en nommer un nouveau remplace l'ancien
         const gr = { ...curGroup() }, id = b.dataset.org, cur = (gr.organizers || [])[0];
@@ -2188,7 +2191,7 @@
     }
   };
   function commonNav(v) {
-    v.querySelectorAll('[data-go]').forEach(b => b.onclick = () => go(b.dataset.go, b.dataset.go === 'setup' ? { draft: null } : b.dataset.new ? { editCourse: null } : {}));
+    v.querySelectorAll('[data-go]').forEach(b => b.onclick = () => go(b.dataset.go, b.dataset.go === 'setup' ? { draft: null } : b.dataset.go === 'players' ? { pMode: b.dataset.pmode || 'banque' } : b.dataset.new ? { editCourse: null } : {}));
     v.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openGame(b.dataset.open));
   }
 
