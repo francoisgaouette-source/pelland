@@ -726,3 +726,13 @@ textarea { font-family: inherit; line-height: 1.4; resize: vertical; }
 .acct-steps li::before { content: counter(s) ". "; }
 .acct-steps li.done { border-color: #1f6b46; color: #1f6b46; } .acct-steps li.on { border-color: #e3a90b; color: var(--ink, #16201a); }
 .acct-need { background: #f3f7f4; border-radius: 10px; padding: 10px 12px; margin: 0 0 12px; line-height: 1.4; }
+/* Mon compte */
+.acct-h { margin: 18px 0 8px; }
+.acct-groups { display: grid; gap: 8px; margin: 0 0 10px; }
+.acct-g { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--line, #dde3df); border-radius: 12px; padding: 10px 12px; }
+.acct-g b { display: block; } .acct-g small { color: var(--muted); }
+.acct-g.cur { border-color: #1f6b46; }
+.acct-cur { font-size: 13px; font-weight: 600; color: #1f6b46; white-space: nowrap; }
+.acct-actions { flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.acct-ok { display: flex; gap: 12px; align-items: flex-start; background: #e6f2ea; border-radius: 12px; padding: 12px 14px; }
+.acct-ok span { width: 30px; height: 30px; border-radius: 50%; background: #1f6b46; color: #fff; display: grid; place-items: center; font-weight: 800; flex: none; }

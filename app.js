@@ -88,6 +88,11 @@
       for (const d of Object.values(docs)) { try { const p = await this.db.collection('players').doc(d.id).get(); if (p.exists) out.push({ ...p.data(), id: p.id }); } catch (e) { } }
       return out;
     },
+    async myGroupList() {
+      const pl = await this.myPlayers(), gs = await this.listGroups();
+      return pl.map(p => { const g = gs.find(x => x.id === (p.groupId || 'pelland')) || { id: p.groupId, name: p.groupId }; return { gid: g.id, name: g.name, playerId: p.id, playerName: p.name, owner: g.owner === p.id }; })
+        .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+    },
     // Rend ce joueur (et son groupe) actif pour ce compte
     async linkTo(player) {
       const g = player.groupId || 'pelland';
@@ -556,6 +561,7 @@
     if (S.unwatchPres && view !== 'game') { S.unwatchPres(); S.unwatchPres = null; }
     if (S.unwatchComp && view !== 'comp' && view !== 'compEdit') { S.unwatchComp(); S.unwatchComp = null; }
     if (view === 'comps') S.compList = null;
+    if (view === 'compte') S.acctGroups = null;
     if (view !== 'game' && view !== 'setup' && Voice.wake) Voice.setWake(false);
     S.view = view; Object.assign(S, opts);
     if (view === 'setup' && !S.offres) Store.listOffres().then(l => { S.offres = l; if (S.view === 'setup') render(); });
@@ -576,7 +582,7 @@
     const showDock = false; // plus d'interface vocale
     document.body.classList.toggle('view-game', S.view === 'game');
     $('#dock').hidden = !showDock; document.body.classList.toggle('no-dock', !showDock);
-    const R = { home: vHome, jeux: vJeux, jeuEdit: vJeuEdit, quatuors: vQuatuors, offre: vOffre, setup: vSetup, game: vGame, join: vJoin, history: vHistory, live: vHistory, courses: vCourses, course: vCourse, players: vPlayers, login: vLogin, comps: vComps, compEdit: vCompEdit, comp: vComp }[S.view];
+    const R = { home: vHome, jeux: vJeux, jeuEdit: vJeuEdit, quatuors: vQuatuors, offre: vOffre, setup: vSetup, game: vGame, join: vJoin, history: vHistory, live: vHistory, courses: vCourses, course: vCourse, players: vPlayers, login: vLogin, compte: vCompte, comps: vComps, compEdit: vCompEdit, comp: vComp }[S.view];
     v.innerHTML = R();
     bind[S.view] && bind[S.view](v);
   }
@@ -596,7 +602,7 @@
     const info = ls.get('pelland.lastGameInfo', null);
     const lastDate = info && info.id === last && info.createdAt ? new Date(info.createdAt).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' }) : null;
     return `
-      <div class="hero"><h1>${esc(groupName())}${canOrganize() ? ' <button class="hero-edit" id="renameGroup" type="button" aria-label="Modifier le nom du groupe">Modifier</button>' : ''}</h1><p>${APP} · le golf entre amis${(S.myPlayers || []).length > 1 ? ' · <button class="linkbtn" id="switchGroup" type="button">Changer de groupe</button>' : ''}</p></div>
+      <div class="hero"><h1>${esc(groupName())}${canOrganize() ? ' <button class="hero-edit" id="renameGroup" type="button" aria-label="Modifier le nom du groupe">Modifier</button>' : ''}</h1><p>${APP} · le golf entre amis${(S.myPlayers || []).length > 1 ? ` · <button class="linkbtn" id="switchGroup" type="button">Changer de groupe (${S.myPlayers.length})</button>` : ''}</p></div>
       ${Store.needLogin ? '' : groupInfo(true)}
       ${onboardCard()}
       <div class="tiles">
@@ -612,7 +618,7 @@
       ${referralCard()}
       ${Store.needLogin ? '' : `<button class="caddie-tile" data-caddie type="button"><span class="cad-ico" aria-hidden="true">?</span><span><b>Une question ?</b><small>Demandez au Caddie : l’app, les règles des jeux, les forfaits.</small></span></button>`}
       ${viralCard('home')}
-      ${Store.mode === 'firebase' && Store.email ? `<p class="note">Connecté : <b>${esc(ls.get('pelland.me', '') || '')}</b> · <button class="linkbtn" id="logout" type="button">Se déconnecter</button></p>` : ''}
+      ${Store.mode === 'firebase' && Store.email ? `<p class="note">Connecté : <b>${esc(ls.get('pelland.me', '') || '')}</b> · <button class="linkbtn" data-go="compte" type="button">Mon compte</button> · <button class="linkbtn" id="logout" type="button">Se déconnecter</button></p>` : ''}
       <p class="note">${Store.mode === 'firebase' ? 'Base partagée active : les autres joueurs suivent la partie en direct dans Parties en cours.' : 'Mode local : les parties restent sur ce téléphone.'}</p>
       ${Store.mode === 'local' && Store.error ? `<div class="warn"><b>Pourquoi le mode local :</b> ${esc(Store.error)}</div>` : ''}`;
   }
@@ -711,6 +717,43 @@
     });
   });
 
+  // ---------------- Mon compte : le compte de la personne et tous les groupes dont elle fait partie ----------------
+  function groupRows(l, cur) {
+    return `<div class="acct-groups">${l.map((x, i) => `<div class="acct-g ${x.gid === cur ? 'cur' : ''}"><div><b>${esc(x.name)}</b><small>${esc(x.playerName)}${x.owner ? ' · propriétaire' : ''}</small></div>${x.gid === cur ? '<span class="acct-cur">Groupe actuel</span>' : `<button class="btn small" data-gopen="${i}" type="button">Ouvrir</button>`}</div>`).join('') || '<p class="note">Aucun groupe pour l’instant.</p>'}</div>`;
+  }
+  function vCompte() {
+    $('#barTitle').textContent = 'Mon compte';
+    if (S.acctGroups == null) { Store.myGroupList().then(l => { S.acctGroups = l; S.myPlayers = l; if (S.view === 'compte') render(); }).catch(() => { S.acctGroups = []; render(); }); return '<p class="note">Chargement…</p>'; }
+    const u = (window.firebase && firebase.auth().currentUser) || {}, cell = (u.phoneNumber || '').replace(/^\+1/, '');
+    return `<section class="card"><h2>${esc(ls.get('pelland.me', '') || '')}</h2>
+        <p class="note">${cell ? 'Cellulaire confirmé : ' + esc(fmtPhone(cell)) : 'Compte créé avant les comptes avec mot de passe : déconnectez-vous puis touchez « Créer mon compte » pour le mettre à jour.'}</p></section>
+      <h3 class="acct-h">Mes groupes (${S.acctGroups.length})</h3>
+      ${groupRows(S.acctGroups, Store.gid)}
+      <p class="note">Ce sont les groupes où votre cellulaire est inscrit. Pour en rejoindre un autre, demandez à son organisateur de vous ajouter dans Joueurs.</p>
+      <div class="row acct-actions"><button class="btn ghost small" data-viral type="button">Créer un groupe</button><button class="btn ghost small" id="chgPw" type="button">Changer mon mot de passe</button><button class="btn ghost small" id="logout2" type="button">Se déconnecter</button></div>`;
+  }
+  async function openGroup(x) {
+    try { await Store.switchGroup(x); ls.set('pelland.lastGame', null); location.href = location.pathname; } catch (e) { toast(e.message); }
+  }
+  function bindCompte(v) {
+      commonNav(v);
+      v.querySelectorAll('[data-gopen]').forEach(b => b.onclick = () => { b.disabled = true; b.textContent = '…'; openGroup(S.acctGroups[+b.dataset.gopen]); });
+      const lo = v.querySelector('#logout2'); if (lo) lo.onclick = () => Store.logout();
+      const cp = v.querySelector('#chgPw'); if (cp) cp.onclick = () => openSheet(`<h3>Changer mon mot de passe</h3>
+          <label>Nouveau mot de passe<input id="np1" type="password" autocomplete="new-password" placeholder="6 caractères ou plus"></label>
+          <label>Confirmez<input id="np2" type="password" autocomplete="new-password"></label>
+          <p class="note" id="npMsg"></p>
+          <div class="row"><button class="btn small" id="npGo" type="button">Enregistrer</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`, sh => {
+        sh.querySelector('[data-close]').onclick = closeSheet;
+        sh.querySelector('#npGo').onclick = async () => {
+          const a = sh.querySelector('#np1').value, b = sh.querySelector('#np2').value, m = sh.querySelector('#npMsg');
+          if (a.length < 6) return m.textContent = 'Au moins 6 caractères.'; if (a !== b) return m.textContent = 'Les deux mots de passe ne sont pas pareils.';
+          try { await firebase.auth().currentUser.updatePassword(a); closeSheet(); toast('Mot de passe changé.'); }
+          catch (e) { m.textContent = /recent/.test(e.code || '') ? 'Pour votre sécurité : déconnectez-vous, puis « Mot de passe oublié ? » sur l’écran de connexion.' : 'Impossible : ' + (e.code || e.message); }
+        };
+      });
+    }
+
   // ---------------- Parrainage : le propriétaire partage son lien ; les groupes créés avec ce lien sont comptés ----------------
   function refLink(code) { return location.origin + location.pathname + '?ref=' + encodeURIComponent(code || Store.gid); }
   function referralCard() {
@@ -777,7 +820,7 @@
   document.addEventListener('click', e => {
     const t = e.target.closest && e.target.closest('[data-viral],[data-viralhide],#switchGroup'); if (!t) return;
     e.preventDefault();
-    if (t.id === 'switchGroup') return switchGroupSheet();
+    if (t.id === 'switchGroup') return go('compte');
     if (t.hasAttribute('data-viralhide')) { ls.set('pelland.viral.hide', Date.now() + 30 * 864e5); return render(); }
     closeSheet(); setTimeout(newGroupSheet, 30);
   });
@@ -1401,7 +1444,7 @@
       const refGroup = refQ && groups.find(g => g.id === refQ);
       const title = A.reset ? 'Nouveau mot de passe' : A.forGroup ? 'Créer un groupe' : 'Créer mon compte';
       const steps = ['Cellulaire', 'Code', 'Mot de passe'].concat(A.forGroup ? ['Groupe'] : []);
-      const at = { phone: 0, code: 1, pw: 2, group: 3 }[A.step] || 0;
+      const at = { phone: 0, code: 1, pw: 2, group: 3, ok: 9 }[A.step] || 0;
       let body = '';
       if (A.step === 'phone') body = `<p class="acct-need"><b>Il faut un cellulaire.</b> On vous envoie un code par texto pour confirmer que c’est bien vous. Ensuite, vous choisissez un mot de passe : plus besoin de code.</p>
         <label>Votre numéro de cellulaire<input id="acPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="450 555-1234" value="${esc(A.phone || '')}"></label>
@@ -1414,6 +1457,8 @@
         <label>Mot de passe<input id="acPw" type="password" autocomplete="new-password" placeholder="6 caractères ou plus"></label>
         <label>Confirmez le mot de passe<input id="acPw2" type="password" autocomplete="new-password"></label>
         <button class="btn" id="acSetPw" type="button">${A.reset ? 'Enregistrer' : 'Créer mon compte'}</button>`;
+      else if (A.step === 'ok') body = `<div class="acct-ok"><span aria-hidden="true">✓</span><div><b>Votre compte est prêt.</b> La prochaine fois : votre nom et votre mot de passe, sans code.</div></div>
+        <h3 class="acct-h">Mes groupes</h3>${groupRows(A.groups || [], null).replace(/Ouvrir/g, 'Entrer')}`;
       else if (A.step === 'group') body = `<label>Nom du groupe<input id="ngName" type="text" placeholder="ex. Les lève-tôt du samedi"></label>
         <label>Votre prénom et nom<input id="ngMe" type="text" autocapitalize="words" value="${esc(A.name || '')}"></label>
         <button class="btn" id="ngCreate" type="button">Créer le groupe</button>
@@ -1633,6 +1678,7 @@
   // Interactions
   // =====================================================================
   const bind = {
+    compte(v) { bindCompte(v); },
     login(v) {
       const done = () => { const q = new URLSearchParams(location.search); q.delete('joueur'); q.delete('ref'); location.href = location.pathname + (q.toString() ? '?' + q : ''); };
       const say = t => { const m = $('#acMsg') || $('#loginMsg'); if (m) m.textContent = t; };
@@ -1688,9 +1734,10 @@
           const order = pref ? (A.matches || []).filter(p => p !== pref).concat([pref]) : (A.matches || []);
           await Store.setPassword(p1, order);
           if (A.forGroup || !order.length) { A.step = 'group'; A.forGroup = true; A.name = (pref || order[0] || {}).name || ''; A.msg = ''; render(); return; }
-          Store.needLogin = false; done();
+          Store.needLogin = false; A.groups = await Store.myGroupList().catch(() => []); A.step = 'ok'; A.msg = ''; render();
         } catch (e) { sp.disabled = false; say(errTxt(e)); }
       };
+      v.querySelectorAll('[data-gopen]').forEach(b => b.onclick = () => { b.disabled = true; b.textContent = '…'; const x = A.groups[+b.dataset.gopen]; openGroup(x).then(() => { }); });
       const nc = $('#ngCreate'); if (nc) nc.onclick = async () => {
         nc.disabled = true; say('Création…');
         try { await Store.createGroup($('#ngName').value, $('#ngMe').value); done(); } catch (e) { nc.disabled = false; say(e.message); }
