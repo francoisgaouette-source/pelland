@@ -627,6 +627,7 @@
       </div>`)}
       <h3 class="home-h">Les banques</h3>
       ${lockTiles(`<div class="tiles banks">
+        <button class="tile" data-go="players"><span class="pin" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="9" cy="8" r="3.2" fill="currentColor"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" fill="currentColor"/><circle cx="17" cy="9" r="2.4" fill="currentColor" opacity=".7"/><path d="M15.5 13.6c3 .2 5.5 2.1 5.5 5.4h-4.3" fill="currentColor" opacity=".7"/></svg></span><div><strong>Banque de joueurs</strong><span>Tous les joueurs du groupe : ajouter, renommer, retirer, importer d’Excel</span></div></button>
         <button class="tile" data-go="courses"><span class="pin">⛳</span><div><strong>Banque de terrains</strong><span>Consultez les terrains ou ajoutez-en un</span></div></button>
         <button class="tile" data-go="jeux"><span class="pin" style="font-family:var(--display);font-weight:700">$</span><div><strong>Banque de jeux</strong><span>Les règles et l’argent de chaque jeu ; ajoutez les vôtres</span></div></button>
       </div>`)}
