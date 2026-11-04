@@ -747,3 +747,10 @@ textarea { font-family: inherit; line-height: 1.4; resize: vertical; }
 .home-h { margin: 22px 2px 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-family: var(--body, inherit); font-weight: 700; }
 .pin.step-n { font-family: var(--display); font-weight: 800; font-size: 24px; background: #e3a90b; color: #14231b; }
 .tile.locked .pin.step-n { background: #9aa7a0; color: #fff; }
+/* Case du groupe : propriétaire et organisateur avec pastilles */
+.grp-info > .who-line { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.grp-info > .who-line b { font-size: 18px; margin-right: 2px; }
+.role-tag { font-size: 12px; font-weight: 700; letter-spacing: .03em; padding: 3px 9px; border-radius: 999px; white-space: nowrap; text-transform: none !important; }
+.grp-info .role-tag.own { background: #1f6b46; color: #fff; }
+.grp-info .role-tag.org { background: #fdf3d6; color: #6b4e00; border: 1px solid #ecd28b; }
+.grp-info > .who-act { grid-column: 1 / -1; margin-top: -4px; } .grp-info > .who-act .linkbtn { font-size: 13px; }
