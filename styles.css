@@ -755,3 +755,6 @@ textarea { font-family: inherit; line-height: 1.4; resize: vertical; }
 .grp-info .role-tag.org { background: #fdf3d6; color: #6b4e00; border: 1px solid #ecd28b; }
 .grp-info > .who-act { grid-column: 1 / -1; margin-top: -4px; } .grp-info > .who-act .linkbtn { font-size: 13px; }
 .pick-list .pick-off { opacity: .5; cursor: not-allowed; } .pick-list .btn small { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
+.full-box { background: #fdf3d6; border: 1px solid #ecd28b; border-radius: 12px; padding: 12px 14px; } .full-box p { margin: 6px 0 10px; }
+.full-box a.btn { display: inline-grid; place-items: center; text-decoration: none; }
+.room-left { margin: 0 0 8px; }

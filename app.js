@@ -1584,9 +1584,12 @@
     const inviter = S.pMode === 'inviter';
     $('#barTitle').textContent = inviter ? 'Inviter des joueurs' : 'Banque de joueurs';
     return `${inviter ? '<p class="note">Entrez le nom et le cellulaire : un texto d’invitation est prêt à envoyer. La personne crée ensuite son compte avec son cellulaire.</p>' : groupInfo()}<section class="card"><h2>${inviter ? 'Inviter un joueur' : 'Ajouter un joueur'}</h2>
-        <input id="newPlayer" type="text" placeholder="Prénom et nom" autocapitalize="words">
+        ${roomLeft() <= 0 ? `<div class="full-box"><b>Le groupe est complet : ${S.players.length} / ${planOf().max} joueurs.</b>
+          <p>${planOf().paid ? `Le forfait ${planOf().name} permet ${planOf().max} joueurs. Retirez un joueur pour en ajouter un autre, ou écrivez à bonjour@fanion.ai pour une ligue.` : `Le forfait Gratuit permet ${planOf().max} joueurs. Passez au forfait Groupe pour en inviter jusqu’à 16.`}</p>
+          ${!planOf().paid ? (meId() && meId() === ownerId() ? `<a class="btn small" href="${buyUrl()}" target="_blank" rel="noopener">Passer au Groupe</a>` : `<p class="note">Seul le propriétaire peut changer de forfait.</p>`) : ''}</div>`
+        : `${!planOf().paid ? `<p class="note room-left">Forfait Gratuit : il reste <b>${roomLeft()}</b> place${roomLeft() > 1 ? 's' : ''} sur ${planOf().max}.</p>` : ''}        <input id="newPlayer" type="text" placeholder="Prénom et nom" autocapitalize="words">
         <div class="row" style="flex-wrap:nowrap"><input id="newPhone" type="tel" inputmode="tel" placeholder="Cellulaire" style="flex:1;min-width:0"><button class="btn small" id="addPlayer" type="button">Ajouter</button></div>
-        ${canOrganize() ? `<div class="import-row"><label class="btn ghost small" for="xlsFile">Importer un fichier Excel</label><input id="xlsFile" type="file" accept=".xlsx,.xls,.csv,.ods" hidden><span class="note">Deux colonnes : le nom et le cellulaire.</span></div>` : ''}
+        ${canOrganize() ? `<div class="import-row"><label class="btn ghost small" for="xlsFile">Importer un fichier Excel</label><input id="xlsFile" type="file" accept=".xlsx,.xls,.csv,.ods" hidden><span class="note">Deux colonnes : le nom et le cellulaire.</span></div>` : ''}`}
         </section>
       ${(() => { const dups = duplicateMap(S.players); const nd = Object.keys(dups).length; return nd ? `<div class="warn">${nd} joueurs semblent en double. Vérifiez les noms marqués « Doublon ? » et retirez celui de trop.</div>` : ''; })()}
       ${!ownerId() && S.players.length ? `<div class="warn">Le groupe n’a pas encore de propriétaire (la personne qui l’administre et paie l’abonnement). <button class="linkbtn" id="claimOwner" type="button">C’est moi</button></div>` : ''}
@@ -1866,7 +1869,7 @@
       });
     },
     players(v) {
-      if (S.pMode === 'inviter' && !S.pFocused) { S.pFocused = true; setTimeout(() => { const i = $('#newPlayer'); if (i) i.focus(); }, 80); }
+      if (S.pMode === 'inviter' && !S.pFocused && roomLeft() > 0) { S.pFocused = true; setTimeout(() => { const i = $('#newPlayer'); if (i) i.focus(); }, 80); }
       v.querySelectorAll('[data-org]').forEach(b => b.onclick = async () => {
         // un seul organisateur (en plus du propriétaire) : en nommer un nouveau remplace l'ancien
         const gr = { ...curGroup() }, id = b.dataset.org, cur = (gr.organizers || [])[0];
@@ -1890,9 +1893,9 @@
         try { const np = await Store.savePlayer(n); const ph = $('#newPhone').value.trim(); if (ph) await Store.setPhone(np, ph); S.players = await Store.listPlayers(); render(); if (ph) inviteText(n, ph, np.id); else setTimeout(() => $('#newPlayer') && $('#newPlayer').focus(), 50); }
         catch (e) { toast('Ajout impossible : ' + e.message); }
       };
-      $('#addPlayer').onclick = add;
+      if ($('#addPlayer')) $('#addPlayer').onclick = add;
       const xf = $('#xlsFile'); if (xf) xf.onchange = async () => { const f = xf.files[0]; xf.value = ''; if (f) importPlayersFile(f); };
-      $('#newPlayer').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); add(); } };
+      if ($('#newPlayer')) $('#newPlayer').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); add(); } };
       v.querySelectorAll('[data-askdel]').forEach(b => b.onclick = () => { S.confirmDel = b.dataset.askdel; render(); });
       v.querySelectorAll('[data-phone]').forEach(b => b.onclick = () => {
         const pl = S.players.find(x => x.id === b.dataset.phone);
