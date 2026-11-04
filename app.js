@@ -602,7 +602,7 @@
     const info = ls.get('pelland.lastGameInfo', null);
     const lastDate = info && info.id === last && info.createdAt ? new Date(info.createdAt).toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' }) : null;
     return `
-      <div class="hero"><h1>${esc(groupName())}${canOrganize() ? ' <button class="hero-edit" id="renameGroup" type="button" aria-label="Modifier le nom du groupe">Modifier</button>' : ''}</h1><p>${APP} · le golf entre amis${(S.myPlayers || []).length > 1 ? ` · <button class="linkbtn" id="switchGroup" type="button">Changer de groupe (${S.myPlayers.length})</button>` : ''}</p></div>
+      <div class="hero"><h1><span class="hero-k">Groupe :</span> ${esc(groupName())}${canOrganize() ? ' <button class="hero-edit" id="renameGroup" type="button" aria-label="Modifier le nom du groupe">Modifier</button>' : ''}</h1><p>${APP} · le golf entre amis${(S.myPlayers || []).length > 1 ? ` · <button class="linkbtn" id="switchGroup" type="button">Changer de groupe (${S.myPlayers.length})</button>` : ''}</p></div>
       ${Store.needLogin ? '' : groupInfo(true)}
       ${onboardCard()}
       <div class="tiles">
@@ -719,7 +719,7 @@
 
   // ---------------- Mon compte : le compte de la personne et tous les groupes dont elle fait partie ----------------
   function groupRows(l, cur) {
-    return `<div class="acct-groups">${l.map((x, i) => `<div class="acct-g ${x.gid === cur ? 'cur' : ''}"><div><b>${esc(x.name)}</b><small>${esc(x.playerName)}${x.owner ? ' · propriétaire' : ''}</small></div>${x.gid === cur ? '<span class="acct-cur">Groupe actuel</span>' : `<button class="btn small" data-gopen="${i}" type="button">Ouvrir</button>`}</div>`).join('') || '<p class="note">Aucun groupe pour l’instant.</p>'}</div>`;
+    return `<div class="acct-groups">${l.map((x, i) => `<div class="acct-g ${x.gid === cur ? 'cur' : ''}"><div><b><span class="g-k">Groupe :</span> ${esc(x.name)}</b><small>${esc(x.playerName)}${x.owner ? ' · propriétaire' : ''}</small></div>${x.gid === cur ? '<span class="acct-cur">Groupe actuel</span>' : `<button class="btn small" data-gopen="${i}" type="button">Ouvrir</button>`}</div>`).join('') || '<p class="note">Aucun groupe pour l’instant.</p>'}</div>`;
   }
   function vCompte() {
     $('#barTitle').textContent = 'Mon compte';
