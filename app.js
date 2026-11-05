@@ -1619,9 +1619,15 @@
       ${!ownerId() && S.players.length ? `<div class="warn">Le groupe n’a pas encore de propriétaire (la personne qui l’administre et paie l’abonnement). <button class="linkbtn" id="claimOwner" type="button">C’est moi</button></div>` : ''}
       ${S.players.length ? `<div class="row pl-head"><p class="pl-count"><b>${S.players.length}</b> joueur${S.players.length > 1 ? 's' : ''} dans le groupe</p>${canOrganize() ? `<button class="btn ghost small" data-selmode type="button">${S.selMode ? 'Terminer' : 'Sélectionner'}</button>` : ''}</div>` : ''}
       ${S.selMode ? (() => { const sel = S.sel || [], removable = S.players.filter(p => canRemove(p)); return `<div class="sel-bar"><button class="linkbtn" data-selall type="button">${sel.length === removable.length && removable.length ? 'Tout désélectionner' : 'Tout sélectionner'}</button><span class="note">${sel.length} sélectionné${sel.length > 1 ? 's' : ''}</span>${sel.length ? (S.confirmBulk ? `<button class="btn small" data-bulkdel type="button" style="background:var(--red)">Confirmer : retirer ${sel.length}</button><button class="btn ghost small" data-bulkcancel type="button">Annuler</button>` : `<button class="btn small" data-bulkask type="button" style="background:var(--red)">Retirer (${sel.length})</button>`) : ''}</div>`; })() : ''}
-      <div class="list">${S.players.length ? (() => { const dups = duplicateMap(S.players); return S.players.map((p, n) => S.selMode ? `<label class="item pl-row sel-row ${dups[p.id] ? 'dup' : ''}">${canRemove(p) ? `<input type="checkbox" data-selp="${esc(p.id)}" ${(S.sel || []).includes(p.id) ? 'checked' : ''}>` : '<span class="sel-lock" title="Ne peut pas être retiré">—</span>'}<b><span class="pl-n">${n + 1}.</span> ${esc(p.name)}${p.id === ownerId() ? ' <span class="owner-tag">Propriétaire</span>' : ''}${p.id === meId() ? ' <span class="note">(vous)</span>' : ''}</b></label>` : `<div class="item pl-row ${dups[p.id] ? 'dup' : ''}"><b><span class="pl-n">${n + 1}.</span> ${canOrganize() || p.id === meId() ? `<button class="name-btn" data-rename="${esc(p.id)}" type="button">${esc(p.name)}</button>` : esc(p.name)}${p.id === ownerId() ? ' <span class="owner-tag">Propriétaire</span>' : !ownerId() ? '' : meId() === ownerId() ? ` <button class="role-chip ${isOrganizer(p.id) ? 'on' : ''}" data-org="${esc(p.id)}" type="button" ${!isOrganizer(p.id) && !hasAccepted(p) ? 'disabled title="Invitation pas encore acceptée"' : ''}>${isOrganizer(p.id) ? 'Organisateur ✓' : '+ Organisateur'}</button>` : isOrganizer(p.id) ? ' <span class="org-tag">Organisateur</span>' : ''}${dups[p.id] ? ` <span class="dup-flag" title="Ressemble à ${esc(dups[p.id].join(', '))}">Doublon ?</span>` : ''}</b>${S.confirmDel === p.id
+      <div class="list">${S.players.length ? (() => { const dups = duplicateMap(S.players); return S.players.map((p, n) => S.selMode ? `<label class="item pl-row sel-row ${dups[p.id] ? 'dup' : ''}">${canRemove(p) ? `<input type="checkbox" data-selp="${esc(p.id)}" ${(S.sel || []).includes(p.id) ? 'checked' : ''}>` : '<span class="sel-lock" title="Ne peut pas être retiré">—</span>'}<b><span class="pl-n">${n + 1}.</span> ${esc(p.name)}${p.id === ownerId() ? ' <span class="owner-tag">Propriétaire</span>' : ''}${p.id === meId() ? ' <span class="note">(vous)</span>' : ''}</b></label>` : `<div class="item pl-row ${dups[p.id] ? 'dup' : ''}"><b><span class="pl-n">${n + 1}.</span> ${canOrganize() || p.id === meId() ? `<button class="name-btn" data-rename="${esc(p.id)}" type="button">${esc(p.name)}</button>` : esc(p.name)}${p.id === ownerId() ? ' <span class="owner-tag">Propriétaire</span>' : !ownerId() ? '' : meId() === ownerId() ? ` <button class="role-chip ${isOrganizer(p.id) ? 'on' : ''}" data-org="${esc(p.id)}" type="button" ${!isOrganizer(p.id) && !hasAccepted(p) ? 'disabled title="Invitation pas encore acceptée"' : ''}>${isOrganizer(p.id) ? 'Organisateur ✓' : '+ Organisateur'}</button>` : isOrganizer(p.id) ? ' <span class="org-tag">Organisateur</span>' : ''}${dups[p.id] ? ` <span class="dup-flag" title="Ressemble à ${esc(dups[p.id].join(', '))}">Doublon ?</span>` : ''}${plStatus(p)}</b>${S.confirmDel === p.id
         ? `<span class="row"><button class="btn small" data-delp="${esc(p.id)}" type="button" style="background:var(--red)">Confirmer</button><button class="btn ghost small" data-canceldel type="button">Annuler</button></span>`
         : `<span class="row" style="flex-wrap:nowrap;flex:none"><button class="btn ghost small" data-phone="${esc(p.id)}" type="button">${p.phone ? '☎ ' + esc(fmtPhone(p.phone)) : p.authEmail ? '☎ ••' + esc(p.phoneHint || '') : '+ Téléphone'}</button>${p.id === ownerId() ? '' : `<button class="btn ghost small" data-askdel="${esc(p.id)}" type="button">Retirer</button>`}</span>`}</div>`).join(''); })() : '<p class="note">Aucun joueur pour l\'instant.</p>'}</div>`;
+  }
+  // Statut d'invitation d'un joueur : compte créé, invité en attente, ou sans cellulaire
+  function plStatus(p) {
+    if (hasAccepted(p)) return ' <span class="pl-st ok" title="Invitation acceptée : compte créé">✓ Compte créé</span>';
+    if (p.phone || p.phoneHint) return ' <span class="pl-st wait" title="Le texto d’invitation a pu être envoyé ; le joueur n’a pas encore créé son compte">Invité · en attente</span>';
+    return ' <span class="pl-st none" title="Ajoutez son cellulaire pour l’inviter">Sans cellulaire</span>';
   }
   function vCourses() {
     $('#barTitle').textContent = 'Terrains';
@@ -2599,7 +2605,28 @@
     return t.p.map(p => { const idx = parseIdx(p.index); const ch = idx == null || !tee ? 0 : L.courseHandicap(idx, tee, par); return { ...p, ch, ph: Math.round(ch * (c.allowance || 85) / 100) }; });
   }
   // Résultat d'une équipe : score net de la meilleure balle à chaque trou, total par rapport à la normale
+  // Texas scramble : handicap d'équipe selon le système mondial (4 joueurs : 25-20-15-10 % ; 3 : 30-20-10 % ; 2 : 35-15 %)
+  const TX_W = { 2: [0.35, 0.15], 3: [0.30, 0.20, 0.10], 4: [0.25, 0.20, 0.15, 0.10] };
+  function texasHcp(c, t) {
+    const tee = compTee(c), par = L.teePar(c.course, tee);
+    const chs = t.p.map(p => { const i = parseIdx(p.index); return i == null || !tee ? 0 : L.courseHandicap(i, tee, par); }).sort((a, b) => a - b);
+    const w = TX_W[chs.length] || TX_W[4];
+    return Math.round(chs.reduce((a, ch, k) => a + ch * (w[k] || 0), 0));
+  }
   function compTeamResult(c, t) {
+    if (c.format === 'texas') {
+      const tee = compTee(c), sc = (c.scores || {})[t.id] || {}, th = texasHcp(c, t), drives = t.p.map(() => 0);
+      let toPar = 0, thru = 0, gross = 0, net = 0; const holes = [];
+      for (let h = 1; h <= 18; h++) {
+        const par = L.holePar(c.course, tee, h), si = c.course.holes[h - 1].si, s = sc[h] || [];
+        const g = s[0] == null || s[0] === '' ? null : Number(s[0]), dv = s[1] == null ? null : Number(s[1]);
+        const best = g == null ? null : g - L.strokesOnHole(th, si);
+        if (dv != null && drives[dv] != null && g != null) drives[dv]++;
+        holes.push({ h, par, si, best, s, g, dv });
+        if (best != null) { thru++; toPar += best - par; gross += g; net += best; }
+      }
+      return { t, ps: t.p.map(p => ({ ...p, ph: 0 })), toPar, thru, net, gross, pts: 0, holes, ph: th, drives };
+    }
     const ps = compPlayers(c, t), tee = compTee(c), sc = (c.scores || {})[t.id] || {};
     let toPar = 0, thru = 0, net = 0, pts = 0; const holes = [];
     for (let h = 1; h <= 18; h++) {
@@ -2656,6 +2683,8 @@
     return { T, M };
   }
   const fmtPt = x => String(x).replace('.5', ',5');
+  // Départs fournis par chaque joueur (Texas scramble), avec ⚠ pour ceux sous le minimum
+  const drivesTxt = (c, r) => r.t.p.map((p, i) => `${esc((p.name || '?').split(' ')[0])} ${r.drives[i]}${(c.minDrives || 0) && r.drives[i] < c.minDrives ? '⚠' : ''}`).join(' · ');
   const sumHtml = (c, r) => `<span>${r.thru ? `Après ${r.thru} trou${r.thru > 1 ? 's' : ''}` : 'Aucun score'}</span><b class="${c.format !== 'stableford' && r.toPar < 0 ? 'under' : ''}">${!r.thru ? '' : c.format === 'stableford' ? r.pts + ' pts' : toParTxt(r.toPar)}</b>`;
 
   // Formats de compétition (comme la banque de jeux) ; ready = on peut la créer dans l'app
@@ -2669,6 +2698,9 @@
     { f: 'coups', ready: true, name: 'Membre-membre en coups', who: 'Équipes de 2, réparties en flites selon le handicap d’équipe',
       rules: ['À chaque trou, le meilleur score net de l’équipe compte (meilleure balle).', 'On additionne les 18 trous ; le total se lit par rapport à la normale (−5, Par, +2).', 'Allocation recommandée : 85 % du handicap de parcours.'],
       score: ['Le plus bas total net gagne la flite.'] },
+    { f: 'texas', ready: true, name: 'Texas scramble', who: 'Équipes de 4 (ou de 2 ou 3), avec ou sans flites',
+      rules: ['Les joueurs de l’équipe frappent tous ; on choisit la meilleure balle et tout le monde rejoue de là, jusqu’au trou.', 'Chaque joueur doit fournir un nombre minimum de coups de départ (souvent 3 ou 4 sur 18 trous).', 'Handicap d’équipe : 25 % du plus bas handicap de parcours, 20 % du 2e, 15 % du 3e, 10 % du 4e (2 joueurs : 35 % et 15 %).'],
+      score: ['Un seul score par équipe et par trou ; le plus bas total net gagne.', 'L’app compte les départs de chaque joueur et signale ceux qui manquent.'] },
     { f: 'invite', ready: false, name: 'Membre-invité', who: 'Un membre et son invité, en équipe de 2',
       rules: ['Comme le membre-membre, mais chaque équipe compte un invité de l’extérieur du club.', 'Souvent en match play ou en Stableford, avec flites.'], score: ['Bientôt dans l’app.'] },
     { f: 'scramble', ready: false, name: 'Scramble à 4', who: 'Équipes de 4',
@@ -2703,10 +2735,15 @@
         <label>Date<input id="cmDate" type="date" value="${esc(d.date)}"></label>
         <label>Terrain<select id="cmCourse">${S.courses.map(x => `<option value="${esc(x.id)}" ${x.id === d.courseId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>
         <label>Tertre<select id="cmTee">${(course.tees || []).map(t => `<option ${t.name === d.tee ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></label>
-        <label>Format<select id="cmFmt"><option value="match" ${d.format !== 'coups' ? 'selected' : ''}>Match play : chaque équipe contre toutes les autres de sa flite</option><option value="coups" ${d.format === 'coups' ? 'selected' : ''}>Meilleure balle en coups : le plus bas total net</option><option value="stableford" ${d.format === 'stableford' ? 'selected' : ''}>Stableford : le plus de points (meilleure balle)</option></select></label>
+        <label>Format<select id="cmFmt"><option value="match" ${d.format !== 'coups' ? 'selected' : ''}>Match play : chaque équipe contre toutes les autres de sa flite</option><option value="coups" ${d.format === 'coups' ? 'selected' : ''}>Meilleure balle en coups : le plus bas total net</option><option value="stableford" ${d.format === 'stableford' ? 'selected' : ''}>Stableford : le plus de points (meilleure balle)</option><option value="texas" ${d.format === 'texas' ? 'selected' : ''}>Texas scramble : une balle par équipe, départs minimums</option></select></label>
+        ${d.format === 'texas' ? `<div class="row"><label style="flex:1">Joueurs par équipe<select id="cmSize">${[2, 3, 4].map(n => `<option ${n === (d.teamSize || 4) ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+          <label style="flex:1">Départs minimums par joueur<select id="cmMinDr">${[0, 1, 2, 3, 4, 5, 6].map(n => `<option value="${n}" ${n === (d.minDrives == null ? 3 : d.minDrives) ? 'selected' : ''}>${n || 'Aucun'}</option>`).join('')}</select></label>
+          <label style="flex:1">Nombre de flites<select id="cmFl">${[1, 2, 3, 4].map(n => `<option ${n === d.flights ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div><input type="hidden" id="cmAllow" value="100">` : `
         <div class="row"><label style="flex:1">Allocation du handicap<select id="cmAllow">${[85, 90, 100].map(a => `<option value="${a}" ${a === d.allowance ? 'selected' : ''}>${a} %${a === (d.format === 'match' ? 90 : 85) ? ' (recommandé)' : ''}</option>`).join('')}</select></label>
-        <label style="flex:1">Nombre de flites<select id="cmFl">${[1, 2, 3, 4].map(n => `<option ${n === d.flights ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div>
-        <p class="note">${d.format === 'coups' ? 'Meilleure balle nette en coups : chaque joueur reçoit' : d.format === 'stableford' ? 'Stableford, meilleure balle nette (normale nette 2 points, oiselet 3, boguey 1) : chaque joueur reçoit' : 'Match play, meilleure balle nette : match gagné 1 point, nul ½. Chaque joueur reçoit'} ${d.allowance} % de son handicap de parcours${d.format === 'match' ? ', et les coups se donnent à partir du plus bas des quatre joueurs du match' : ''}. Les équipes sont réparties dans les flites selon leur handicap d’équipe.</p></section>
+        <label style="flex:1">Nombre de flites<select id="cmFl">${[1, 2, 3, 4].map(n => `<option ${n === d.flights ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div>`}
+        <p class="note">${d.format === 'texas'
+          ? `Texas scramble : une seule balle par équipe ; chaque joueur fournit au moins ${d.minDrives == null ? 3 : d.minDrives} départ(s). Handicap d’équipe : 25-20-15-10 % des handicaps de parcours (2 joueurs : 35-15 %), donné trou par trou selon la difficulté.`
+          : `${d.format === 'coups' ? 'Meilleure balle nette en coups : chaque joueur reçoit' : d.format === 'stableford' ? 'Stableford, meilleure balle nette (normale nette 2 points, oiselet 3, boguey 1) : chaque joueur reçoit' : 'Match play, meilleure balle nette : match gagné 1 point, nul ½. Chaque joueur reçoit'} ${d.allowance} % de son handicap de parcours${d.format === 'match' ? ', et les coups se donnent à partir du plus bas des quatre joueurs du match' : ''}.`} Les équipes sont réparties dans les flites selon leur handicap d’équipe.</p></section>
       <section class="card"><h2>Les équipes (${d.teams.length})</h2>
         <datalist id="cmNames">${(S.players || []).map(p => `<option value="${esc(p.name)}">`).join('')}</datalist>
         <div class="cm-teams">${d.teams.map((t, i) => `<div class="cm-team"><div class="cm-th"><b>Équipe ${i + 1}</b><button class="linkbtn" data-cmdel="${i}" type="button">Retirer</button></div>
@@ -2719,7 +2756,7 @@
     const c = S.comp; if (!c) return '<p class="note">Chargement…</p>';
     $('#barTitle').textContent = c.name;
     const tab = S.compTab || 'class', fl = compFlights(c);
-    const head = `<div class="cm-head"><span>${esc(c.date ? new Date(c.date + 'T12:00').toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' }) : '')}</span><span>${esc(c.course.name)} · tertre ${esc(c.tee)}</span><span>${c.format === 'coups' ? 'Meilleure balle nette en coups' : c.format === 'stableford' ? 'Stableford, meilleure balle nette' : 'Match play, meilleure balle nette'} · ${c.allowance} % du handicap</span></div>
+    const head = `<div class="cm-head"><span>${esc(c.date ? new Date(c.date + 'T12:00').toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' }) : '')}</span><span>${esc(c.course.name)} · tertre ${esc(c.tee)}</span><span>${c.format === 'texas' ? `Texas scramble · équipes de ${c.teamSize || 4} · ${c.minDrives || 0} départ(s) minimum par joueur` : `${c.format === 'coups' ? 'Meilleure balle nette en coups' : c.format === 'stableford' ? 'Stableford, meilleure balle nette' : 'Match play, meilleure balle nette'} · ${c.allowance} % du handicap`}</span></div>
       <div class="seg cm-tabs">${[['class', 'Classement'], ['score', 'Pointage'], ['teams', 'Équipes']].map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-ctab="${k}" type="button">${l}</button>`).join('')}</div>`;
     if (tab === 'class' && (c.format || 'match') === 'match') return head + fl.map(f => { const st = compStandings(c, f); return `<section class="card cm-board"><h3>${esc(f.name)}</h3>
         <table class="cm-lb"><thead><tr><th>Pos.</th><th>Équipe</th><th>G-N-P</th><th>Pts</th></tr></thead>
@@ -2728,14 +2765,23 @@
       '<p class="note">Chaque équipe affronte toutes les équipes de sa flite en match play, meilleure balle nette. Match gagné : 1 point ; nul : ½. G-N-P = gagnés, nuls, perdus. Égalité de points : on départage par les trous gagnés. Les coups se donnent à partir du plus bas handicap de jeu des quatre joueurs du match.</p>';
     if (tab === 'class') return head + fl.map(f => `<section class="card cm-board"><h3>${esc(f.name)}</h3>
         <table class="cm-lb"><thead><tr><th>Pos.</th><th>Équipe</th><th>Trous</th><th>${c.format === 'stableford' ? 'Pts' : 'Total'}</th></tr></thead>
-        <tbody>${f.teams.map(r => `<tr class="${r.pos === 1 ? 'lead' : ''}"><td>${r.pos ? (r.tie ? 'É' : '') + r.pos : '—'}</td><td>${teamLabel(r.t)}<small>Hcp d’équipe ${r.ph}${c.format === 'stableford' && r.thru ? ' · ' + toParTxt(r.toPar) : ''}</small></td><td>${r.thru === 18 ? 'F' : r.thru || '—'}</td><td class="tp ${c.format !== 'stableford' && r.toPar < 0 ? 'under' : ''}">${!r.thru ? '—' : c.format === 'stableford' ? r.pts : toParTxt(r.toPar)}</td></tr>`).join('')}</tbody></table></section>`).join('') +
+        <tbody>${f.teams.map(r => `<tr class="${r.pos === 1 ? 'lead' : ''}"><td>${r.pos ? (r.tie ? 'É' : '') + r.pos : '—'}</td><td>${teamLabel(r.t)}<small>Hcp d’équipe ${r.ph}${c.format === 'stableford' && r.thru ? ' · ' + toParTxt(r.toPar) : ''}${c.format === 'texas' ? (r.thru ? ' · brut ' + r.gross : '') + ' · départs : ' + drivesTxt(c, r) : ''}</small></td><td>${r.thru === 18 ? 'F' : r.thru || '—'}</td><td class="tp ${c.format !== 'stableford' && r.toPar < 0 ? 'under' : ''}">${!r.thru ? '—' : c.format === 'stableford' ? r.pts : toParTxt(r.toPar)}</td></tr>`).join('')}</tbody></table></section>`).join('') +
       `<p class="note">${c.format === 'stableford' ? 'Stableford, meilleure balle nette : à chaque trou, le meilleur joueur de l’équipe compte. Normale nette 2 points, oiselet net 3, aigle net 4, boguey net 1, double boguey ou pire 0. Le plus de points gagne. ' : ''}É = égalité. F = parcours terminé. Le classement se met à jour en direct pendant que les équipes entrent leurs scores.</p>`;
-    if (tab === 'teams') return head + `<div class="list">${fl.map(f => f.teams.map(r => `<div class="item"><b>${teamLabel(r.t)}</b><span>${esc(f.name)} · ${r.ps.map(p => `${esc(p.name)} : index ${String(p.index).replace('.', ',')}, hcp de jeu ${p.ph}`).join(' · ')}</span></div>`).join('')).join('')}</div>
+    if (tab === 'teams') return head + `<div class="list">${fl.map(f => f.teams.map(r => `<div class="item"><b>${teamLabel(r.t)}</b><span>${esc(f.name)} · ${c.format === 'texas' ? `hcp d’équipe ${r.ph} · ` + r.t.p.map(p => `${esc(p.name)} : index ${String(p.index).replace('.', ',')}`).join(' · ') : r.ps.map(p => `${esc(p.name)} : index ${String(p.index).replace('.', ',')}, hcp de jeu ${p.ph}`).join(' · ')}</span></div>`).join('')).join('')}</div>
       ${canOrganize() ? `<div class="row"><button class="btn ghost small" data-cedit type="button">Modifier les équipes</button>${S.confirmDelComp ? '<button class="btn small" data-cdelok type="button" style="background:var(--red)">Confirmer l’effacement</button>' : '<button class="btn ghost small" data-cdel type="button">Effacer la compétition</button>'}</div>` : ''}`;
     // Pointage d'une équipe
     const teams = (c.teams || []), tid = S.compTeam && teams.find(t => t.id === S.compTeam) ? S.compTeam : (teams[0] || {}).id, t = teams.find(x => x.id === tid);
     if (!t) return head + '<p class="note">Aucune équipe.</p>';
     const r = compTeamResult(c, t);
+    if (c.format === 'texas') return head + `<label>Équipe<select id="cmTeamSel">${teams.map(x => `<option value="${esc(x.id)}" ${x.id === tid ? 'selected' : ''}>${teamLabel(x)}</option>`).join('')}</select></label>
+      <div class="cm-sum">${sumHtml(c, r)}</div>
+      <p class="note tx-drv">Départs : ${drivesTxt(c, r)}${c.minDrives ? ` (minimum ${c.minDrives} chacun)` : ''}</p>
+      <div class="card-scroll"><table class="sc cm-sc tx"><thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th><th>Score de l’équipe</th><th>Départ de</th><th>Net</th></tr></thead>
+      <tbody>${r.holes.map(hh => { const k = L.strokesOnHole(r.ph, hh.si); return `<tr><td>${hh.h}</td><td>${hh.par}</td><td>${hh.si}</td>
+        <td class="cm-in">${k > 0 ? `<i class="dots">${'•'.repeat(Math.min(k, 3))}</i>` : ''}<input data-tx="${hh.h}" type="text" inputmode="numeric" maxlength="2" value="${hh.g == null ? '' : hh.g}" aria-label="Trou ${hh.h}, score de l’équipe"></td>
+        <td><select data-td="${hh.h}" aria-label="Trou ${hh.h}, départ de"><option value="">—</option>${t.p.map((p, i) => `<option value="${i}" ${hh.dv === i ? 'selected' : ''}>${esc((p.name || '?').split(' ')[0])}</option>`).join('')}</select></td>
+        <td class="cm-best ${hh.best != null && hh.best < hh.par ? 'under' : ''}">${hh.best == null ? '' : hh.best}</td></tr>`; }).join('')}</tbody></table></div>
+      <p class="note">Entrez le score de l’équipe (une seule balle) et le joueur dont le départ a été choisi. Les points (•) sont les coups reçus par l’équipe.</p>`;
     return head + `<label>Équipe<select id="cmTeamSel">${teams.map(x => `<option value="${esc(x.id)}" ${x.id === tid ? 'selected' : ''}>${teamLabel(x)}</option>`).join('')}</select></label>
       <div class="cm-sum">${sumHtml(c, r)}</div>
       <div class="card-scroll"><table class="sc cm-sc"><thead><tr><th>Trou</th><th>Norm.</th><th>Hcp</th>${r.ps.map(p => `<th>${esc((p.name || '?').split(' ')[0])}<small>${p.ph}</small></th>`).join('')}<th>Équipe</th></tr></thead>
@@ -2754,12 +2800,17 @@
   Object.assign(bind, {
     comps(v) {
       v.querySelectorAll('[data-comp]').forEach(b => b.onclick = () => openComp(b.dataset.comp));
-      v.querySelectorAll('[data-compnew]').forEach(n => n.onclick = () => { const d = newCompDraft(); d.format = n.dataset.compnew || 'match'; d.allowance = d.format === 'match' ? 90 : 85; go('compEdit', { compDraft: d }); });
+      v.querySelectorAll('[data-compnew]').forEach(n => n.onclick = () => {
+        const d = newCompDraft(); d.format = n.dataset.compnew || 'match'; d.allowance = d.format === 'match' ? 90 : d.format === 'texas' ? 100 : 85;
+        if (d.format === 'texas') { d.teamSize = 4; d.minDrives = 3; d.flights = 1; d.name = 'Texas scramble ' + new Date().getFullYear(); d.teams.forEach(t => { while (t.p.length < 4) t.p.push({ name: '', index: '' }); }); }
+        go('compEdit', { compDraft: d });
+      });
     },
     compEdit(v) {
       const d = S.compDraft;
       const sync = () => {
-        d.format = $('#cmFmt').value; d.name = $('#cmName').value; d.date = $('#cmDate').value; d.allowance = +$('#cmAllow').value; d.flights = +$('#cmFl').value; d.tee = $('#cmTee').value;
+        d.format = $('#cmFmt').value; d.name = $('#cmName').value;
+        if ($('#cmSize')) d.teamSize = +$('#cmSize').value; if ($('#cmMinDr')) d.minDrives = +$('#cmMinDr').value; d.date = $('#cmDate').value; d.allowance = +$('#cmAllow').value; d.flights = +$('#cmFl').value; d.tee = $('#cmTee').value;
         v.querySelectorAll('[data-cmn]').forEach(i => { const [a, b] = i.dataset.cmn.split('.'); d.teams[a].p[b].name = i.value.trim(); });
         v.querySelectorAll('[data-cmi]').forEach(i => { const [a, b] = i.dataset.cmi.split('.'); d.teams[a].p[b].index = i.value.trim(); });
       };
@@ -2767,8 +2818,10 @@
       v.querySelectorAll('[data-cmn]').forEach(i => i.onchange = () => { const last = (ls.get('pelland.lastPlayers', []) || []).find(p => p && L.norm(p.name || '') === L.norm(i.value)); const ix = v.querySelector(`[data-cmi="${i.dataset.cmn}"]`); if (last && last.index && ix && !ix.value) ix.value = last.index; });
       $('#cmCourse').onchange = e => { sync(); d.courseId = e.target.value; const c = S.courses.find(x => x.id === d.courseId); d.tee = ((c && c.tees[0]) || {}).name; render(); };
       $('#cmAllow').onchange = () => { sync(); render(); };
-      $('#cmFmt').onchange = () => { sync(); d.allowance = d.format === 'match' ? 90 : 85; render(); };
-      $('#cmAdd').onclick = () => { sync(); d.teams.push({ id: Math.random().toString(36).slice(2, 8), p: [{ name: '', index: '' }, { name: '', index: '' }] }); render(); };
+      const resize = n => d.teams.forEach(t => { while (t.p.length < n) t.p.push({ name: '', index: '' }); t.p.length = n; });
+      $('#cmFmt').onchange = () => { sync(); d.allowance = d.format === 'match' ? 90 : d.format === 'texas' ? 100 : 85; if (d.format === 'texas') { d.teamSize = d.teamSize || 4; if (d.minDrives == null) d.minDrives = 3; } resize(d.format === 'texas' ? d.teamSize : 2); render(); };
+      if ($('#cmSize')) $('#cmSize').onchange = () => { sync(); resize(d.teamSize); render(); };
+      $('#cmAdd').onclick = () => { sync(); d.teams.push({ id: Math.random().toString(36).slice(2, 8), p: Array.from({ length: d.format === 'texas' ? (d.teamSize || 4) : 2 }, () => ({ name: '', index: '' })) }); render(); };
       v.querySelectorAll('[data-cmdel]').forEach(b => b.onclick = () => { sync(); d.teams.splice(+b.dataset.cmdel, 1); render(); });
       $('#cmCancel').onclick = () => d.id ? openComp(d.id) : go('comps', { compList: null });
       $('#cmSave').onclick = async () => {
@@ -2776,22 +2829,37 @@
         if (!d.name.trim()) return toast('Donnez un nom à la compétition.');
         const teams = d.teams.filter(t => t.p.some(p => p.name));
         for (const t of teams) for (const p of t.p) {
-          if (!p.name) return toast('Chaque équipe a besoin de deux joueurs.');
+          if (!p.name) return toast(`Chaque équipe a besoin de ${t.p.length} joueurs.`);
           if (parseIdx(p.index) == null) return toast(`Entrez l’index de ${p.name} (ex. 12,4).`);
         }
         if (teams.length < 2) return toast('Il faut au moins deux équipes.');
         const course = S.courses.find(x => x.id === d.courseId) || S.courses[0];
         const c = { ...(d.id ? S.comp : {}), id: d.id || Date.now().toString(36), groupId: Store.gid, kind: 'membre-membre', format: d.format || 'match', name: d.name.trim(), date: d.date, courseId: course.id,
-          course: JSON.parse(JSON.stringify(course)), tee: d.tee, allowance: d.allowance, flights: d.flights, teams, by: ls.get('pelland.me', '') || '', createdAt: (S.comp && d.id && S.comp.createdAt) || Date.now() };
+          course: JSON.parse(JSON.stringify(course)), tee: d.tee, allowance: d.allowance, flights: d.flights, teams, teamSize: d.format === 'texas' ? (d.teamSize || 4) : 2, minDrives: d.format === 'texas' ? (d.minDrives == null ? 3 : d.minDrives) : null, by: ls.get('pelland.me', '') || '', createdAt: (S.comp && d.id && S.comp.createdAt) || Date.now() };
         try { await Store.saveComp(c); S.compList = null; openComp(c.id); toast(d.id ? 'Compétition modifiée.' : 'Compétition créée.'); } catch (e) { toast('Enregistrement impossible : ' + e.message); }
       };
     },
     comp(v) {
       v.querySelectorAll('[data-ctab]').forEach(b => b.onclick = () => { S.compTab = b.dataset.ctab; render(); });
       const sel = v.querySelector('#cmTeamSel'); if (sel) sel.onchange = () => { S.compTeam = sel.value; render(); };
-      const ed = v.querySelector('[data-cedit]'); if (ed) ed.onclick = () => { const c = S.comp; go('compEdit', { compDraft: { id: c.id, format: c.format || 'match', name: c.name, date: c.date, courseId: c.courseId, tee: c.tee, allowance: c.allowance, flights: c.flights, teams: JSON.parse(JSON.stringify(c.teams)) } }); };
+      const ed = v.querySelector('[data-cedit]'); if (ed) ed.onclick = () => { const c = S.comp; go('compEdit', { compDraft: { id: c.id, format: c.format || 'match', teamSize: c.teamSize, minDrives: c.minDrives, name: c.name, date: c.date, courseId: c.courseId, tee: c.tee, allowance: c.allowance, flights: c.flights, teams: JSON.parse(JSON.stringify(c.teams)) } }); };
       const dl = v.querySelector('[data-cdel]'); if (dl) dl.onclick = () => { S.confirmDelComp = true; render(); };
       const dok = v.querySelector('[data-cdelok]'); if (dok) dok.onclick = async () => { try { await Store.deleteComp(S.comp.id); if (S.unwatchComp) { S.unwatchComp(); S.unwatchComp = null; } go('comps', { compList: null }); toast('Compétition effacée.'); } catch (e) { toast('Impossible : ' + e.message); } };
+      // Texas scramble : score de l'équipe et départ choisi, enregistrés ensemble [score, joueur]
+      const txSave = async h => {
+        const c = S.comp, tid = S.compTeam && c.teams.find(t => t.id === S.compTeam) ? S.compTeam : c.teams[0].id;
+        const gi = v.querySelector(`[data-tx="${h}"]`), di = v.querySelector(`[data-td="${h}"]`), raw = gi.value.trim(), g = raw === '' ? null : parseInt(raw, 10);
+        if (raw !== '' && !(g >= 1 && g <= 15)) { toast('Score invalide.'); gi.value = ''; return; }
+        const arr = [g, di.value === '' ? null : +di.value];
+        c.scores = c.scores || {}; c.scores[tid] = c.scores[tid] || {}; c.scores[tid][h] = arr;
+        const t = c.teams.find(x => x.id === tid), r = compTeamResult(c, t), hh = r.holes[h - 1];
+        const cell = gi.closest('tr').querySelector('.cm-best'); cell.textContent = hh.best == null ? '' : hh.best; cell.classList.toggle('under', hh.best != null && hh.best < hh.par);
+        const sm = v.querySelector('.cm-sum'); if (sm) sm.innerHTML = sumHtml(c, r);
+        const dr = v.querySelector('.tx-drv'); if (dr) dr.innerHTML = 'Départs : ' + drivesTxt(c, r) + (c.minDrives ? ` (minimum ${c.minDrives} chacun)` : '');
+        try { await Store.setCompScore(c.id, tid, h, arr); } catch (e) { toast('Score non enregistré : ' + e.message); }
+      };
+      v.querySelectorAll('[data-tx]').forEach(i => { i.onchange = () => txSave(+i.dataset.tx); i.addEventListener('input', () => { const x = i.value.trim(); if ((x.length === 1 && x !== '1') || x.length === 2) { const sel = v.querySelector(`[data-td="${i.dataset.tx}"]`); if (sel) sel.focus(); } }); });
+      v.querySelectorAll('[data-td]').forEach(sel => sel.onchange = () => { txSave(+sel.dataset.td); const nx = v.querySelector(`[data-tx="${+sel.dataset.td + 1}"]`); if (nx) nx.focus(); });
       const all = [...v.querySelectorAll('[data-cms]')];
       all.forEach((inp, k) => inp.addEventListener('input', () => { const x = inp.value.trim(); if ((x.length === 1 && x !== '1') || x.length === 2) { const nx = all[k + 1]; if (nx) nx.focus(); } }));
       v.querySelectorAll('[data-cms]').forEach(inp => {
