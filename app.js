@@ -1025,7 +1025,7 @@
         <button class="btn ghost small" id="oAddDate" type="button">+ Ajouter une date</button>
         <label>Date butoir pour répondre<input type="date" id="oDeadline" value="${esc(f.deadline)}"></label>
         <div class="row"><button class="btn sms-btn" id="oSend" type="button">Enregistrer et texter les joueurs</button><button class="btn ghost small" id="oCancel" type="button">Annuler</button></div></div>`
-      : canOrganize() ? `<button class="btn" id="oNew" type="button">Offrir des parties</button>` : '<p class="note">Seuls le propriétaire et l’organisateur du groupe offrent des parties.</p>';
+      : canOrganize() ? `<button class="btn" id="oNew" type="button">Créer des parties</button>` : '<p class="note">Seuls le propriétaire et l’organisateur du groupe offrent des parties.</p>';
     return `<section class="card"><h2>Parties offertes</h2><p class="note">Proposez des dates : tous les joueurs reçoivent un texto et indiquent dans l’app les dates où ils sont disponibles, avant la date butoir.</p>${form}${list}</section>`;
   }
   // Rappels : à ceux qui n'ont pas répondu, ou aux joueurs disponibles pour une date
