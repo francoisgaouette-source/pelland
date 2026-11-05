@@ -231,7 +231,11 @@
       return list.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
     },
     async saveGroup(gr) {
-      if (this.mode === 'firebase') { await this.db.collection('players').doc('_groupe_' + gr.id).set(gr); return; }
+      if (this.mode === 'firebase') {
+        // le compteur de joueurs n'est jamais réécrit ici (il ne change qu'avec l'ajout ou le retrait d'un joueur)
+        const { nPlayers, lastAdd, lastDel, ...rest } = gr; const isNew = !(S.groups || []).some(g => g.id === gr.id);
+        await this.db.collection('players').doc('_groupe_' + gr.id).set(isNew ? gr : rest, isNew ? undefined : { merge: true }); return;
+      }
       const all = ls.get('pelland.groups', {}); all[gr.id] = gr; ls.set('pelland.groups', all);
     },
     // Mes groupes (sur ce téléphone) : un joueur peut faire partie de plusieurs groupes, un compte par groupe
@@ -256,7 +260,7 @@
       if (!String(groupName || '').trim()) throw new Error('Donnez un nom au groupe.');
       if (!String(name || '').trim()) throw new Error('Entrez votre prénom et nom.');
       const pid = slug(name) + '-' + Math.random().toString(36).slice(2, 6);
-      const gr = { id: slug(groupName) + '-' + Math.random().toString(36).slice(2, 6), name: groupName.trim(), owner: pid, createdAt: Date.now() };
+      const gr = { id: slug(groupName) + '-' + Math.random().toString(36).slice(2, 6), name: groupName.trim(), owner: pid, createdAt: Date.now(), nPlayers: 1 };
       const rc = String(ref || this.refCode() || '').replace(/[^a-z0-9_-]/gi, '').slice(0, 60); if (rc) gr.ref = rc;
       if (this.mode === 'firebase') {
         const u = firebase.auth().currentUser;
@@ -362,17 +366,33 @@
       if (this.mode === 'firebase') { await this.db.collection('offres').doc(id).delete(); try { await this.db.collection('players').doc('_offre_' + id).delete(); } catch (e) { } return; }
       const all = ls.get('pelland.offres', {}); delete all[id]; ls.set('pelland.offres', all);
     },
-    async savePlayer(name) {
+    // Compteur de joueurs du groupe (players/_groupe_<g>.nPlayers) : il change dans la même écriture que le joueur,
+    // et les règles Firestore refusent un joueur de plus que le forfait (4 en Gratuit, 16 en Groupe).
+    incr(n, fallback) { const FV = firebase.firestore.FieldValue; return FV && FV.increment ? FV.increment(n) : fallback; },
+    async savePlayer(name, count) {
       const p = { id: slug(name) + '-' + Math.random().toString(36).slice(2, 6), name: name.trim(), groupId: this.gid, updatedAt: Date.now() };
-      if (this.mode === 'firebase') { await this.db.collection('players').doc(p.id).set(p); return p; }
+      if (this.mode === 'firebase') {
+        const b = this.db.batch();
+        b.set(this.db.collection('players').doc(p.id), p);
+        b.set(this.db.collection('players').doc('_groupe_' + this.gid), { nPlayers: this.incr(1, (count || 0) + 1), lastAdd: p.id }, { merge: true });
+        try { await b.commit(); } catch (e) { throw /permission/i.test(e.code || e.message || '') ? new Error('Le forfait du groupe est plein.') : e; }
+        return p;
+      }
       const list = ls.get('pelland.players', []); list.push(p); ls.set('pelland.players', list); return p;
     },
     async renamePlayer(id, name) {
       if (this.mode === 'firebase') { await this.db.collection('players').doc(id).set({ name: name.trim(), updatedAt: Date.now() }, { merge: true }); return; }
       ls.set('pelland.players', ls.get('pelland.players', []).map(x => x.id === id ? { ...x, name: name.trim() } : x));
     },
-    async deletePlayer(id) {
-      if (this.mode === 'firebase') { await this.db.collection('players').doc(id).delete(); try { await this.db.collection('phones').doc(id).delete(); } catch (e) { } return; }
+    async deletePlayer(id, count) {
+      if (this.mode === 'firebase') {
+        const b = this.db.batch();
+        b.delete(this.db.collection('players').doc(id));
+        b.set(this.db.collection('players').doc('_groupe_' + this.gid), { nPlayers: this.incr(-1, Math.max(0, (count || 1) - 1)), lastDel: id }, { merge: true });
+        await b.commit();
+        try { await this.db.collection('phones').doc(id).delete(); } catch (e) { }
+        return;
+      }
       ls.set('pelland.players', ls.get('pelland.players', []).filter(x => x.id !== id));
     },
     // Présences : presence/{partie} = { cléJoueur: { ok: true|false, at } } ; chaque membre écrit sa propre réponse
@@ -648,7 +668,6 @@
   // Forfait gardé dans players/_groupe_<g> : plan = 'groupe' (16 joueurs, payé) et paidUntil (ms). Sans forfait : Gratuit, 4 joueurs.
   function planOf(gr) {
     gr = gr || curGroup();
-    if (gr.id === 'pelland') return { name: 'Fondateur', max: 16, until: null, paid: true };  // la gang à Pelland : groupe fondateur
     if (gr.plan === 'groupe' && (!gr.paidUntil || gr.paidUntil > Date.now())) return { name: 'Groupe', max: 16, until: gr.paidUntil || null, paid: true };
     return { name: 'Gratuit', max: 4, until: null, paid: false, expired: gr.plan === 'groupe' };
   }
@@ -1570,7 +1589,7 @@
         const btn = sh.querySelector('#impGo'); btn.disabled = true;
         for (const x of todo) {
           btn.textContent = `Ajout… ${ok + 1}/${todo.length}`;
-          try { const np = await Store.savePlayer(x.name); ok++; if (x.phone && x.phone.length >= 10) { try { await Store.setPhone(np, x.phone); } catch (e) { phErr++; } } } catch (e) { }
+          try { const np = await Store.savePlayer(x.name, S.players.length + ok); ok++; if (x.phone && x.phone.length >= 10) { try { await Store.setPhone(np, x.phone); } catch (e) { phErr++; } } } catch (e) { }
         }
         S.players = await Store.listPlayers(); closeSheet(); render();
         toast(`${ok} joueur${ok > 1 ? 's' : ''} ajouté${ok > 1 ? 's' : ''}${phErr ? ` · ${phErr} numéro${phErr > 1 ? 's' : ''} à refaire` : ''}.`);
@@ -1890,7 +1909,7 @@
         if (near && S.confirmAdd !== n) { S.confirmAdd = n; return toast(`Ressemble à ${near.join(', ')}. Touchez Ajouter de nouveau pour confirmer.`); }
         S.confirmAdd = null;
         if (roomLeft() <= 0) return limitSheet();
-        try { const np = await Store.savePlayer(n); const ph = $('#newPhone').value.trim(); if (ph) await Store.setPhone(np, ph); S.players = await Store.listPlayers(); render(); if (ph) inviteText(n, ph, np.id); else setTimeout(() => $('#newPlayer') && $('#newPlayer').focus(), 50); }
+        try { const np = await Store.savePlayer(n, S.players.length); const ph = $('#newPhone').value.trim(); if (ph) await Store.setPhone(np, ph); S.players = await Store.listPlayers(); render(); if (ph) inviteText(n, ph, np.id); else setTimeout(() => $('#newPlayer') && $('#newPlayer').focus(), 50); }
         catch (e) { toast('Ajout impossible : ' + e.message); }
       };
       if ($('#addPlayer')) $('#addPlayer').onclick = add;
@@ -1937,13 +1956,13 @@
       const bc = v.querySelector('[data-bulkcancel]'); if (bc) bc.onclick = () => { S.confirmBulk = false; render(); };
       const bd = v.querySelector('[data-bulkdel]'); if (bd) bd.onclick = async () => {
         const ids = (S.sel || []).slice(); let ok = 0;
-        for (const id of ids) { try { await Store.deletePlayer(id); ok++; } catch (e) { } }
+        for (const id of ids) { try { await Store.deletePlayer(id, S.players.length - ok); ok++; } catch (e) { } }
         S.players = await Store.listPlayers(); S.sel = []; S.confirmBulk = false; S.selMode = false;
         toast(ok === ids.length ? `${ok} joueur${ok > 1 ? 's' : ''} retiré${ok > 1 ? 's' : ''}.` : `${ok} sur ${ids.length} retirés : réessayez pour les autres.`); render();
       };
       v.querySelectorAll('[data-canceldel]').forEach(b => b.onclick = () => { S.confirmDel = null; render(); });
       v.querySelectorAll('[data-delp]').forEach(b => b.onclick = async () => {
-        try { await Store.deletePlayer(b.dataset.delp); S.players = await Store.listPlayers(); S.confirmDel = null; render(); } catch (e) { toast('Retrait impossible : ' + e.message); }
+        try { await Store.deletePlayer(b.dataset.delp, S.players.length); S.players = await Store.listPlayers(); S.confirmDel = null; render(); } catch (e) { toast('Retrait impossible : ' + e.message); }
       });
     },
     home(v) {
@@ -3044,6 +3063,8 @@
     try { S.quatuors = await Store.listQuatuors(); } catch (e) { S.quatuors = []; }
     try { S.jeux = await Store.listJeux(); } catch (e) { S.jeux = []; }
     try { S.groups = await Store.listGroups(); } catch (e) { S.groups = []; }
+    // Groupes créés avant le compteur : on l'initialise une fois avec le nombre de joueurs
+    if (Store.mode === 'firebase' && curGroup().nPlayers == null && S.players.length && canOrganize()) { try { await Store.db.collection('players').doc('_groupe_' + Store.gid).set({ nPlayers: S.players.length }, { merge: true }); S.groups = await Store.listGroups(); } catch (e) { console.warn('compteur', e.message); } }
     Store.myPlayers().then(l => { S.myPlayers = l; if (S.view === 'home' && l.length > 1) render(); }).catch(() => { });
     const params = new URLSearchParams(location.search);
     const code = (params.get('partie') || params.get('code') || '').toUpperCase();

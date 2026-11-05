@@ -38,6 +38,23 @@ service cloud.firestore {
     function groupeDe(data) {
       return data.get('groupId', 'pelland');
     }
+    // ---------- Forfait et nombre de joueurs ----------
+    function grp(g) { return /databases/$(database)/documents/players/$('_groupe_' + g); }
+    // Joueurs permis : 16 avec le forfait Groupe en cours, sinon 4 (Gratuit)
+    function maxJoueurs(d) {
+      return d.get('plan', '') == 'groupe' && (!('paidUntil' in d) || d.paidUntil > request.time.toMillis()) ? 16 : 4;
+    }
+    // Un joueur ajouté : le compteur du groupe monte de 1 dans la même écriture, sans dépasser le forfait
+    function ajoutCompte(g) {
+      return exists(grp(g)) && 'nPlayers' in get(grp(g)).data
+        && getAfter(grp(g)).data.nPlayers == get(grp(g)).data.nPlayers + 1
+        && getAfter(grp(g)).data.nPlayers <= maxJoueurs(get(grp(g)).data);
+    }
+    // Un joueur retiré : le compteur descend de 1 dans la même écriture
+    function retraitCompte(g) {
+      return !exists(grp(g)) || !('nPlayers' in get(grp(g)).data)
+        || getAfter(grp(g)).data.nPlayers == get(grp(g)).data.nPlayers - 1;
+    }
 
     // ---------- Lien compte → joueur → groupe ----------
     match /auth/{uid} {
@@ -55,7 +72,7 @@ service cloud.firestore {
 
       // Fiche d'un joueur (identifiant sans « _ »)
       allow create: if membre() && !id.matches('_.*') && (
-          dansGroupe(request.resource.data.groupId)
+          (dansGroupe(request.resource.data.groupId) && ajoutCompte(request.resource.data.groupId))
           // fondateur d'un nouveau groupe : c'est lui le propriétaire et la fiche porte son courriel
           || (get(/databases/$(database)/documents/players/$('_groupe_' + request.resource.data.groupId)).data.owner == id
               && courriel() != '' && request.resource.data.authEmail == courriel()));
@@ -64,15 +81,27 @@ service cloud.firestore {
           // premier membre d'un ancien groupe : il inscrit son propre courriel sur sa fiche
           || (resource.data.get('authEmail', '') == '' && courriel() != '' && request.resource.data.authEmail == courriel()
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['authEmail', 'phoneHint'])));
-      allow delete: if membre() && !id.matches('_.*') && dansGroupe(groupeDe(resource.data));
+      allow delete: if membre() && !id.matches('_.*') && dansGroupe(groupeDe(resource.data)) && retraitCompte(groupeDe(resource.data));
 
       // Groupe : _groupe_<g>
       // Le forfait (plan, paidUntil) est donné par Fanion après le paiement : jamais modifiable depuis l'app
       allow create: if membre() && id.matches('_groupe_.+') && request.resource.data.id == id.split('_groupe_')[1]
-        && !request.resource.data.keys().hasAny(['plan', 'paidUntil']);
+        && !request.resource.data.keys().hasAny(['plan', 'paidUntil'])
+        && request.resource.data.get('nPlayers', 1) == 1;
       allow update: if membre() && id.matches('_groupe_.+') && dansGroupe(id.split('_groupe_')[1])
         && request.resource.data.id == resource.data.id
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan', 'paidUntil'])
+        // compteur de joueurs : +1 avec un nouveau joueur du groupe, −1 avec un joueur retiré, ou première initialisation
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['nPlayers'])
+            || !('nPlayers' in resource.data)
+            || (request.resource.data.nPlayers == resource.data.nPlayers + 1
+                && !exists(/databases/$(database)/documents/players/$(request.resource.data.lastAdd))
+                && existsAfter(/databases/$(database)/documents/players/$(request.resource.data.lastAdd))
+                && getAfter(/databases/$(database)/documents/players/$(request.resource.data.lastAdd)).data.groupId == id.split('_groupe_')[1])
+            || (request.resource.data.nPlayers == resource.data.nPlayers - 1
+                && exists(/databases/$(database)/documents/players/$(request.resource.data.lastDel))
+                && !existsAfter(/databases/$(database)/documents/players/$(request.resource.data.lastDel))
+                && get(/databases/$(database)/documents/players/$(request.resource.data.lastDel)).data.get('groupId', 'pelland') == id.split('_groupe_')[1]))
         // propriétaire et organisateur : seul le propriétaire les change (ou un membre réclame un groupe sans propriétaire)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['owner', 'organizers'])
             || resource.data.get('owner', '') == ''
