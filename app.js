@@ -651,11 +651,8 @@
         <button class="tile" data-go="players"><span class="pin" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="9" cy="8" r="3.2" fill="currentColor"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" fill="currentColor"/><circle cx="17" cy="9" r="2.4" fill="currentColor" opacity=".7"/><path d="M15.5 13.6c3 .2 5.5 2.1 5.5 5.4h-4.3" fill="currentColor" opacity=".7"/></svg></span><div><strong>Banque de joueurs</strong><span>Tous les joueurs du groupe : ajouter, renommer, retirer, importer d’Excel</span></div></button>
         <button class="tile" data-go="courses"><span class="pin">⛳</span><div><strong>Banque de terrains</strong><span>Consultez les terrains ou ajoutez-en un</span></div></button>
         <button class="tile" data-go="jeux"><span class="pin" style="font-family:var(--display);font-weight:700">$</span><div><strong>Banque de jeux</strong><span>Les règles et l’argent de chaque jeu ; ajoutez les vôtres</span></div></button>
+        <button class="tile" data-go="comps"><span class="pin"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M7 4h10v3a5 5 0 0 1-10 0V4z" fill="currentColor"/><path d="M7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M12 12v4M8 20h8l-1-4H9z" fill="currentColor" stroke="currentColor" stroke-width="1.2"/></svg></span><div><strong>Banque de compétitions</strong><span>Membre-membre : équipes de 2, flites et classement en direct</span></div></button>
       </div>`)}
-      <h3 class="home-h">Compétitions</h3>
-      <div class="tiles">
-        <button class="tile" data-go="comps"><span class="pin"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M7 4h10v3a5 5 0 0 1-10 0V4z" fill="currentColor"/><path d="M7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M12 12v4M8 20h8l-1-4H9z" fill="currentColor" stroke="currentColor" stroke-width="1.2"/></svg></span><div><strong>Compétitions</strong><span>Membre-membre : équipes de 2, flites et classement en direct</span></div></button>
-      </div>
       ${referralCard()}
       ${Store.needLogin ? '' : `<button class="caddie-tile" data-caddie type="button"><span class="cad-ico" aria-hidden="true">?</span><span><b>Une question ?</b><small>Demandez au Caddie : l’app, les règles des jeux, les forfaits.</small></span></button>`}
       ${viralCard('home')}
@@ -2655,7 +2652,7 @@
   const sumHtml = (c, r) => `<span>${r.thru ? `Après ${r.thru} trou${r.thru > 1 ? 's' : ''}` : 'Aucun score'}</span><b class="${c.format !== 'stableford' && r.toPar < 0 ? 'under' : ''}">${!r.thru ? '' : c.format === 'stableford' ? r.pts + ' pts' : toParTxt(r.toPar)}</b>`;
 
   function vComps() {
-    $('#barTitle').textContent = 'Compétitions';
+    $('#barTitle').textContent = 'Banque de compétitions';
     if (S.compList == null) { Store.listComps().then(l => { S.compList = l; if (S.view === 'comps') render(); }); return '<p class="note">Chargement…</p>'; }
     return `<p class="note">Membre-membre : équipes de deux, match play, Stableford ou coups en meilleure balle nette, flites selon le handicap d’équipe et classement en direct pour tout le groupe.</p>
       ${canOrganize() ? '<button class="btn" data-compnew type="button">Nouvelle compétition</button>' : ''}
@@ -2787,7 +2784,7 @@
   const SMS_API = 'https://fanion.ai/api/sms';
   // ---------------- Le Caddie : l'agent qui répond aux questions (API Claude, par le serveur Fanion) ----------------
   const CADDIE_API = 'https://fanion.ai/api/caddie';
-  const SCREENS = { home: 'Accueil', players: 'Inviter des joueurs', quatuors: 'Parties à préparer', setup: 'Créer une partie', jeux: 'Banque de jeux', courses: 'Banque de terrains', live: 'Parties en cours', history: 'Parties jouées', comps: 'Compétitions', compte: 'Mon compte' };
+  const SCREENS = { home: 'Accueil', players: 'Inviter des joueurs', quatuors: 'Parties à préparer', setup: 'Créer une partie', jeux: 'Banque de jeux', courses: 'Banque de terrains', live: 'Parties en cours', history: 'Parties jouées', comps: 'Banque de compétitions', compte: 'Mon compte' };
   let caddieReady = null;
   async function caddieStatus() {
     if (caddieReady !== null) return caddieReady;
