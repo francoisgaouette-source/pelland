@@ -132,6 +132,16 @@
       }
       return email;
     },
+    // Connexion : cellulaire + mot de passe (le courriel interne du compte se calcule à partir du cellulaire)
+    async loginPhone(phone, pw) {
+      const e164 = this.phoneE164(phone);
+      if (!e164) throw Object.assign(new Error('Entrez votre numéro de cellulaire (10 chiffres).'), { code: 'local/phone' });
+      if (!pw) throw Object.assign(new Error('Entrez votre mot de passe.'), { code: 'local/pw' });
+      try { const c = await firebase.auth().signInWithEmailAndPassword(await this.acctEmail(e164), pw); this.setUser(c.user); }
+      catch (e) { throw Object.assign(new Error(/too-many/.test(e.code || '') ? 'Trop d’essais. Réessayez dans quelques minutes, ou touchez « Mot de passe oublié ».' : 'Cellulaire ou mot de passe incorrect. Première fois ? Touchez « Créer mon compte ».'), { code: 'local/badpw' }); }
+      this.needLogin = false;
+      ls.set('pelland.lastPhone', e164.slice(2));
+    },
     async loginPassword(player, pw) {
       if (!player.acct) throw Object.assign(new Error(player.name + ' n’a pas encore de compte. Touchez « Créer mon compte ».'), { code: 'local/noacct' });
       try { const c = await firebase.auth().signInWithEmailAndPassword(player.acct, pw); this.setUser(c.user); }
@@ -582,6 +592,7 @@
     if (S.unwatchComp && view !== 'comp' && view !== 'compEdit') { S.unwatchComp(); S.unwatchComp = null; }
     if (view === 'comps') S.compList = null;
     if (view === 'compte') S.acctGroups = null;
+    if (view !== 'compte') S.fromLogin = false;
     if (view === 'players') S.pFocused = false;
     if (view !== 'game' && view !== 'setup' && Voice.wake) Voice.setWake(false);
     S.view = view; Object.assign(S, opts);
@@ -769,10 +780,13 @@
     $('#barTitle').textContent = 'Mon compte';
     if (S.acctGroups == null) { Store.myGroupList().then(l => { S.acctGroups = l; S.myPlayers = l; if (S.view === 'compte') render(); }).catch(() => { S.acctGroups = []; render(); }); return '<p class="note">Chargement…</p>'; }
     const u = (window.firebase && firebase.auth().currentUser) || {}, cell = (u.phoneNumber || '').replace(/^\+1/, '');
-    return `<section class="card"><h2>${esc(ls.get('pelland.me', '') || '')}</h2>
+    const mine = S.acctGroups.find(g => g.gid === Store.gid) || S.acctGroups[0];
+    if (mine && !S.fromLogin) ls.set('pelland.me', mine.playerName);
+    return `<section class="card"><h2>${esc(mine ? mine.playerName : ls.get('pelland.me', '') || '')}</h2>
+        ${S.fromLogin ? '<p class="note"><b>Bienvenue !</b> Choisissez votre groupe.</p>' : ''}
         <p class="note">${cell ? 'Cellulaire confirmé : ' + esc(fmtPhone(cell)) : 'Compte créé avant les comptes avec mot de passe : déconnectez-vous puis touchez « Créer mon compte » pour le mettre à jour.'}</p></section>
       <h3 class="acct-h">Mes groupes (${S.acctGroups.length})</h3>
-      ${groupRows(S.acctGroups, Store.gid)}
+      ${groupRows(S.acctGroups, S.fromLogin ? null : Store.gid).replace(S.fromLogin ? /Ouvrir/g : /^$/, 'Entrer')}
       <p class="note">Ce sont les groupes où votre cellulaire est inscrit. Pour en rejoindre un autre, demandez à son organisateur de vous ajouter dans Joueurs.</p>
       <div class="row acct-actions"><button class="btn ghost small" data-viral type="button">Créer un groupe</button><button class="btn ghost small" id="chgPw" type="button">Changer mon mot de passe</button><button class="btn ghost small" id="logout2" type="button">Se déconnecter</button></div>`;
   }
@@ -1515,18 +1529,12 @@
         <p class="note" id="acMsg">${esc(A.msg || '')}</p>
         ${A.step === 'phone' || A.step === 'code' ? '<p class="note" style="text-align:center"><button class="linkbtn" id="acCancel" type="button">J’ai déjà un compte : me connecter</button></p>' : ''}</section>`;
     }
-    const inGroup = S.players.filter(p => (p.groupId || 'pelland') === S.loginGroup);
-    const pickId = S.loginPick || (invited && inGroup.some(p => p.id === invited) ? invited : (inGroup.find(p => p.name === me) || {}).id);
-    const pick = inGroup.find(p => p.id === pickId);
     return hero + `<section class="card"><h2>Connexion</h2>
-        ${groups.length > 1 ? `<label>Votre groupe<select id="loginGroup">${groups.map(gr => `<option value="${esc(gr.id)}" ${gr.id === S.loginGroup ? 'selected' : ''}>${esc(gr.name)}</option>`).join('')}</select></label>` : ''}
-        <label>Votre nom<select id="loginName"><option value="">— Choisir —</option>${inGroup.map(p => `<option value="${esc(p.id)}" ${p.id === pickId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
-        ${pick && !pick.acct ? `<div class="warn"><b>${esc(pick.name)}</b> n’a pas encore de compte. Il faut un cellulaire : on vous envoie un code, puis vous choisissez un mot de passe.</div>
-          <button class="btn" id="goCreate" type="button">Créer mon compte</button>`
-        : `<label>Mot de passe<input id="loginPw" type="password" autocomplete="current-password"></label>
-          <button class="btn" id="loginBtn" type="button">Entrer</button>`}
+        <label>Votre cellulaire<input id="loginCell" type="tel" inputmode="tel" autocomplete="username" placeholder="450 555-1234" value="${esc(S.loginCell != null ? S.loginCell : fmtPhone(ls.get('pelland.lastPhone', '') || ''))}"></label>
+        <label>Mot de passe<input id="loginPw" type="password" autocomplete="current-password"></label>
+        <button class="btn" id="loginBtn" type="button">Entrer</button>
         <p class="note" id="loginMsg">${esc(S.loginMsg || '')}</p>
-        ${pick && !pick.acct ? '' : '<p class="note" style="text-align:center"><button class="linkbtn" id="forgotPw" type="button">Mot de passe oublié ?</button> · <button class="linkbtn" id="goCreate2" type="button">Première fois ? Créer mon compte</button></p>'}
+        <p class="note" style="text-align:center"><button class="linkbtn" id="forgotPw" type="button">Mot de passe oublié ?</button> · <button class="linkbtn" id="goCreate2" type="button">Première fois ? Créer mon compte</button></p>
       </section>
       <p class="note" style="text-align:center">Nouveau groupe d’amis ? <button class="linkbtn" id="newGroup" type="button">Créer un groupe</button></p>`;
   }
@@ -1744,15 +1752,14 @@
       const A = S.acct;
       const start = o => { S.acct = { step: 'phone', ...o }; S.loginMsg = ''; render(); setTimeout(() => { const i = $('#acPhone'); if (i) i.focus(); }, 50); };
       // ----- Connexion : nom + mot de passe -----
-      const lg = $('#loginGroup'); if (lg) lg.onchange = e => { S.loginGroup = e.target.value; S.loginPick = null; render(); };
-      const ln = $('#loginName'); if (ln) ln.onchange = () => { S.loginPick = ln.value; S.loginMsg = ''; render(); };
+      // Après la connexion : on arrive dans son compte, pour choisir son groupe
+      const toAccount = () => { const q = new URLSearchParams(location.search); q.delete('joueur'); q.delete('ref'); q.set('compte', '1'); location.href = location.pathname + '?' + q; };
       const enter = async () => {
-        const pl = S.players.find(p => p.id === $('#loginName').value); if (!pl) return say('Choisissez votre nom.');
-        const b = $('#loginBtn'); b.disabled = true; say('Connexion…');
-        try { await Store.loginPassword(pl, $('#loginPw').value); done(); } catch (e) { b.disabled = false; say(errTxt(e)); }
+        const b = $('#loginBtn'); b.disabled = true; say('Connexion…'); S.loginCell = $('#loginCell').value;
+        try { await Store.loginPhone($('#loginCell').value, $('#loginPw').value); toAccount(); } catch (e) { b.disabled = false; say(errTxt(e)); }
       };
-      if ($('#loginBtn')) { $('#loginBtn').onclick = enter; $('#loginPw').onkeydown = e => { if (e.key === 'Enter') enter(); }; }
-      [['#goCreate', {}], ['#goCreate2', {}], ['#forgotPw', { reset: true }], ['#newGroup', { forGroup: true }]].forEach(([id, o]) => { const b = $(id); if (b) b.onclick = () => start(o); });
+      if ($('#loginBtn')) { $('#loginBtn').onclick = enter; $('#loginPw').onkeydown = e => { if (e.key === 'Enter') enter(); }; $('#loginCell').onkeydown = e => { if (e.key === 'Enter') $('#loginPw').focus(); }; }
+      [['#goCreate2', {}], ['#forgotPw', { reset: true }], ['#newGroup', { forGroup: true }]].forEach(([id, o]) => { const b = $(id); if (b) b.onclick = () => start(o); });
       if (!A) return;
       // ----- Création de compte : cellulaire → code → mot de passe (→ groupe) -----
       const cancel = $('#acCancel'); if (cancel) cancel.onclick = () => { S.acct = null; S.loginMsg = ''; render(); };
@@ -3066,6 +3073,7 @@
     const params = new URLSearchParams(location.search);
     const code = (params.get('partie') || params.get('code') || '').toUpperCase();
     const offreId = params.get('offre');
+    if (params.get('compte')) { history.replaceState(null, '', location.pathname); go('compte', { fromLogin: true }); return; }
     if (offreId) go('offre', { offreId });
     else if (code) openGame(code);
     else if (params.has('ecoute') || params.has('pelland')) {
