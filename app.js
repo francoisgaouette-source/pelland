@@ -2658,12 +2658,36 @@
   const fmtPt = x => String(x).replace('.5', ',5');
   const sumHtml = (c, r) => `<span>${r.thru ? `Après ${r.thru} trou${r.thru > 1 ? 's' : ''}` : 'Aucun score'}</span><b class="${c.format !== 'stableford' && r.toPar < 0 ? 'under' : ''}">${!r.thru ? '' : c.format === 'stableford' ? r.pts + ' pts' : toParTxt(r.toPar)}</b>`;
 
+  // Formats de compétition (comme la banque de jeux) ; ready = on peut la créer dans l'app
+  const COMP_INFO = [
+    { f: 'match', ready: true, name: 'Membre-membre en match play', who: 'Équipes de 2, réparties en flites selon le handicap d’équipe',
+      rules: ['Dans chaque flite, chaque équipe affronte toutes les autres (ronde).', 'Chaque match se joue en meilleure balle nette sur 18 trous : l’équipe au meilleur score net gagne le trou.', 'Les coups se donnent à partir du plus bas handicap de jeu des quatre joueurs du match ; allocation recommandée : 90 %.'],
+      score: ['Match gagné : 1 point ; nul : ½ ; perdu : 0.', 'Égalité de points : on départage par les trous gagnés.', 'Le classement de chaque flite se met à jour en direct.'] },
+    { f: 'stableford', ready: true, name: 'Membre-membre Stableford', who: 'Équipes de 2, réparties en flites selon le handicap d’équipe',
+      rules: ['À chaque trou, le meilleur score net de l’équipe compte (meilleure balle).', 'Points : normale nette 2, oiselet net 3, aigle net 4, boguey net 1, double boguey ou pire 0.', 'Allocation recommandée : 85 % du handicap de parcours.'],
+      score: ['Le plus de points sur 18 trous gagne la flite.', 'Un mauvais trou ne coûte que 0 point : idéal pour les handicaps élevés.'] },
+    { f: 'coups', ready: true, name: 'Membre-membre en coups', who: 'Équipes de 2, réparties en flites selon le handicap d’équipe',
+      rules: ['À chaque trou, le meilleur score net de l’équipe compte (meilleure balle).', 'On additionne les 18 trous ; le total se lit par rapport à la normale (−5, Par, +2).', 'Allocation recommandée : 85 % du handicap de parcours.'],
+      score: ['Le plus bas total net gagne la flite.'] },
+    { f: 'invite', ready: false, name: 'Membre-invité', who: 'Un membre et son invité, en équipe de 2',
+      rules: ['Comme le membre-membre, mais chaque équipe compte un invité de l’extérieur du club.', 'Souvent en match play ou en Stableford, avec flites.'], score: ['Bientôt dans l’app.'] },
+    { f: 'scramble', ready: false, name: 'Scramble à 4', who: 'Équipes de 4',
+      rules: ['Les 4 joueurs frappent ; l’équipe choisit la meilleure balle et tout le monde rejoue de là, jusqu’au trou.', 'Handicap d’équipe : un pourcentage des handicaps (souvent 25 %, 20 %, 15 %, 10 %).'], score: ['Le plus bas total net gagne. Bientôt dans l’app.'] },
+    { f: 'ryder', ready: false, name: 'Coupe Ryder du groupe', who: 'Deux camps (Rouges contre Bleus)',
+      rules: ['Plusieurs rondes de matchs : quatre balles, deux balles alternées, puis simples.', 'Chaque match gagné rapporte un point à son camp.'], score: ['Le premier camp à la majorité des points gagne la coupe. Bientôt dans l’app.'] },
+  ];
   function vComps() {
-    $('#barTitle').textContent = 'Banque de compétitions';
+    $('#barTitle').textContent = 'Compétitions';
     if (S.compList == null) { Store.listComps().then(l => { S.compList = l; if (S.view === 'comps') render(); }); return '<p class="note">Chargement…</p>'; }
-    return `<p class="note">Membre-membre : équipes de deux, match play, Stableford ou coups en meilleure balle nette, flites selon le handicap d’équipe et classement en direct pour tout le groupe.</p>
-      ${canOrganize() ? '<button class="btn" data-compnew type="button">Nouvelle compétition</button>' : ''}
-      <div class="list">${S.compList.map(c => `<button class="item" data-comp="${esc(c.id)}"><b>${esc(c.name)}</b><span>${esc(c.date ? new Date(c.date + 'T12:00').toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' }) : '')} · ${esc(c.course.name)} · ${(c.teams || []).length} équipes</span></button>`).join('') || '<p class="note">Aucune compétition pour l’instant.</p>'}</div>`;
+    const fmtName = f => (COMP_INFO.find(x => x.f === (f || 'match')) || {}).name || '';
+    return `<p class="note">Les formats de compétition, leurs règles et leur pointage. Tout se compte au net, avec le handicap de chacun.</p>
+      <div class="jeux">${COMP_INFO.map(x => `<details class="card jeu"><summary><b>${esc(x.name)}${x.ready ? '' : ' <span class="soon-tag">Bientôt</span>'}</b><span>${esc(x.who)}</span></summary>
+        <h3>Règles</h3><ul>${x.rules.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
+        <h3>Le classement</h3><ul>${x.score.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
+        ${x.ready && canOrganize() ? `<button class="btn small" data-compnew="${x.f}" type="button">Créer dans ce format</button>` : ''}</details>`).join('')}</div>
+      <h2 class="jeux-h">Compétitions du groupe</h2>
+      <div class="list">${S.compList.map(c => `<button class="item" data-comp="${esc(c.id)}"><b>${esc(c.name)}</b><span>${esc(c.date ? new Date(c.date + 'T12:00').toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' }) : '')} · ${esc(fmtName(c.format))} · ${esc(c.course.name)} · ${(c.teams || []).length} équipes</span></button>`).join('') || '<p class="note">Aucune compétition pour l’instant.</p>'}</div>
+      ${canOrganize() ? '<button class="btn" data-compnew="match" type="button">Nouvelle compétition</button>' : ''}`;
   }
 
   function newCompDraft() {
@@ -2730,7 +2754,7 @@
   Object.assign(bind, {
     comps(v) {
       v.querySelectorAll('[data-comp]').forEach(b => b.onclick = () => openComp(b.dataset.comp));
-      const n = v.querySelector('[data-compnew]'); if (n) n.onclick = () => go('compEdit', { compDraft: newCompDraft() });
+      v.querySelectorAll('[data-compnew]').forEach(n => n.onclick = () => { const d = newCompDraft(); d.format = n.dataset.compnew || 'match'; d.allowance = d.format === 'match' ? 90 : 85; go('compEdit', { compDraft: d }); });
     },
     compEdit(v) {
       const d = S.compDraft;
