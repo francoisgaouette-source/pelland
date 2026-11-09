@@ -750,6 +750,7 @@
         <button class="tile" data-go="jeux"><span class="pin" style="font-family:var(--display);font-weight:700">$</span><div><strong>Banque de jeux</strong><span>Les règles et l’argent de chaque jeu ; ajoutez les vôtres</span></div></button>
         <button class="tile" data-go="comps"><span class="pin"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M7 4h10v3a5 5 0 0 1-10 0V4z" fill="currentColor"/><path d="M7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M12 12v4M8 20h8l-1-4H9z" fill="currentColor" stroke="currentColor" stroke-width="1.2"/></svg></span><div><strong>Banque de compétitions</strong><span>Membre-membre : équipes de 2, flites et classement en direct</span></div></button>
       </div>`)}
+      ${pushCard()}
       ${referralCard()}
       ${Store.needLogin ? '' : `<button class="caddie-tile" data-caddie type="button"><span class="cad-ico" aria-hidden="true">?</span><span><b>Une question ?</b><small>Demandez au Caddie : l’app, les règles des jeux, les forfaits.</small></span></button>`}
       ${viralCard('home')}
@@ -875,6 +876,9 @@
       <h3 class="acct-h">Mes groupes (${S.acctGroups.length})</h3>
       ${groupRows(S.acctGroups, S.fromLogin ? null : Store.gid).replace(S.fromLogin ? /Ouvrir/g : /^$/, 'Entrer')}
       <p class="note">Ce sont les groupes où votre cellulaire est inscrit. Pour en rejoindre un autre, demandez à son organisateur de vous ajouter dans Joueurs.</p>
+      <h3 class="acct-h">Notifications</h3>
+      <div class="acct-g"><div><b>${Push.perm() === 'granted' && ls.get('pelland.push', 0) ? 'Activées sur ce téléphone' : Push.perm() === 'denied' ? 'Bloquées' : 'Désactivées'}</b><small>${Push.perm() === 'denied' ? 'Permettez-les dans les réglages du navigateur ou du téléphone.' : Push.needsInstall() ? 'Sur iPhone : ajoutez d’abord l’app à l’écran d’accueil.' : 'Nouvelles dates, rappels, parties et résultats.'}</small></div>
+        ${Push.perm() === 'granted' && ls.get('pelland.push', 0) ? '<button class="btn ghost small" data-pushoff type="button">Désactiver</button>' : Push.perm() === 'denied' ? '' : Push.needsInstall() ? '<button class="btn small" data-onbact="ecran" type="button">Comment</button>' : '<button class="btn small" data-pushon type="button">Activer</button>'}</div>
       <div class="row acct-actions"><button class="btn ghost small" data-viral type="button">Créer un groupe</button><button class="btn ghost small" id="chgPw" type="button">Changer mon mot de passe</button><button class="btn ghost small" id="logout2" type="button">Se déconnecter</button></div>`;
   }
   async function openGroup(x) {
@@ -1134,7 +1138,9 @@
         <div class="row"><button class="btn small" id="rmGo" type="button" ${c && c.ps.some(p => p.phone) ? '' : 'disabled'}>Envoyer le texto${c ? ` (${c.ps.filter(p => p.phone).length})` : ''}</button><button class="btn ghost small" data-close type="button">Annuler</button></div>`;
       sh.querySelectorAll('[data-rc]').forEach(bt => bt.onclick = () => draw(sh, +bt.dataset.rc));
       sh.querySelector('[data-close]').onclick = closeSheet;
-      const go = sh.querySelector('#rmGo'); if (go) go.onclick = () => { if (!c) return; const txt = sh.querySelector('#rmMsg').value; closeSheet(); openSms(c.ps.filter(p => p.phone).map(p => p.phone), txt); };
+      const go = sh.querySelector('#rmGo'); if (go) go.onclick = () => { if (!c) return; const txt = sh.querySelector('#rmMsg').value; closeSheet();
+        Push.notify({ title: 'Rappel – ' + groupName(), body: txt.replace(/^Rappel – [^:]*: /, '').slice(0, 200), url: './?offre=' + o.id, tag: 'rappel-' + o.id, playerIds: c.ps.map(p => p.id) });
+        openSms(c.ps.filter(p => p.phone).map(p => p.phone), txt); };
     };
     openSheet('', sh => draw(sh, choices.length === 1 ? 0 : null));
   }
@@ -1942,7 +1948,8 @@
           if (!dates.length) return toast('Ajoutez au moins une date.');
           if (!f.deadline) return toast('Choisissez la date butoir.');
           const o = { id: Date.now().toString(36), course: f.course, place: f.place || '', dates, deadline: new Date(f.deadline + 'T23:59:59').getTime(), by: ls.get('pelland.me', '') || '', groupId: Store.gid, createdAt: Date.now() };
-          try { await Store.saveOffre(o); S.offres = [o].concat(S.offres || []); S.newOffre = null; markStep('offre'); render(); offreSms(o); }
+          try { await Store.saveOffre(o); S.offres = [o].concat(S.offres || []); S.newOffre = null; markStep('offre'); render(); offreSms(o);
+            Push.notify({ title: 'Nouvelles dates – ' + o.course.replace(/^Club de golf /i, ''), body: `Indiquez vos disponibilités avant le ${fmtDay(o.deadline)}.`, url: './?offre=' + o.id, tag: 'offre-' + o.id }); }
           catch (e) { toast('Enregistrement impossible : ' + e.message); }
         };
       }
@@ -2228,6 +2235,8 @@
           // Responsable choisi = un autre joueur que moi : la partie lui est confiée (il la prend en l'ouvrant)
           const mi = myIdx(g); if (Store.uid && g.responsable !== mi) { g.ownerUid = ''; await Store.saveGame(g); }
           S.draft = null; openGame(id); toast(g.ownerUid ? 'Partie créée.' : `Partie créée : ${g.players[g.responsable].name} est le responsable.`);
+          const inGame = new Set(g.players.map(p => L.norm(p.name)));
+          Push.notify({ title: 'La partie commence', body: `${g.course.name} : suivez-la en direct, trou par trou.`, url: './?partie=' + id, tag: 'partie-' + id, playerIds: (S.players || []).filter(p => inGame.has(L.norm(p.name))).map(p => p.id) });
         }
         catch (e) { toast('Création impossible : ' + e.message); }
       };
@@ -2288,7 +2297,11 @@
       const inv = v.querySelector('[data-invite]'); if (inv) inv.onclick = () => invitePlayers(S.game);
       const fin = v.querySelector('[data-finish]'); if (fin) fin.onclick = async () => {
         const ng = JSON.parse(JSON.stringify(S.game)); ng.status = 'terminée'; ng.finishedAt = Date.now();
-        try { await Store.saveGame(ng); S.game = ng; toast('Partie terminée : elle est dans Parties jouées.'); ls.set('pelland.lastGame', null); go('home'); } catch (e) { toast('Impossible de terminer : ' + e.message); }
+        try {
+          await Store.saveGame(ng); S.game = ng; toast('Partie terminée : elle est dans Parties jouées.'); ls.set('pelland.lastGame', null);
+          Push.notify({ title: 'Résultats de la partie', body: `${ng.course.name} : voyez les points et qui doit quoi.`, url: './?partie=' + ng.id, tag: 'partie-' + ng.id });
+          go('home');
+        } catch (e) { toast('Impossible de terminer : ' + e.message); }
       };
       const reo = v.querySelector('[data-reopen]'); if (reo) reo.onclick = async () => { const ng = JSON.parse(JSON.stringify(S.game)); ng.status = 'en cours'; delete ng.finishedAt; S.game = ng; render(); await Store.saveGame(ng); };
       const ask = v.querySelector('[data-askdelthis]'); if (ask) ask.onclick = () => { S.confirmDelGame = S.game.id; render(); };
@@ -2924,7 +2937,8 @@
         const course = S.courses.find(x => x.id === d.courseId) || S.courses[0];
         const c = { ...(d.id ? S.comp : {}), id: d.id || Date.now().toString(36), groupId: Store.gid, kind: 'membre-membre', format: d.format || 'match', name: d.name.trim(), date: d.date, courseId: course.id,
           course: JSON.parse(JSON.stringify(course)), tee: d.tee, allowance: d.allowance, flights: d.flights, teams, teamSize: d.format === 'texas' ? (d.teamSize || 4) : 2, minDrives: d.format === 'texas' ? (d.minDrives == null ? 3 : d.minDrives) : null, by: ls.get('pelland.me', '') || '', createdAt: (S.comp && d.id && S.comp.createdAt) || Date.now() };
-        try { await Store.saveComp(c); S.compList = null; openComp(c.id); toast(d.id ? 'Compétition modifiée.' : 'Compétition créée.'); } catch (e) { toast('Enregistrement impossible : ' + e.message); }
+        try { await Store.saveComp(c); S.compList = null; openComp(c.id); toast(d.id ? 'Compétition modifiée.' : 'Compétition créée.');
+          if (!d.id) Push.notify({ title: 'Nouvelle compétition : ' + c.name, body: `${c.course.name}, ${new Date(c.date + 'T12:00').toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' })}. Suivez le classement en direct.`, url: './', tag: 'comp-' + c.id }); } catch (e) { toast('Enregistrement impossible : ' + e.message); }
       };
     },
     comp(v) {
@@ -2969,6 +2983,71 @@
   });
 
   const SMS_API = 'https://fanion.ai/api/sms';
+  // =====================================================================
+  // Notifications de l'app (Web Push) : gratuites, envoyées par le serveur Fanion aux membres abonnés du groupe
+  // =====================================================================
+  const PUSH_API = 'https://fanion.ai/api/push', PUSH_KEY = 'BMVvjqKa_we_-S3JsTaehS0yuyqp0qQy4fVCXY7Zmk331-qJS54o--bBg4XvThPOPl5ec1fnL1HDj8GL5IwiuR4';
+  const Push = {
+    supported() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; },
+    // iPhone : les notifications n'existent que pour l'app ajoutée à l'écran d'accueil
+    needsInstall() { return /iPhone|iPad|iPod/.test(navigator.userAgent) && !(navigator.standalone || (matchMedia && matchMedia('(display-mode: standalone)').matches)); },
+    perm() { return 'Notification' in window ? Notification.permission : 'unsupported'; },
+    async sub() { try { const r = await navigator.serviceWorker.ready; return await r.pushManager.getSubscription(); } catch (e) { return null; } },
+    key() { const s = PUSH_KEY.replace(/-/g, '+').replace(/_/g, '/'); const b = atob(s + '==='.slice((s.length + 3) % 4)); return Uint8Array.from(b, c => c.charCodeAt(0)); },
+    // Abonne ce téléphone ; un document par groupe du compte (subs/<uid>_<groupe>)
+    async enable() {
+      if (!this.supported()) throw new Error(this.needsInstall() ? 'Ajoutez d’abord l’app à votre écran d’accueil.' : 'Ce navigateur ne reçoit pas les notifications.');
+      const p = await Notification.requestPermission();
+      if (p !== 'granted') throw new Error('Notifications refusées. Vous pouvez les permettre dans les réglages du téléphone.');
+      const reg = await navigator.serviceWorker.ready;
+      const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: this.key() });
+      await this.save(sub);
+      ls.set('pelland.push', 1);
+    },
+    async save(sub) {
+      if (Store.mode !== 'firebase' || !Store.uid) return;
+      let mine = []; try { mine = await Store.myPlayers(); } catch (e) { }
+      if (!mine.length && meId()) mine = [{ id: meId(), groupId: Store.gid }];
+      const js = JSON.stringify(sub);
+      for (const p of mine) { const g = p.groupId || 'pelland'; try { await Store.db.collection('subs').doc(Store.uid + '_' + g).set({ uid: Store.uid, groupId: g, playerId: p.id, sub: js, at: Date.now() }); } catch (e) { console.warn('abonnement', g, e.message); } }
+    },
+    async disable() {
+      const sub = await this.sub(); if (sub) { try { await sub.unsubscribe(); } catch (e) { } }
+      ls.set('pelland.push', 0);
+      if (Store.mode !== 'firebase' || !Store.uid) return;
+      let mine = []; try { mine = await Store.myPlayers(); } catch (e) { }
+      const gs = new Set(mine.map(p => p.groupId || 'pelland').concat([Store.gid]));
+      for (const g of gs) { try { await Store.db.collection('subs').doc(Store.uid + '_' + g).delete(); } catch (e) { } }
+    },
+    // Garde l'abonnement à jour (nouveau groupe, abonnement renouvelé par le navigateur)
+    async refresh() { if (this.supported() && this.perm() === 'granted' && ls.get('pelland.push', 0)) { const s = await this.sub(); if (s) await this.save(s); } },
+    // Avertit les membres du groupe (sauf soi) ; playerIds = seulement ces joueurs
+    async notify(data) {
+      if (Store.mode !== 'firebase' || !Store.uid) return;
+      try { const tok = await firebase.auth().currentUser.getIdToken(); await fetch(PUSH_API, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ groupId: Store.gid, ...data }) }); } catch (e) { console.warn('notification', e.message); }
+    }
+  };
+  function pushCard() {
+    if (Store.needLogin || Store.mode !== 'firebase') return '';
+    if ((ls.get('pelland.push.later', 0) || 0) > Date.now()) return '';
+    const on = Push.perm() === 'granted' && ls.get('pelland.push', 0);
+    if (on || Push.perm() === 'denied') return '';
+    const install = Push.needsInstall();
+    if (!install && !Push.supported()) return '';
+    return `<section class="card push-card"><span class="push-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 3a6 6 0 0 0-6 6v3.6L4.3 15.4A1 1 0 0 0 5.2 17h13.6a1 1 0 0 0 .9-1.6L18 12.6V9a6 6 0 0 0-6-6z" fill="currentColor"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0" fill="currentColor"/></svg></span>
+      <div><h3>Recevez les nouvelles du groupe</h3><p>Une alerte sur votre téléphone pour les nouvelles dates, les rappels, le début des parties et les résultats. Gratuit.</p>
+      <div class="row">${install ? '<button class="btn small" data-onbact="ecran" type="button">Ajouter l’app à l’écran d’accueil</button>' : '<button class="btn small" data-pushon type="button">Activer les notifications</button>'}<button class="btn ghost small" data-pushlater type="button">Plus tard</button></div>
+      ${install ? '<p class="note">Sur iPhone, les notifications fonctionnent une fois l’app ajoutée à l’écran d’accueil. Ouvrez-la ensuite par son icône.</p>' : ''}</div></section>`;
+  }
+  document.addEventListener('click', async e => {
+    const t = e.target.closest && e.target.closest('[data-pushon],[data-pushlater],[data-pushoff]'); if (!t) return;
+    e.preventDefault();
+    if (t.hasAttribute('data-pushlater')) { ls.set('pelland.push.later', Date.now() + 14 * 864e5); return render(); }
+    if (t.hasAttribute('data-pushoff')) { await Push.disable(); toast('Notifications désactivées.'); return render(); }
+    t.disabled = true;
+    try { await Push.enable(); toast('Notifications activées.'); } catch (x) { toast(x.message); }
+    render();
+  });
   // ---------------- Le Caddie : l'agent qui répond aux questions (API Claude, par le serveur Fanion) ----------------
   const CADDIE_API = 'https://fanion.ai/api/caddie';
   const SCREENS = { home: 'Accueil', players: 'Inviter des joueurs', quatuors: 'Parties à préparer', setup: 'Créer une partie', jeux: 'Banque de jeux', courses: 'Banque de terrains', live: 'Parties en cours', history: 'Parties jouées', comps: 'Banque de compétitions', compte: 'Mon compte' };
@@ -3249,6 +3328,7 @@
     try { S.groups = await Store.listGroups(); } catch (e) { S.groups = []; }
     // Groupes créés avant le compteur : on l'initialise une fois avec le nombre de joueurs
     if (Store.mode === 'firebase' && curGroup().nPlayers == null && S.players.length && canOrganize()) { try { await Store.db.collection('players').doc('_groupe_' + Store.gid).set({ nPlayers: S.players.length }, { merge: true }); S.groups = await Store.listGroups(); } catch (e) { console.warn('compteur', e.message); } }
+    Push.refresh().catch(() => { });
     Store.myPlayers().then(l => { S.myPlayers = l; if (S.view === 'home' && l.length > 1) render(); }).catch(() => { });
     const params = new URLSearchParams(location.search);
     const code = (params.get('partie') || params.get('code') || '').toUpperCase();

@@ -179,6 +179,20 @@ service cloud.firestore {
       allow delete: if dansGroupe(resource.data.groupId);
     }
 
+    // ---------- Abonnements aux notifications : subs/<uid>_<groupe> ----------
+    // Chacun abonne son propre téléphone, seulement pour les groupes où il est joueur ;
+    // les membres d'un groupe peuvent lire les abonnements du groupe (pour envoyer une notification par le serveur Fanion).
+    match /subs/{id} {
+      allow get: if membre() && resource.data.uid == request.auth.uid;
+      allow list: if dansGroupe(resource.data.groupId);
+      allow create, update: if membre() && id == request.auth.uid + '_' + request.resource.data.groupId
+        && request.resource.data.uid == request.auth.uid
+        && groupeDe(joueur(request.resource.data.playerId)) == request.resource.data.groupId
+        && (bonNumero(request.resource.data.playerId)
+            || (dansGroupe(request.resource.data.groupId) && lien().playerId == request.resource.data.playerId));
+      allow delete: if membre() && resource.data.uid == request.auth.uid;
+    }
+
     // ---------- Présences à une partie ----------
     match /presence/{gameId} {
       allow read, write: if dansGroupe(get(/databases/$(database)/documents/games/$(gameId)).data.get('groupId', 'pelland'));

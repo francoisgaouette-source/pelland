@@ -2,6 +2,7 @@
 // Secrets à entrer dans Cloudflare (Workers & Pages → pelland → Settings → Variables and secrets) :
 //   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM (ex. +15145550000)
 //   ANTHROPIC_API_KEY (le Caddie : l'agent qui répond aux questions dans l'app)
+//   VAPID_PRIVATE_JWK (notifications de l'app : clé privée VAPID, format JWK)
 // Sécurité : seuls les membres connectés (jeton Firebase) peuvent texter, et seulement les numéros
 // de leur propre groupe (collection Firestore « phones », champ groupId). Maximum 30 numéros par envoi.
 
@@ -58,6 +59,69 @@ async function sendSms(env, to, body) {
     body: new URLSearchParams({ To: '+1' + to, From: env.TWILIO_FROM, Body: body })
   });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.message || 'Twilio ' + r.status); }
+}
+
+// --- Notifications Web Push (RFC 8291 aes128gcm + VAPID RFC 8292), en WebCrypto ---
+const wpEnc = new TextEncoder();
+const wpB64u = buf => { let s = ''; const b = new Uint8Array(buf); for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+const wpUnb64u = str => { const s = str.replace(/-/g, '+').replace(/_/g, '/'); const p = s + '==='.slice((s.length + 3) % 4); const bin = atob(p); const out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; };
+const wpCat = (...a) => { const n = a.reduce((x, y) => x + y.length, 0), o = new Uint8Array(n); let k = 0; for (const x of a) { o.set(x, k); k += x.length; } return o; };
+async function wpHkdf(salt, ikm, info, len) {
+  const key = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
+  return new Uint8Array(await crypto.subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt, info }, key, len * 8));
+}
+// Chiffre le message pour un abonnement { endpoint, keys: { p256dh, auth } }
+async function encryptPush(sub, payload) {
+  const uaPub = wpUnb64u(sub.keys.p256dh), authSecret = wpUnb64u(sub.keys.auth);
+  const as = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const asPub = new Uint8Array(await crypto.subtle.exportKey('raw', as.publicKey));
+  const uaKey = await crypto.subtle.importKey('raw', uaPub, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const shared = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: uaKey }, as.privateKey, 256));
+  const ikm = await wpHkdf(authSecret, shared, wpCat(wpEnc.encode('WebPush: info\0'), uaPub, asPub), 32);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const cek = await wpHkdf(salt, ikm, wpEnc.encode('Content-Encoding: aes128gcm\0'), 16);
+  const nonce = await wpHkdf(salt, ikm, wpEnc.encode('Content-Encoding: nonce\0'), 12);
+  const plain = wpCat(wpEnc.encode(payload), new Uint8Array([2]));   // délimiteur du dernier enregistrement
+  const key = await crypto.subtle.importKey('raw', cek, 'AES-GCM', false, ['encrypt']);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, key, plain));
+  const rs = new Uint8Array(4); new DataView(rs.buffer).setUint32(0, 4096);
+  return wpCat(salt, rs, new Uint8Array([asPub.length]), asPub, ct);
+}
+// Jeton VAPID (ES256) pour le service de notifications de l'abonné
+async function vapidAuth(endpoint, jwk, subject, publicKey) {
+  const aud = new URL(endpoint).origin;
+  const head = wpB64u(wpEnc.encode(JSON.stringify({ typ: 'JWT', alg: 'ES256' })));
+  const body = wpB64u(wpEnc.encode(JSON.stringify({ aud, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: subject })));
+  const key = await crypto.subtle.importKey('jwk', { ...jwk, ext: true }, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, wpEnc.encode(head + '.' + body));
+  return `vapid t=${head}.${body}.${wpB64u(sig)}, k=${publicKey}`;
+}
+async function sendPush(env, sub, data) {
+  const jwk = JSON.parse(env.VAPID_PRIVATE_JWK);
+  const pub = wpB64u(wpCat(new Uint8Array([4]), wpUnb64u(jwk.x), wpUnb64u(jwk.y)));
+  const body = await encryptPush(sub, JSON.stringify(data));
+  const r = await fetch(sub.endpoint, { method: 'POST', headers: {
+    Authorization: await vapidAuth(sub.endpoint, jwk, 'mailto:bonjour@fanion.ai', pub),
+    'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: '86400', Urgency: 'normal'
+  }, body });
+  return r.status;
+}
+
+// Envoie une notification aux membres d'un groupe abonnés (subs/<uid>_<groupe>), sauf à l'expéditeur
+async function pushGroup(env, tok, uid, data) {
+  const a = await fetch(`${FS}/auth/${uid}`, { headers: { Authorization: 'Bearer ' + tok } });
+  if (!a.ok) throw new Error('membre sans groupe');
+  const g = (((await a.json()).fields || {}).groupId || {}).stringValue;
+  if (!g || g !== data.groupId) throw new Error('groupe non autorisé');
+  const r = await fetch(`${FS}:runQuery`, { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'subs' }], where: { fieldFilter: { field: { fieldPath: 'groupId' }, op: 'EQUAL', value: { stringValue: g } } }, limit: 200 } }) });
+  if (!r.ok) throw new Error('lecture des abonnements refusée');
+  const only = Array.isArray(data.playerIds) && data.playerIds.length ? new Set(data.playerIds) : null;
+  const subs = (await r.json()).map(x => (x.document || {}).fields).filter(Boolean).map(f => ({ uid: (f.uid || {}).stringValue, playerId: (f.playerId || {}).stringValue, sub: (() => { try { return JSON.parse((f.sub || {}).stringValue); } catch (e) { return null; } })() }))
+    .filter(x => x.sub && x.sub.endpoint && x.uid !== uid && (!only || only.has(x.playerId)));
+  const msg = { title: String(data.title || 'Le 19e').slice(0, 80), body: String(data.body || '').slice(0, 240), url: String(data.url || './').slice(0, 300), tag: data.tag ? String(data.tag).slice(0, 60) : undefined };
+  const res = await Promise.all(subs.map(x => sendPush(env, x.sub, msg).catch(() => 0)));
+  return { sent: res.filter(s => s >= 200 && s < 300).length, total: subs.length, gone: res.filter(s => s === 404 || s === 410).length };
 }
 
 // --- Le Caddie : répond aux questions des membres sur l'app et les jeux ---
@@ -121,6 +185,16 @@ export default {
     const url = new URL(req.url), origin = req.headers.get('Origin') || '';
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req);
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(origin) });
+    if (url.pathname === '/api/push/status') return json({ ready: !!env.VAPID_PRIVATE_JWK }, 200, origin);
+    if (url.pathname === '/api/push' && req.method === 'POST') {
+      if (!env.VAPID_PRIVATE_JWK) return json({ error: 'Notifications pas encore configurées.' }, 503, origin);
+      const tk = (req.headers.get('Authorization') || '').replace(/^Bearer /, '');
+      let who; try { who = await verifyToken(tk); } catch (e) { return json({ error: 'Connexion requise.' }, 401, origin); }
+      const uid = who.user_id || who.sub;
+      if (tooMany('push:' + uid)) return json({ error: 'Trop de notifications d’un coup.' }, 429, origin);
+      let data; try { data = await req.json(); } catch (e) { return json({ error: 'requête invalide' }, 400, origin); }
+      try { return json(await pushGroup(env, tk, uid, data), 200, origin); } catch (e) { return json({ error: e.message }, 403, origin); }
+    }
     if (url.pathname === '/api/caddie/status') return json({ ready: !!env.ANTHROPIC_API_KEY }, 200, origin);
     if (url.pathname === '/api/caddie' && req.method === 'POST') {
       if (!env.ANTHROPIC_API_KEY) return json({ error: 'Le Caddie n’est pas encore configuré.' }, 503, origin);
