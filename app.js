@@ -741,7 +741,8 @@
         <button class="tile" data-go="quatuors"><span class="pin step-n">2</span><div><strong>Parties à préparer</strong><span>Offrez des dates ; les joueurs répondent et l’app forme les quatuors</span></div></button>
         <button class="tile" data-go="setup"><span class="pin step-n">3</span><div><strong>Créer une partie</strong><span>Terrain, joueurs, jeu et montants</span></div></button>
         <button class="tile" data-go="live"><span class="pin step-n">4</span><div><strong>Parties en cours</strong><span>Suivez les parties en direct</span></div></button>
-        <button class="tile" data-go="history"><span class="pin step-n">5</span><div><strong>Parties jouées</strong><span>Les résultats et qui doit quoi</span></div></button>
+        <button class="tile" data-go="comps" data-clive="1"><span class="pin step-n">5</span><div><strong>Compétitions en cours</strong><span>Classements en direct des compétitions du groupe</span></div></button>
+        <button class="tile" data-go="history"><span class="pin step-n">6</span><div><strong>Parties jouées</strong><span>Les résultats et qui doit quoi</span></div></button>
       </div>`)}
       <h3 class="home-h">Les banques</h3>
       ${lockTiles(`<div class="tiles banks">
@@ -2328,7 +2329,7 @@
     }
   };
   function commonNav(v) {
-    v.querySelectorAll('[data-go]').forEach(b => b.onclick = () => go(b.dataset.go, b.dataset.go === 'setup' ? { draft: null } : b.dataset.go === 'players' ? { pMode: b.dataset.pmode || 'banque' } : b.dataset.new ? { editCourse: null } : {}));
+    v.querySelectorAll('[data-go]').forEach(b => b.onclick = () => go(b.dataset.go, b.dataset.go === 'setup' ? { draft: null } : b.dataset.go === 'players' ? { pMode: b.dataset.pmode || 'banque' } : b.dataset.go === 'comps' ? { compLive: !!b.dataset.clive } : b.dataset.new ? { editCourse: null } : {}));
     v.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openGame(b.dataset.open));
   }
 
@@ -2810,9 +2811,19 @@
       rules: ['Plusieurs rondes de matchs : quatre balles, deux balles alternées, puis simples.', 'Chaque match gagné rapporte un point à son camp.'], score: ['Le premier camp à la majorité des points gagne la coupe. Bientôt dans l’app.'] },
   ];
   function vComps() {
-    $('#barTitle').textContent = 'Compétitions';
+    $('#barTitle').textContent = S.compLive ? 'Compétitions en cours' : 'Compétitions';
     if (S.compList == null) { Store.listComps().then(l => { S.compList = l; if (S.view === 'comps') render(); }); return '<p class="note">Chargement…</p>'; }
     const fmtName = f => (COMP_INFO.find(x => x.f === (f || 'match')) || {}).name || '';
+    const dayTxt = c => c.date ? new Date(c.date + 'T12:00').toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' }) : '';
+    if (S.compLive) {
+      // En cours : aujourd'hui et à venir (et la veille, pour finir d'entrer les scores)
+      const from = new Date(Date.now() - 864e5).toISOString().slice(0, 10), today = new Date().toISOString().slice(0, 10);
+      const l = S.compList.filter(c => (c.date || '') >= from).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+      return `<p class="note">Touchez une compétition pour voir son classement en direct et entrer les scores de votre équipe.</p>
+        <div class="list">${l.map(c => `<button class="item" data-comp="${esc(c.id)}"><b>${esc(c.name)}${c.date === today ? ' <span class="live-tag">Aujourd’hui</span>' : ''}</b><span>${esc(dayTxt(c))} · ${esc(fmtName(c.format))} · ${esc(c.course.name)} · ${(c.teams || []).length} équipes</span></button>`).join('')
+          || `<p class="note">Aucune compétition en cours.</p>`}</div>
+        <button class="btn ghost" data-go="comps" type="button">Voir la Banque de compétitions</button>`;
+    }
     return `<p class="note">Les formats de compétition, leurs règles et leur pointage. Tout se compte au net, avec le handicap de chacun.</p>
       <div class="jeux">${COMP_INFO.map(x => `<details class="card jeu"><summary><b>${esc(x.name)}${x.ready ? '' : ' <span class="soon-tag">Bientôt</span>'}</b><span>${esc(x.who)}</span></summary>
         <h3>Règles</h3><ul>${x.rules.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
@@ -2901,6 +2912,7 @@
   Object.assign(bind, {
     comps(v) {
       v.querySelectorAll('[data-comp]').forEach(b => b.onclick = () => openComp(b.dataset.comp));
+      v.querySelectorAll('[data-go="comps"]').forEach(b => b.onclick = () => go('comps', { compLive: false }));
       v.querySelectorAll('[data-compnew]').forEach(n => n.onclick = () => {
         const d = newCompDraft(); d.format = n.dataset.compnew || 'match'; d.allowance = d.format === 'match' ? 90 : d.format === 'texas' ? 100 : 85;
         if (d.format === 'texas') { d.teamSize = 4; d.minDrives = 3; d.flights = 1; d.name = 'Texas scramble ' + new Date().getFullYear(); d.teams.forEach(t => { while (t.p.length < 4) t.p.push({ name: '', index: '' }); }); }
