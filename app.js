@@ -748,7 +748,7 @@
         <button class="tile" data-go="players"><span class="pin" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="9" cy="8" r="3.2" fill="currentColor"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" fill="currentColor"/><circle cx="17" cy="9" r="2.4" fill="currentColor" opacity=".7"/><path d="M15.5 13.6c3 .2 5.5 2.1 5.5 5.4h-4.3" fill="currentColor" opacity=".7"/></svg></span><div><strong>Banque de joueurs</strong><span>Tous les joueurs du groupe : ajouter, renommer, retirer, importer d’Excel</span></div></button>
         <button class="tile" data-go="courses"><span class="pin">⛳</span><div><strong>Banque de terrains</strong><span>Consultez les terrains ou ajoutez-en un</span></div></button>
         <button class="tile" data-go="jeux"><span class="pin" style="font-family:var(--display);font-weight:700">$</span><div><strong>Banque de jeux</strong><span>Les règles et l’argent de chaque jeu ; ajoutez les vôtres</span></div></button>
-        <button class="tile" data-go="comps"><span class="pin"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M7 4h10v3a5 5 0 0 1-10 0V4z" fill="currentColor"/><path d="M7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M12 12v4M8 20h8l-1-4H9z" fill="currentColor" stroke="currentColor" stroke-width="1.2"/></svg></span><div><strong>Banque de compétitions</strong><span>Membre-membre : équipes de 2, flites et classement en direct</span></div></button>
+        <button class="tile" data-go="comps"><span class="pin"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M7 4h10v3a5 5 0 0 1-10 0V4z" fill="currentColor"/><path d="M7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M12 12v4M8 20h8l-1-4H9z" fill="currentColor" stroke="currentColor" stroke-width="1.2"/></svg></span><div><strong>Banque de compétitions</strong><span>Membre-membre : équipes de 2, classes et classement en direct</span></div></button>
       </div>`)}
       ${pushCard()}
       ${referralCard()}
@@ -2694,9 +2694,9 @@
   }
   // Textos : par le service Fanion (Twilio, via fanion.ai) quand il est en place ; sinon, Messages s'ouvre sur le téléphone
   // =====================================================================
-  // Compétitions : membre-membre (équipes de 2, meilleure balle nette en coups, flites, classement en direct)
+  // Compétitions : membre-membre (équipes de 2, meilleure balle nette en coups, classes, classement en direct)
   // =====================================================================
-  const FLITES = ['A', 'B', 'C', 'D'];
+  const CLASSES_LETTRES = ['A', 'B', 'C', 'D'];
   const toParTxt = x => x === 0 ? 'Par' : (x > 0 ? '+' : '−') + Math.abs(x);
   const parseIdx = v => { const n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isNaN(n) ? null : n; };
   function compTee(c) { return (c.course.tees || []).find(t => t.name === c.tee) || (c.course.tees || [])[0]; }
@@ -2741,11 +2741,11 @@
     }
     return { t, ps, toPar, thru, net, pts, holes, ph: ps.reduce((a, p) => a + p.ph, 0) };
   }
-  // Flites : les équipes sont classées par handicap d'équipe (somme des handicaps de jeu), puis réparties également
+  // Classes : les équipes sont classées par handicap d'équipe (somme des handicaps de jeu), puis réparties également
   function compFlights(c) {
     const res = (c.teams || []).map(t => compTeamResult(c, t)).sort((a, b) => a.ph - b.ph);
     const n = Math.max(1, Math.min(c.flights || 1, res.length || 1)), out = [];
-    let k = 0; for (let f = 0; f < n; f++) { const size = Math.floor(res.length / n) + (f < res.length % n ? 1 : 0); out.push({ name: n > 1 ? 'Flite ' + FLITES[f] : 'Classement', teams: res.slice(k, k + size) }); k += size; }
+    let k = 0; for (let f = 0; f < n; f++) { const size = Math.floor(res.length / n) + (f < res.length % n ? 1 : 0); out.push({ name: n > 1 ? 'Classe ' + CLASSES_LETTRES[f] : 'Classement', teams: res.slice(k, k + size) }); k += size; }
     out.forEach(fl => {
       const key = r => c.format === 'stableford' ? -r.pts : r.toPar;
       fl.teams.sort((a, b) => (a.thru ? 0 : 1) - (b.thru ? 0 : 1) || key(a) - key(b) || b.thru - a.thru);
@@ -2790,20 +2790,20 @@
 
   // Formats de compétition (comme la banque de jeux) ; ready = on peut la créer dans l'app
   const COMP_INFO = [
-    { f: 'match', ready: true, name: 'Membre-membre en match play', who: 'Équipes de 2, réparties en flites selon le handicap d’équipe',
-      rules: ['Dans chaque flite, chaque équipe affronte toutes les autres (ronde).', 'Chaque match se joue en meilleure balle nette sur 18 trous : l’équipe au meilleur score net gagne le trou.', 'Les coups se donnent à partir du plus bas handicap de jeu des quatre joueurs du match ; allocation recommandée : 90 %.'],
-      score: ['Match gagné : 1 point ; nul : ½ ; perdu : 0.', 'Égalité de points : on départage par les trous gagnés.', 'Le classement de chaque flite se met à jour en direct.'] },
-    { f: 'stableford', ready: true, name: 'Membre-membre Stableford', who: 'Équipes de 2, réparties en flites selon le handicap d’équipe',
+    { f: 'match', ready: true, name: 'Membre-membre en match play', who: 'Équipes de 2, réparties en classes selon le handicap d’équipe',
+      rules: ['Dans chaque classe, chaque équipe affronte toutes les autres (ronde).', 'Chaque match se joue en meilleure balle nette sur 18 trous : l’équipe au meilleur score net gagne le trou.', 'Les coups se donnent à partir du plus bas handicap de jeu des quatre joueurs du match ; allocation recommandée : 90 %.'],
+      score: ['Match gagné : 1 point ; nul : ½ ; perdu : 0.', 'Égalité de points : on départage par les trous gagnés.', 'Le classement de chaque classe se met à jour en direct.'] },
+    { f: 'stableford', ready: true, name: 'Membre-membre Stableford', who: 'Équipes de 2, réparties en classes selon le handicap d’équipe',
       rules: ['À chaque trou, le meilleur score net de l’équipe compte (meilleure balle).', 'Points : normale nette 2, oiselet net 3, aigle net 4, boguey net 1, double boguey ou pire 0.', 'Allocation recommandée : 85 % du handicap de parcours.'],
-      score: ['Le plus de points sur 18 trous gagne la flite.', 'Un mauvais trou ne coûte que 0 point : idéal pour les handicaps élevés.'] },
-    { f: 'coups', ready: true, name: 'Membre-membre en coups', who: 'Équipes de 2, réparties en flites selon le handicap d’équipe',
+      score: ['Le plus de points sur 18 trous gagne la classe.', 'Un mauvais trou ne coûte que 0 point : idéal pour les handicaps élevés.'] },
+    { f: 'coups', ready: true, name: 'Membre-membre en coups', who: 'Équipes de 2, réparties en classes selon le handicap d’équipe',
       rules: ['À chaque trou, le meilleur score net de l’équipe compte (meilleure balle).', 'On additionne les 18 trous ; le total se lit par rapport à la normale (−5, Par, +2).', 'Allocation recommandée : 85 % du handicap de parcours.'],
-      score: ['Le plus bas total net gagne la flite.'] },
-    { f: 'texas', ready: true, name: 'Texas scramble', who: 'Équipes de 4 (ou de 2 ou 3), avec ou sans flites',
+      score: ['Le plus bas total net gagne la classe.'] },
+    { f: 'texas', ready: true, name: 'Texas scramble', who: 'Équipes de 4 (ou de 2 ou 3), avec ou sans classes',
       rules: ['Les joueurs de l’équipe frappent tous ; on choisit la meilleure balle et tout le monde rejoue de là, jusqu’au trou.', 'Chaque joueur doit fournir un nombre minimum de coups de départ (souvent 3 ou 4 sur 18 trous).', 'Handicap d’équipe : 25 % du plus bas handicap de parcours, 20 % du 2e, 15 % du 3e, 10 % du 4e (2 joueurs : 35 % et 15 %).'],
       score: ['Un seul score par équipe et par trou ; le plus bas total net gagne.', 'L’app compte les départs de chaque joueur et signale ceux qui manquent.'] },
     { f: 'invite', ready: false, name: 'Membre-invité', who: 'Un membre et son invité, en équipe de 2',
-      rules: ['Comme le membre-membre, mais chaque équipe compte un invité de l’extérieur du club.', 'Souvent en match play ou en Stableford, avec flites.'], score: ['Bientôt dans l’app.'] },
+      rules: ['Comme le membre-membre, mais chaque équipe compte un invité de l’extérieur du club.', 'Souvent en match play ou en Stableford, avec classes.'], score: ['Bientôt dans l’app.'] },
     { f: 'scramble', ready: false, name: 'Scramble à 4', who: 'Équipes de 4',
       rules: ['Les 4 joueurs frappent ; l’équipe choisit la meilleure balle et tout le monde rejoue de là, jusqu’au trou.', 'Handicap d’équipe : un pourcentage des handicaps (souvent 25 %, 20 %, 15 %, 10 %).'], score: ['Le plus bas total net gagne. Bientôt dans l’app.'] },
     { f: 'ryder', ready: false, name: 'Coupe Ryder du groupe', who: 'Deux camps (Rouges contre Bleus)',
@@ -2836,15 +2836,15 @@
         <label>Date<input id="cmDate" type="date" value="${esc(d.date)}"></label>
         <label>Terrain<select id="cmCourse">${S.courses.map(x => `<option value="${esc(x.id)}" ${x.id === d.courseId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>
         <label>Tertre<select id="cmTee">${(course.tees || []).map(t => `<option ${t.name === d.tee ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></label>
-        <label>Format<select id="cmFmt"><option value="match" ${d.format !== 'coups' ? 'selected' : ''}>Match play : chaque équipe contre toutes les autres de sa flite</option><option value="coups" ${d.format === 'coups' ? 'selected' : ''}>Meilleure balle en coups : le plus bas total net</option><option value="stableford" ${d.format === 'stableford' ? 'selected' : ''}>Stableford : le plus de points (meilleure balle)</option><option value="texas" ${d.format === 'texas' ? 'selected' : ''}>Texas scramble : une balle par équipe, départs minimums</option></select></label>
+        <label>Format<select id="cmFmt"><option value="match" ${d.format !== 'coups' ? 'selected' : ''}>Match play : chaque équipe contre toutes les autres de sa classe</option><option value="coups" ${d.format === 'coups' ? 'selected' : ''}>Meilleure balle en coups : le plus bas total net</option><option value="stableford" ${d.format === 'stableford' ? 'selected' : ''}>Stableford : le plus de points (meilleure balle)</option><option value="texas" ${d.format === 'texas' ? 'selected' : ''}>Texas scramble : une balle par équipe, départs minimums</option></select></label>
         ${d.format === 'texas' ? `<div class="row"><label style="flex:1">Joueurs par équipe<select id="cmSize">${[2, 3, 4].map(n => `<option ${n === (d.teamSize || 4) ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
           <label style="flex:1">Départs minimums par joueur<select id="cmMinDr">${[0, 1, 2, 3, 4, 5, 6].map(n => `<option value="${n}" ${n === (d.minDrives == null ? 3 : d.minDrives) ? 'selected' : ''}>${n || 'Aucun'}</option>`).join('')}</select></label>
-          <label style="flex:1">Nombre de flites<select id="cmFl">${[1, 2, 3, 4].map(n => `<option ${n === d.flights ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div><input type="hidden" id="cmAllow" value="100">` : `
+          <label style="flex:1">Nombre de classes<select id="cmFl">${[1, 2, 3, 4].map(n => `<option ${n === d.flights ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div><input type="hidden" id="cmAllow" value="100">` : `
         <div class="row"><label style="flex:1">Allocation du handicap<select id="cmAllow">${[85, 90, 100].map(a => `<option value="${a}" ${a === d.allowance ? 'selected' : ''}>${a} %${a === (d.format === 'match' ? 90 : 85) ? ' (recommandé)' : ''}</option>`).join('')}</select></label>
-        <label style="flex:1">Nombre de flites<select id="cmFl">${[1, 2, 3, 4].map(n => `<option ${n === d.flights ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div>`}
+        <label style="flex:1">Nombre de classes<select id="cmFl">${[1, 2, 3, 4].map(n => `<option ${n === d.flights ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div>`}
         <p class="note">${d.format === 'texas'
           ? `Texas scramble : une seule balle par équipe ; chaque joueur fournit au moins ${d.minDrives == null ? 3 : d.minDrives} départ(s). Handicap d’équipe : 25-20-15-10 % des handicaps de parcours (2 joueurs : 35-15 %), donné trou par trou selon la difficulté.`
-          : `${d.format === 'coups' ? 'Meilleure balle nette en coups : chaque joueur reçoit' : d.format === 'stableford' ? 'Stableford, meilleure balle nette (normale nette 2 points, oiselet 3, boguey 1) : chaque joueur reçoit' : 'Match play, meilleure balle nette : match gagné 1 point, nul ½. Chaque joueur reçoit'} ${d.allowance} % de son handicap de parcours${d.format === 'match' ? ', et les coups se donnent à partir du plus bas des quatre joueurs du match' : ''}.`} Les équipes sont réparties dans les flites selon leur handicap d’équipe.</p></section>
+          : `${d.format === 'coups' ? 'Meilleure balle nette en coups : chaque joueur reçoit' : d.format === 'stableford' ? 'Stableford, meilleure balle nette (normale nette 2 points, oiselet 3, boguey 1) : chaque joueur reçoit' : 'Match play, meilleure balle nette : match gagné 1 point, nul ½. Chaque joueur reçoit'} ${d.allowance} % de son handicap de parcours${d.format === 'match' ? ', et les coups se donnent à partir du plus bas des quatre joueurs du match' : ''}.`} Les équipes sont réparties dans les classes selon leur handicap d’équipe.</p></section>
       <section class="card"><h2>Les équipes (${d.teams.length})</h2>
         <datalist id="cmNames">${(S.players || []).map(p => `<option value="${esc(p.name)}">`).join('')}</datalist>
         <div class="cm-teams">${d.teams.map((t, i) => `<div class="cm-team"><div class="cm-th"><b>Équipe ${i + 1}</b><button class="linkbtn" data-cmdel="${i}" type="button">Retirer</button></div>
@@ -2863,7 +2863,7 @@
         <table class="cm-lb"><thead><tr><th>Pos.</th><th>Équipe</th><th>G-N-P</th><th>Pts</th></tr></thead>
         <tbody>${st.T.map(x => `<tr class="${x.pos === 1 && x.pts ? 'lead' : ''}"><td>${x.pos}</td><td>${teamLabel(x.r.t)}<small>Hcp d’équipe ${x.r.ph} · trous ${x.diff > 0 ? '+' : x.diff < 0 ? '−' : ''}${Math.abs(x.diff)}</small></td><td>${x.w}-${x.h}-${x.l}</td><td class="tp">${fmtPt(x.pts)}</td></tr>`).join('')}</tbody></table>
         <h4 class="cm-mh">Les matchs</h4><ul class="cm-matches">${st.M.map(m => `<li class="${m.done ? 'done' : ''}"><span>${teamLabel(m.A)} <i>contre</i> ${teamLabel(m.B)}</span><b>${m.lead ? `${esc(m.lead.p.map(p => (p.name || '?').split(' ')[0]).join(' et '))} : ` : ''}${esc(m.txt)}</b></li>`).join('')}</ul></section>`; }).join('') +
-      '<p class="note">Chaque équipe affronte toutes les équipes de sa flite en match play, meilleure balle nette. Match gagné : 1 point ; nul : ½. G-N-P = gagnés, nuls, perdus. Égalité de points : on départage par les trous gagnés. Les coups se donnent à partir du plus bas handicap de jeu des quatre joueurs du match.</p>';
+      '<p class="note">Chaque équipe affronte toutes les équipes de sa classe en match play, meilleure balle nette. Match gagné : 1 point ; nul : ½. G-N-P = gagnés, nuls, perdus. Égalité de points : on départage par les trous gagnés. Les coups se donnent à partir du plus bas handicap de jeu des quatre joueurs du match.</p>';
     if (tab === 'class') return head + fl.map(f => `<section class="card cm-board"><h3>${esc(f.name)}</h3>
         <table class="cm-lb"><thead><tr><th>Pos.</th><th>Équipe</th><th>Trous</th><th>${c.format === 'stableford' ? 'Pts' : 'Total'}</th></tr></thead>
         <tbody>${f.teams.map(r => `<tr class="${r.pos === 1 ? 'lead' : ''}"><td>${r.pos ? (r.tie ? 'É' : '') + r.pos : '—'}</td><td>${teamLabel(r.t)}<small>Hcp d’équipe ${r.ph}${c.format === 'stableford' && r.thru ? ' · ' + toParTxt(r.toPar) : ''}${c.format === 'texas' ? (r.thru ? ' · brut ' + r.gross : '') + ' · départs : ' + drivesTxt(c, r) : ''}</small></td><td>${r.thru === 18 ? 'F' : r.thru || '—'}</td><td class="tp ${c.format !== 'stableford' && r.toPar < 0 ? 'under' : ''}">${!r.thru ? '—' : c.format === 'stableford' ? r.pts : toParTxt(r.toPar)}</td></tr>`).join('')}</tbody></table></section>`).join('') +
