@@ -706,7 +706,7 @@ textarea { font-family: inherit; line-height: 1.4; resize: vertical; }
 .cm-lb { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .cm-lb th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 4px 6px; border-bottom: 1px solid var(--line, #dde3df); }
 .cm-lb td { padding: 9px 6px; border-bottom: 1px solid #eef1ef; vertical-align: top; } .cm-lb td small { display: block; color: var(--muted); font-size: 12px; }
-.cm-lb td:first-child { font-weight: 700; width: 44px; } .cm-lb td:nth-child(3) { width: 52px; text-align: center; } .cm-lb th:nth-child(3) { text-align: center; }
+.cm-lb td:first-child { font-weight: 700; width: 44px; } .cm-lb td:nth-child(3) { width: 60px; text-align: center; white-space: nowrap; } .cm-lb th:nth-child(3) { text-align: center; }
 .cm-lb td.tp { font-weight: 800; font-size: 18px; text-align: right; width: 60px; } .cm-lb th:last-child { text-align: right; }
 .cm-lb tr.lead td { background: color-mix(in srgb, var(--flag) 18%, var(--surface)); }
 .under { color: #b3402b; }

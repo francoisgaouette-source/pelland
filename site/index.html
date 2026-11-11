@@ -7,7 +7,7 @@
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>Le 19e · le golf entre amis, organisé</title>
-<meta name="description" content="Le 19e organise votre groupe de golf : dates offertes, disponibilités, quatuors formés automatiquement, pointage en direct et calcul de qui doit quoi. Fait au Québec, en français.">
+<meta name="description" content="Le 19e organise votre groupe de golf : dates offertes, quatuors formés automatiquement, pointage en direct, compétitions membre-membre et Texas scramble, et qui doit quoi au 19e. Fait au Québec, en français.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&display=swap">
@@ -165,6 +165,58 @@ summary::after { content: '+'; position: absolute; right: 4px; top: 14px; font-f
 details[open] summary::after { content: '−'; }
 details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
 
+
+/* Écran d'accueil de l'app */
+.tour { background: var(--pine); color: #dfe7e1; }
+.tour .wrap { display: grid; grid-template-columns: 1fr 320px; gap: 64px; align-items: start; }
+.tour h2 { color: var(--white); }
+.tour .intro { color: #b9c8bf; }
+.tour h3 { font-family: var(--display); font-weight: 700; font-size: 15px; letter-spacing: .12em; text-transform: uppercase; color: var(--flag); margin: 0 0 14px; }
+.flow { list-style: none; margin: 0 0 40px; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; counter-reset: f; }
+.flow li { counter-increment: f; background: var(--pine-2); border: 1px solid #2f4a3b; border-radius: 14px; padding: 14px 16px 14px 62px; position: relative; font-size: 16px; line-height: 1.4; }
+.flow li::before { content: counter(f); position: absolute; left: 14px; top: 14px; width: 34px; height: 34px; border-radius: 50%; background: var(--flag); color: var(--pine); display: grid; place-items: center; font-family: var(--display); font-weight: 800; font-size: 20px; }
+.flow b, .banks b { display: block; color: var(--white); font-family: var(--display); font-size: 22px; font-weight: 700; line-height: 1.15; }
+.banks { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.banks li { border: 1.5px dashed #3d5a4a; border-radius: 14px; padding: 14px 16px; font-size: 16px; line-height: 1.4; }
+.tour .shot { border-color: #05100a; background: #05100a; }
+@media (max-width: 860px) { .tour .wrap { grid-template-columns: 1fr; gap: 40px; } .flow, .banks { grid-template-columns: 1fr; } }
+
+/* Compétitions */
+.comps .wrap { display: grid; grid-template-columns: 1fr 320px; gap: 64px; align-items: start; }
+.formats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 0 0 32px; }
+.fmt { background: var(--white); border: 1.5px solid var(--line); border-radius: 14px; padding: 20px 22px; }
+.fmt h3 { font-family: var(--display); font-weight: 700; font-size: 26px; margin: 0 0 4px; line-height: 1.1; }
+.fmt .who { font-size: 15px; font-weight: 600; color: var(--fairway); margin: 0 0 8px; }
+.fmt p { margin: 0; color: var(--pencil); font-size: 17px; }
+.fmt.soon { background: transparent; border-style: dashed; grid-column: 1 / -1; }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.checks li { padding-left: 32px; position: relative; }
+.checks li::before { content: ''; position: absolute; left: 2px; top: 6px; width: 18px; height: 18px; border-radius: 50%; background: var(--fairway); box-shadow: inset 0 0 0 5px var(--fairway), inset 0 0 0 9px #fff; }
+@media (max-width: 860px) { .comps .wrap { grid-template-columns: 1fr; gap: 40px; } .formats { grid-template-columns: 1fr; } }
+
+/* Rôles */
+.roles { background: var(--white); }
+.role-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 0 0 56px; }
+.role { border: 1.5px solid var(--line); border-radius: 14px; padding: 22px; }
+.role .pill { display: inline-block; font-weight: 700; font-size: 14px; letter-spacing: .03em; border-radius: 999px; padding: 4px 12px; margin-bottom: 10px; }
+.pill.own { background: var(--fairway); color: #fff; } .pill.org { background: #fdf3d6; color: #6b4e00; border: 1px solid #ecd28a; } .pill.par { background: #e3eaf3; color: #24405f; }
+.role p { margin: 0; color: var(--pencil); }
+.welcome-row { display: grid; grid-template-columns: 1fr 260px 260px; gap: 32px; align-items: center; }
+.welcome-row h3 { font-family: var(--display); font-weight: 800; font-size: 36px; line-height: 1.05; margin: 0 0 12px; }
+.welcome-row p { margin: 0 0 12px; color: var(--pencil); }
+.welcome-row .shot { position: static; border-width: 8px; }
+@media (max-width: 980px) { .role-cards { grid-template-columns: 1fr; } .welcome-row { grid-template-columns: 1fr 1fr; } .welcome-row > div:first-child { grid-column: 1 / -1; } }
+@media (max-width: 560px) { .welcome-row { gap: 14px; } .welcome-row .shot { border-width: 5px; border-radius: 18px; } }
+
+/* Et aussi */
+.extras { padding-top: 0; }
+.extra-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.extra { background: var(--white); border-radius: 14px; padding: 24px; border: 1.5px solid var(--line); }
+.extra h3 { font-family: var(--display); font-weight: 700; font-size: 26px; margin: 0 0 6px; }
+.extra p { margin: 0; color: var(--pencil); }
+.extra svg { color: var(--fairway); margin-bottom: 10px; }
+@media (max-width: 860px) { .extra-grid { grid-template-columns: 1fr; } }
+
 /* Pied */
 .foot { background: var(--pine); color: #b9c8bf; padding: 48px 0; font-size: 16px; }
 .foot .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 24px; }
@@ -183,6 +235,7 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
     <nav class="nav" aria-label="Sections">
       <a href="#comment">Comment ça marche</a>
       <a href="#jeux">Les jeux</a>
+      <a href="#competitions">Compétitions</a>
       <a href="regles/">Règles</a>
       <a href="#prix">Prix</a>
       <a href="#questions">Questions</a>
@@ -196,7 +249,7 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
   <div class="wrap">
     <div>
       <h1>Votre gang de golf, organisée.</h1>
-      <p class="lead">Le 19e offre les dates, recueille les disponibilités, forme les quatuors, compte les points pendant la partie et dit qui doit quoi à la fin. Fini les 40 textos du jeudi soir.</p>
+      <p class="lead">Le 19e offre les dates, forme les quatuors, compte les points pendant la partie et dit qui doit quoi à la fin. Il mène aussi vos compétitions, classement en direct. Fini les 40 textos du jeudi soir.</p>
       <div class="ctas">
         <a class="btn main" href="https://app.fanion.ai/">Essayer gratuitement</a>
         <a class="btn ghost" href="#prix">Voir les prix</a>
@@ -232,6 +285,33 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
   </div>
 </section>
 
+
+<section id="app" class="tour">
+  <div class="wrap">
+    <div>
+      <h2>Tout le groupe sur un écran</h2>
+      <p class="intro">L’accueil de l’app suit la saison dans l’ordre : six étapes, de l’invitation au 19e trou, et quatre banques qui gardent tout ce que le groupe a bâti.</p>
+      <h3>Les étapes</h3>
+      <ol class="flow">
+        <li><b>Inviter des joueurs</b>Nom et cellulaire : l’invitation part par texto.</li>
+        <li><b>Parties à préparer</b>Des dates offertes, les dispos de chacun, les quatuors.</li>
+        <li><b>Créer une partie</b>Terrain, joueurs, équipes, jeu et montants.</li>
+        <li><b>Parties en cours</b>Le pointage en direct, trou par trou.</li>
+        <li><b>Compétitions en cours</b>Le classement qui bouge à chaque score.</li>
+        <li><b>Parties jouées</b>Les résultats et qui doit quoi à qui.</li>
+      </ol>
+      <h3>Les banques</h3>
+      <ul class="banks">
+        <li><b>Joueurs</b>Ajouter, renommer, importer d’Excel. On voit qui a créé son compte.</li>
+        <li><b>Terrains</b>Les terrains du Québec, ou le vôtre à partir d’une photo de la carte.</li>
+        <li><b>Jeux</b>Les règles et l’argent de chaque jeu, plus vos jeux maison.</li>
+        <li><b>Compétitions</b>Membre-membre, Texas scramble et les autres formats.</li>
+      </ul>
+    </div>
+    <div class="shot"><img src="img/accueil-etapes.jpg" alt="L’accueil de l’app : les étapes 1 à 6, d’Inviter des joueurs à Parties jouées." loading="lazy" width="390" height="844"></div>
+  </div>
+</section>
+
 <section id="jeux" class="games">
   <div class="wrap">
     <h2>Sept jeux, plus les vôtres</h2>
@@ -250,6 +330,60 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
     <div class="after">
       <p>À la fin, Le 19e fait le compte : la mise de départ, les revirements, les points et les normales 3. Chacun sait ce qu’il doit, sans calculatrice au bar. L’app note les gageures ; elle ne touche jamais à l’argent.</p>
       <div class="shot"><img src="img/carte.png" alt="Le meneur, le gain par joueur en ce moment et la carte de pointage avec le calcul de chaque trou."></div>
+    </div>
+  </div>
+</section>
+
+
+<section id="competitions" class="comps">
+  <div class="wrap">
+    <div>
+      <h2>Vos compétitions, comme au club</h2>
+      <p class="intro">Le tournoi de fin de saison ou le membre-membre du club : créez les équipes, l’app calcule les handicaps, forme les classes et tient le classement en direct.</p>
+      <div class="formats">
+        <div class="fmt"><h3>Membre-membre en match play</h3><p class="who">Équipes de 2 · 90 % du handicap</p><p>Chaque équipe affronte toutes celles de sa classe, en meilleure balle nette. Match gagné 1 point, nul ½.</p></div>
+        <div class="fmt"><h3>Membre-membre Stableford</h3><p class="who">Équipes de 2 · 85 % du handicap</p><p>Meilleure balle nette, en points : normale nette 2, oiselet 3, boguey 1. Le plus de points gagne.</p></div>
+        <div class="fmt"><h3>Membre-membre en coups</h3><p class="who">Équipes de 2 · 85 % du handicap</p><p>Le plus bas total de la meilleure balle nette, par rapport à la normale.</p></div>
+        <div class="fmt"><h3>Texas scramble</h3><p class="who">Équipes de 2 à 4 · handicap d’équipe</p><p>Une seule balle par équipe, un minimum de départs par joueur, et le handicap d’équipe à 25-20-15-10 %.</p></div>
+        <div class="fmt soon"><h3>Bientôt</h3><p>Membre-invité, scramble à la Floride, coupe Ryder entre deux clans.</p></div>
+      </div>
+      <ul class="checks">
+        <li>Les équipes réparties en classes A, B, C selon leur handicap.</li>
+        <li>Chaque équipe entre ses scores sur son téléphone ; le classement se met à jour pour tous.</li>
+        <li>Tout le monde reçoit une notification quand la compétition est créée.</li>
+      </ul>
+    </div>
+    <div class="shot"><img src="img/competition.jpg" alt="Le classement d’un membre-membre en match play : classe A, trois équipes, fiche gagnés-nuls-perdus et résultat de chaque match." loading="lazy" width="390" height="844"></div>
+  </div>
+</section>
+
+<section id="roles" class="roles">
+  <div class="wrap">
+    <h2>Chacun sa place dans la gang</h2>
+    <p class="intro">Un seul compte par golfeur, lié à son cellulaire, pour tous ses groupes. Dans chaque groupe, chacun a son rôle.</p>
+    <div class="role-cards">
+      <div class="role"><span class="pill own">Propriétaire</span><p>Il a créé le groupe et choisi le forfait. Il peut confier l’organisation à un autre joueur.</p></div>
+      <div class="role"><span class="pill org">Organisateur</span><p>Il invite les joueurs, offre les dates, crée les parties et les compétitions. Souvent le propriétaire lui-même.</p></div>
+      <div class="role"><span class="pill par">Participant</span><p>Il répond aux dates, suit les parties et les classements en direct, et voit qui doit quoi. Il joue, c’est tout.</p></div>
+    </div>
+    <div class="welcome-row">
+      <div>
+        <h3>Un accueil à son nom</h3>
+        <p>La première fois qu’un invité entre dans le groupe, une étiquette de sac à son nom l’accueille et lui explique ce qu’il peut faire.</p>
+        <p>Les outils de l’organisateur restent visibles, mais grisés : un toucher montre un aperçu de ce qu’ils font. Personne ne se sent perdu, et l’envie d’organiser sa propre gang vient toute seule.</p>
+      </div>
+      <div class="shot"><img src="img/bienvenue.jpg" alt="L’accueil d’une participante : une étiquette de sac à son nom et la liste de ce qu’elle peut faire." loading="lazy" width="390" height="844"></div>
+      <div class="shot"><img src="img/apercu.jpg" alt="L’aperçu de la tuile Parties à préparer, réservée à l’organisateur." loading="lazy" width="390" height="844"></div>
+    </div>
+  </div>
+</section>
+
+<section class="extras">
+  <div class="wrap">
+    <div class="extra-grid">
+      <div class="extra"><svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zM10 19a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><h3>Notifications</h3><p>Des dates offertes, une partie qui commence, une compétition créée : le groupe est averti sur son téléphone, sans texto de plus.</p></div>
+      <div class="extra"><svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8 10h8M8 13h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><h3>Le Caddie</h3><p>Une question sur l’app, une règle ou un handicap d’équipe ? Le Caddie répond, en français, à toute heure.</p></div>
+      <div class="extra"><svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12v8H4v-8M2 8h20v4H2zM12 8v12M12 8c-2-4-6-4-6-1s6 1 6 1zm0 0c2-4 6-4 6-1s-6 1-6 1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><h3>Parrainage</h3><p>Partagez votre lien : pour chaque groupe qui passe au forfait Groupe grâce à vous, votre prochaine saison est offerte.</p></div>
     </div>
   </div>
 </section>
@@ -280,8 +414,9 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
         <p class="for">Pour essayer avec votre quatuor.</p>
         <ul>
           <li>1 groupe, jusqu’à 4 joueurs</li>
-          <li>Tous les jeux</li>
+          <li>Tous les jeux et toutes les compétitions</li>
           <li>Pointage en direct et qui doit quoi</li>
+          <li>Notifications et Caddie</li>
         </ul>
         <a class="btn line" href="https://app.fanion.ai/">Commencer gratuitement</a>
       </div>
@@ -291,11 +426,12 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
         <p class="founder"><b>Prix fondateur</b> pour les groupes inscrits avant le 31 mars 2027, garanti les saisons suivantes. Ensuite : 79 $.</p>
         <p class="for">Pour une gang qui joue toute la saison.</p>
         <ul>
-          <li>Jusqu’à 16 joueurs</li>
-          <li>Dates offertes et disponibilités</li>
-          <li>Quatuors automatiques</li>
-          <li>Textos d’invitation et de rappel</li>
+          <li>Jusqu’à 16 joueurs, de quoi faire 4 quatuors</li>
+          <li>Tout ce qu’offre la formule Gratuit</li>
+          <li>Dates offertes et quatuors automatiques</li>
+          <li>Compétitions à plusieurs équipes, en classes</li>
           <li>Un organisateur en plus de vous</li>
+          <li>Une saison offerte par groupe parrainé</li>
         </ul>
         <a class="btn main" href="achat.html">Acheter pour mon groupe</a>
       </div>
@@ -306,7 +442,7 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
         <ul>
           <li>Jusqu’à 64 joueurs</li>
           <li>Tout ce qu’offre la formule Groupe</li>
-          <li>Classement de la saison</li>
+          <li>Classement de la saison et compétitions de club</li>
           <li>Outils pour l’organisateur de la ligue</li>
           <li>Plusieurs organisateurs</li>
         </ul>
@@ -321,11 +457,16 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
   <div class="wrap">
     <h2>Questions</h2>
     <div class="list">
-      <details><summary>Je suis déjà client : où est l’app ?</summary><p>Touchez « Se connecter » en haut de cette page, ou ouvrez <a href="https://app.fanion.ai/">l’app Le 19e</a>. Choisissez votre nom et entrez votre numéro de téléphone. Ajoutez-la ensuite à votre écran d’accueil pour la retrouver en un geste.</p></details>
+      <details><summary>Je suis déjà client : où est l’app ?</summary><p>Touchez « Se connecter » en haut de cette page, ou ouvrez <a href="https://app.fanion.ai/">l’app Le 19e</a>. Entrez votre cellulaire et votre mot de passe, puis choisissez votre groupe. Ajoutez-la ensuite à votre écran d’accueil pour la retrouver en un geste.</p></details>
       <details><summary>Faut-il télécharger une app ?</summary><p>Non. Ouvrez le lien sur votre téléphone, puis ajoutez Le 19e à votre écran d’accueil (sur iPhone : bouton Partager, puis « Sur l’écran d’accueil »). Elle s’ouvre ensuite comme une app.</p></details>
       <details><summary>Est-ce que ça marche sans réseau sur le terrain ?</summary><p>Oui. Les scores entrés sans réseau sont gardés sur le téléphone et envoyés dès que le signal revient.</p></details>
       <details><summary>Est-ce que tout le monde doit avoir l’app ?</summary><p>Seul le responsable de la partie entre les scores. Les autres suivent la partie en direct s’ils le veulent, et répondent aux dates offertes avec le lien reçu par texto.</p></details>
       <details><summary>Comment les joueurs se connectent-ils ?</summary><p>La première fois, chacun crée son compte : il faut un cellulaire, on reçoit un code par texto, puis on choisit un mot de passe. Ensuite, on se connecte avec son cellulaire et son mot de passe, puis on choisit son groupe : le même compte donne accès à tous ses groupes.</p></details>
+      <details><summary>Qui peut faire quoi dans le groupe ?</summary><p>Le propriétaire a créé le groupe et choisit le forfait. Il peut nommer un organisateur, parmi les joueurs qui ont accepté l’invitation. Le propriétaire et l’organisateur invitent les joueurs, offrent les dates, créent les parties et les compétitions. Les participants répondent aux dates, suivent les parties et les classements en direct, et voient d’un toucher à quoi servent les autres tuiles.</p></details>
+      <details><summary>Je joue dans plusieurs groupes. Faut-il plusieurs comptes ?</summary><p>Non. Un seul compte, lié à votre cellulaire, donne accès à tous les groupes où vous êtes invité. Après la connexion, vous choisissez le groupe dans « Mon compte ».</p></details>
+      <details><summary>Quelles compétitions peut-on organiser ?</summary><p>Le membre-membre par équipes de 2 en match play, en Stableford ou en coups, et le Texas scramble par équipes de 2 à 4 avec départs minimums. Les handicaps d’équipe suivent le système mondial, les équipes sont réparties en classes, et le classement se met à jour à chaque score entré.</p></details>
+      <details><summary>Comment suis-je averti des nouvelles parties ?</summary><p>Activez les notifications dans l’app : vous êtes averti quand des dates sont offertes, qu’une partie commence ou se termine, ou qu’une compétition est créée. L’invitation au groupe, elle, part par texto du téléphone de l’organisateur.</p></details>
+      <details><summary>C’est quoi, le Caddie ?</summary><p>Un assistant dans l’app qui répond à vos questions, en français : comment inviter un joueur, les règles d’un jeu, le calcul d’un handicap d’équipe, les forfaits. Il n’a pas accès à vos scores ni aux données de votre groupe.</p></details>
       <details><summary>Comment se passe l’achat ?</summary><p>L’organisateur paie 79 $ plus taxes par carte de crédit (49 $ au prix fondateur, avant le 31 mars 2027), sur une page de paiement sécurisée (Stripe). Il indique le nom de son groupe et reçoit un reçu par courriel. Le groupe passe à 16 joueurs dans les 24 heures.</p></details>
       <details><summary>Est-ce un abonnement qui se renouvelle tout seul ?</summary><p>Non. Vous payez une saison à la fois. Aucun montant n’est prélevé sans votre accord.</p></details>
       <details><summary>Et si ça ne fait pas l’affaire ?</summary><p>Vous avez 30 jours après l’achat pour demander un remboursement complet, sans justification. Écrivez à <a href="mailto:bonjour@fanion.ai">bonjour@fanion.ai</a>.</p></details>
