@@ -1,5 +1,5 @@
-/* Le 19e — garde l'app sur le téléphone pour qu'elle s'ouvre sans réseau. */
-const V = 'fanion-v3';
+/* Fanion — garde l'app sur le téléphone pour qu'elle s'ouvre sans réseau. */
+const V = 'fanion-v4';
 self.addEventListener('install', e => {
   self.skipWaiting();
   e.waitUntil(caches.open(V).then(c => c.addAll(['./', './manifest.webmanifest', './icon-180.png', './icon-192.png']).catch(() => {})));
@@ -34,7 +34,7 @@ self.addEventListener('fetch', e => {
 // ---------- Notifications (envoyées par le serveur Fanion) ----------
 self.addEventListener('push', e => {
   let d = {}; try { d = e.data ? e.data.json() : {}; } catch (x) { d = { body: e.data ? e.data.text() : '' }; }
-  const title = d.title || 'Le 19e';
+  const title = d.title || 'Fanion';
   e.waitUntil(self.registration.showNotification(title, {
     body: d.body || '', icon: './icon-192.png', badge: './icon-192.png', tag: d.tag || undefined, renotify: !!d.tag,
     data: { url: d.url || './' }, lang: 'fr-CA'

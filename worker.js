@@ -119,14 +119,14 @@ async function pushGroup(env, tok, uid, data) {
   const only = Array.isArray(data.playerIds) && data.playerIds.length ? new Set(data.playerIds) : null;
   const subs = (await r.json()).map(x => (x.document || {}).fields).filter(Boolean).map(f => ({ uid: (f.uid || {}).stringValue, playerId: (f.playerId || {}).stringValue, sub: (() => { try { return JSON.parse((f.sub || {}).stringValue); } catch (e) { return null; } })() }))
     .filter(x => x.sub && x.sub.endpoint && x.uid !== uid && (!only || only.has(x.playerId)));
-  const msg = { title: String(data.title || 'Le 19e').slice(0, 80), body: String(data.body || '').slice(0, 240), url: String(data.url || './').slice(0, 300), tag: data.tag ? String(data.tag).slice(0, 60) : undefined };
+  const msg = { title: String(data.title || 'Fanion').slice(0, 80), body: String(data.body || '').slice(0, 240), url: String(data.url || './').slice(0, 300), tag: data.tag ? String(data.tag).slice(0, 60) : undefined };
   const res = await Promise.all(subs.map(x => sendPush(env, x.sub, msg).catch(() => 0)));
   return { sent: res.filter(s => s >= 200 && s < 300).length, total: subs.length, gone: res.filter(s => s === 404 || s === 410).length };
 }
 
 // --- Le Caddie : répond aux questions des membres sur l'app et les jeux ---
 const CADDIE_MODEL = 'claude-haiku-5-5';
-const CADDIE_SYSTEM = `Tu es le Caddie, l'assistant de l'app Le 19e (par Fanion, fanion.ai), une app québécoise pour organiser un groupe de golf entre amis.
+const CADDIE_SYSTEM = `Tu es le Caddie, l'assistant de l'app Fanion (fanion.ai), une app québécoise pour organiser un groupe de golf entre amis.
 Tu parles français québécois simple et chaleureux, tu vouvoies, tu réponds court (3 à 6 phrases, ou une petite liste d'étapes). Tu ne parles que de l'app, des jeux de golf et du golf entre amis.
 Si tu ne sais pas, ou si la personne veut parler à quelqu'un, un remboursement, un problème de paiement ou de compte : dis-lui d'écrire à bonjour@fanion.ai (le bouton « Écrire à l'équipe » sous la conversation envoie la conversation). N'invente jamais une fonction qui n'existe pas.
 Pour amener la personne au bon écran, ajoute à la fin une ligne [[ecran:CLE]] (une seule), avec CLE parmi : home (accueil), players (étape 1, Inviter des joueurs), quatuors (étape 2, Parties à préparer), setup (étape 3, Créer une partie), live (étape 4, Parties en cours), history (étape 5, Parties jouées), courses (Banque de terrains), jeux (Banque de jeux), comps (Banque de compétitions), compte (Mon compte).

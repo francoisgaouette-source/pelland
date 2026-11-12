@@ -619,7 +619,7 @@
     bind[S.view] && bind[S.view](v);
   }
 
-  const APP = 'Le 19e';
+  const APP = 'Fanion';
   function curGroup() { return (S.groups || []).find(x => x.id === Store.gid) || { id: Store.gid, name: 'La gang à Pelland' }; }
   function groupName() { return curGroup().name; }
   const ownerId = () => curGroup().owner || null;
@@ -696,7 +696,7 @@
         <span class="wl-strap"></span>
         <div class="wl-card">
           <span class="wl-hole"></span>
-          <div class="wl-brand"><svg width="16" height="19" viewBox="0 0 26 30"><path d="M5 2v26" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M6 3l15 5.5L6 14z" fill="#e3a90c"/></svg>Le 19e</div>
+          <div class="wl-brand"><svg width="16" height="19" viewBox="0 0 26 30"><path d="M5 2v26" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M6 3l15 5.5L6 14z" fill="#e3a90c"/></svg>Fanion</div>
           <div class="wl-name">${esc(me.name)}</div>
           <div class="wl-grp">${esc(groupName())}</div>
           <div class="wl-role">Participant</div>
@@ -851,9 +851,9 @@
     e.preventDefault();
     if (t.hasAttribute('data-onbhide')) { ls.set('pelland.onb.hide.' + Store.gid, 1); return render(); }
     const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
-    openSheet(`<h3>Le 19e sur votre écran d’accueil</h3>
-      <ol class="info-list">${ios ? '<li>Ouvrez Le 19e dans <b>Safari</b>.</li><li>Touchez le bouton <b>Partager</b> (le carré avec une flèche vers le haut).</li><li>Choisissez <b>Sur l’écran d’accueil</b>, puis <b>Ajouter</b>.</li>'
-        : '<li>Ouvrez Le 19e dans <b>Chrome</b>.</li><li>Touchez le menu <b>⋮</b> en haut à droite.</li><li>Choisissez <b>Ajouter à l’écran d’accueil</b> (ou <b>Installer l’application</b>).</li>'}</ol>
+    openSheet(`<h3>Fanion sur votre écran d’accueil</h3>
+      <ol class="info-list">${ios ? '<li>Ouvrez Fanion dans <b>Safari</b>.</li><li>Touchez le bouton <b>Partager</b> (le carré avec une flèche vers le haut).</li><li>Choisissez <b>Sur l’écran d’accueil</b>, puis <b>Ajouter</b>.</li>'
+        : '<li>Ouvrez Fanion dans <b>Chrome</b>.</li><li>Touchez le menu <b>⋮</b> en haut à droite.</li><li>Choisissez <b>Ajouter à l’écran d’accueil</b> (ou <b>Installer l’application</b>).</li>'}</ol>
       <p class="note">L’icône du fanion apparaît avec vos autres apps. Partagez ces étapes avec vos joueurs.</p>
       <div class="sheet-actions"><button class="btn" data-ecranok type="button">C’est fait</button><button class="btn ghost" data-close type="button">Plus tard</button></div>`, sh => {
       sh.querySelector('[data-close]').onclick = closeSheet;
@@ -1041,7 +1041,7 @@
         <div class="seg"><button type="button" data-web="1" aria-pressed="${st.web === true}"><b>Oui</b><small>Je donne l’adresse</small></button><button type="button" data-web="0" aria-pressed="${st.web === false}"><b>Non</b><small>Je l’explique</small></button></div>
         ${st.web === true ? `<label>Où ? Adresse de la page (lien)<input id="ngUrl" type="url" inputmode="url" placeholder="https://…" value="${esc(st.url || '')}"></label>` : ''}
         ${st.web === false ? `<label>Expliquez le jeu que vous voulez créer<textarea id="ngTxt" rows="7" placeholder="Combien de joueurs ? En équipes ou chacun pour soi ? Comment on gagne des points à chaque trou ? Comment l’argent se compte ?">${esc(st.txt || '')}</textarea></label>` : ''}
-        ${st.web != null ? '<p class="note">Nous ajoutons le jeu au 19e et vous avisons dès qu’il est prêt.</p>' : ''}
+        ${st.web != null ? '<p class="note">Nous ajoutons le jeu à Fanion et vous avisons dès qu’il est prêt.</p>' : ''}
         <div class="row"><button class="btn small" id="ngSend" type="button" ${st.web == null ? 'disabled' : ''}>Envoyer</button><button class="btn ghost small" data-close type="button">Annuler</button></div>
         <p class="note" style="margin-top:10px">Vous savez déjà comment le compter ? <button class="linkbtn" id="ngSelf" type="button">Le créer moi-même</button></p>`;
       const keep = () => { const n = sh.querySelector('#ngName'), u = sh.querySelector('#ngUrl'), t = sh.querySelector('#ngTxt'); if (n) st.name = n.value; if (u) st.url = u.value; if (t) st.txt = t.value; };
@@ -1055,9 +1055,9 @@
         if (!st.web && String(st.txt || '').trim().length < 20) return toast('Expliquez le jeu en quelques phrases.');
         const req = { name: st.name.trim(), url: st.web ? st.url.trim() : '', text: st.web ? '' : st.txt.trim(), group: groupName(), groupId: Store.gid, by: ls.get('pelland.me', '') || '', at: Date.now() };
         try { await Store.saveGameRequest(req); } catch (e) { }
-        const body = `Nouveau jeu demandé pour Le 19e\n\nGroupe : ${req.group}\nDemandé par : ${req.by}\nJeu : ${req.name}\n` + (req.url ? `Règles sur le web : ${req.url}\n` : `Explication :\n${req.text}\n`);
+        const body = `Nouveau jeu demandé pour Fanion\n\nGroupe : ${req.group}\nDemandé par : ${req.by}\nJeu : ${req.name}\n` + (req.url ? `Règles sur le web : ${req.url}\n` : `Explication :\n${req.text}\n`);
         closeSheet(); toast('Demande envoyée. Merci !');
-        location.href = 'mailto:bonjour@fanion.ai?subject=' + encodeURIComponent('Le 19e – Ajouter un jeu : ' + req.name) + '&body=' + encodeURIComponent(body);
+        location.href = 'mailto:bonjour@fanion.ai?subject=' + encodeURIComponent('Fanion – Ajouter un jeu : ' + req.name) + '&body=' + encodeURIComponent(body);
       };
     };
     openSheet('', sh => draw(sh));
@@ -3107,7 +3107,7 @@
   function caddieMail() {
     const conv = (S.caddie || []).slice(1).map(m => (m.role === 'user' ? 'Moi : ' : 'Caddie : ') + m.content.replace(/\[\[ecran:[a-z]+\]\]/g, '')).join('\n\n');
     const body = `Groupe : ${groupName()}\nJoueur : ${ls.get('pelland.me', '') || ''}\n\n${conv ? 'Ma conversation avec le Caddie :\n\n' + conv + '\n\n' : ''}Ma question :\n`;
-    return 'mailto:bonjour@fanion.ai?subject=' + encodeURIComponent('Le 19e – question') + '&body=' + encodeURIComponent(body.slice(0, 1800));
+    return 'mailto:bonjour@fanion.ai?subject=' + encodeURIComponent('Fanion – question') + '&body=' + encodeURIComponent(body.slice(0, 1800));
   }
   document.addEventListener('click', e => { const t = e.target.closest && e.target.closest('[data-caddie]'); if (t) { e.preventDefault(); openCaddie(); } });
   async function smsService() {
