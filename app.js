@@ -427,6 +427,15 @@
       if (this.mode === 'firebase') { await this.db.collection('games').doc(id).delete(); return; }
       const all = ls.get('pelland.games', {}); delete all[id]; ls.set('pelland.games', all);
     },
+    // Avis des joueurs : avis/<uid du compte> (un par personne ; publié seulement si approuvé dans la console)
+    async getAvis() {
+      const u = this.mode === 'firebase' && firebase.auth().currentUser; if (!u) return ls.get('fanion.avis', null);
+      try { const d = await this.db.collection('avis').doc(u.uid).get(); return d.exists ? d.data() : null; } catch (e) { return null; }
+    },
+    async saveAvis(a) {
+      const u = this.mode === 'firebase' && firebase.auth().currentUser;
+      if (u) await this.db.collection('avis').doc(u.uid).set(a); else ls.set('fanion.avis', a);
+    },
     // Compétitions : comps/<id> = { groupId, format, name, date, course, tee, allowance, flights, teams:[{id, p:[{name,index}]}], scores:{ <équipe>: { <trou>: [s1, s2] } } }
     async listComps() {
       if (this.mode === 'firebase') { try { const sn = await this.db.collection('comps').where('groupId', '==', this.gid).get(); return sn.docs.map(d => d.data()).sort((a, b) => (b.date || '').localeCompare(a.date || '')); } catch (e) { return []; } }
@@ -752,6 +761,7 @@
         <button class="tile" data-go="comps"><span class="pin"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M7 4h10v3a5 5 0 0 1-10 0V4z" fill="currentColor"/><path d="M7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M12 12v4M8 20h8l-1-4H9z" fill="currentColor" stroke="currentColor" stroke-width="1.2"/></svg></span><div><strong>Banque de compétitions</strong><span>Membre-membre : équipes de 2, classes et classement en direct</span></div></button>
       </div>`)}
       ${pushCard()}
+      ${avisCard('home')}
       ${referralCard()}
       ${Store.needLogin ? '' : `<button class="caddie-tile" data-caddie type="button"><span class="cad-ico" aria-hidden="true">?</span><span><b>Une question ?</b><small>Demandez au Caddie : l’app, les règles des jeux, les forfaits.</small></span></button>`}
       ${viralCard('home')}
@@ -880,7 +890,7 @@
       <h3 class="acct-h">Notifications</h3>
       <div class="acct-g"><div><b>${Push.perm() === 'granted' && ls.get('pelland.push', 0) ? 'Activées sur ce téléphone' : Push.perm() === 'denied' ? 'Bloquées' : 'Désactivées'}</b><small>${Push.perm() === 'denied' ? 'Permettez-les dans les réglages du navigateur ou du téléphone.' : Push.needsInstall() ? 'Sur iPhone : ajoutez d’abord l’app à l’écran d’accueil.' : 'Nouvelles dates, rappels, parties et résultats.'}</small></div>
         ${Push.perm() === 'granted' && ls.get('pelland.push', 0) ? '<button class="btn ghost small" data-pushoff type="button">Désactiver</button>' : Push.perm() === 'denied' ? '' : Push.needsInstall() ? '<button class="btn small" data-onbact="ecran" type="button">Comment</button>' : '<button class="btn small" data-pushon type="button">Activer</button>'}</div>
-      <div class="row acct-actions"><button class="btn ghost small" data-viral type="button">Créer un groupe</button><button class="btn ghost small" id="chgPw" type="button">Changer mon mot de passe</button><button class="btn ghost small" id="logout2" type="button">Se déconnecter</button></div>`;
+      <div class="row acct-actions"><button class="btn ghost small" data-viral type="button">Créer un groupe</button><button class="btn ghost small" data-avis type="button">Donner mon avis</button><button class="btn ghost small" id="chgPw" type="button">Changer mon mot de passe</button><button class="btn ghost small" id="logout2" type="button">Se déconnecter</button></div>`;
   }
   async function openGroup(x) {
     try { await Store.switchGroup(x); ls.set('pelland.lastGame', null); location.href = location.pathname; } catch (e) { toast(e.message); }
@@ -903,6 +913,48 @@
         };
       });
     }
+
+  // ---------------- Avis des joueurs : demandés après une partie terminée ; publiés sur fanion.ai si le joueur accepte et après approbation ----------------
+  const AVIS_K = 'fanion.avis.etat';   // { given: true } ou { later: date }
+  function avisCard(where) {
+    if (Store.needLogin || !meId()) return '';
+    const st = ls.get(AVIS_K, {}) || {};
+    if (where === 'game') ls.set(AVIS_K, { ...st, eligible: 1 });
+    if (st.given || (st.later && Date.now() - st.later < 30 * 864e5)) return '';
+    if (where === 'home' && !st.eligible) return '';
+    return `<section class="card avis-card"><div class="av-stars" aria-hidden="true">★★★★★</div>
+      <h3>Fanion vous plaît ?</h3><p>Dites-le en une phrase. Avec votre accord, votre commentaire pourra paraître sur fanion.ai pour aider d’autres groupes à se lancer.</p>
+      <div class="row"><button class="btn small" data-avis type="button">Donner mon avis</button><button class="btn ghost small" data-avislater type="button">Plus tard</button></div></section>`;
+  }
+  const shortName = n => { const w = String(n || '').trim().split(/\s+/); return (w[0] || '') + (w.length > 1 ? ' ' + w[w.length - 1][0].toUpperCase() + '.' : ''); };
+  async function avisSheet() {
+    const me = (S.players || []).find(p => p.id === meId()) || { name: ls.get('pelland.me', '') };
+    const old = await Store.getAvis() || {};
+    let stars = old.stars || 0;
+    openSheet(`<div class="avis-sheet"><h3>Votre avis sur Fanion</h3>
+      <div class="av-pick" role="radiogroup" aria-label="Note sur 5">${[1, 2, 3, 4, 5].map(n => `<button type="button" role="radio" data-star="${n}" aria-label="${n} étoile${n > 1 ? 's' : ''}">★</button>`).join('')}</div>
+      <label class="fld">En une phrase, qu’est-ce que Fanion change pour votre groupe ?<textarea id="avText" maxlength="280" rows="3" placeholder="ex. Plus besoin de 40 textos pour former les quatuors.">${esc(old.text || '')}</textarea></label>
+      <p class="note" id="avCount"></p>
+      <label class="av-ok"><input type="checkbox" id="avOk" ${old.ok === false ? '' : 'checked'}><span>J’accepte que Fanion publie ce commentaire sur fanion.ai, signé <b>${esc(shortName(me.name))}</b>, ${esc(groupName())}.</span></label>
+      <div class="sheet-actions"><button class="btn" id="avSend" type="button">Envoyer</button><button class="btn ghost" data-close type="button">Annuler</button></div></div>`, sh => {
+      const paint = () => { sh.querySelectorAll('[data-star]').forEach(b => { const on = +b.dataset.star <= stars; b.classList.toggle('on', on); b.setAttribute('aria-checked', String(+b.dataset.star === stars)); }); };
+      const ta = sh.querySelector('#avText'), cnt = () => { sh.querySelector('#avCount').textContent = `${ta.value.length} / 280`; };
+      sh.querySelectorAll('[data-star]').forEach(b => b.onclick = () => { stars = +b.dataset.star; paint(); });
+      ta.oninput = cnt; paint(); cnt();
+      sh.querySelector('[data-close]').onclick = closeSheet;
+      sh.querySelector('#avSend').onclick = async () => {
+        if (!stars) { toast('Choisissez une note de 1 à 5 étoiles.'); return; }
+        const a = { stars, text: ta.value.trim().slice(0, 280), name: shortName(me.name).slice(0, 40), groupName: String(groupName() || '').slice(0, 60), ok: sh.querySelector('#avOk').checked, at: Date.now() };
+        try { await Store.saveAvis(a); ls.set(AVIS_K, { ...(ls.get(AVIS_K, {}) || {}), given: 1 }); closeSheet(); toast('Merci ! Votre avis est envoyé.'); render(); }
+        catch (e) { toast('Envoi impossible : ' + e.message); }
+      };
+    });
+  }
+  document.addEventListener('click', e => {
+    const t = e.target.closest && e.target.closest('[data-avis],[data-avislater]'); if (!t) return;
+    if (t.hasAttribute('data-avis')) { avisSheet(); return; }
+    ls.set(AVIS_K, { ...(ls.get(AVIS_K, {}) || {}), later: Date.now() }); render();
+  });
 
   // ---------------- Parrainage : le propriétaire partage son lien ; les groupes créés avec ce lien sont comptés ----------------
   function refLink(code) { return location.origin + location.pathname + '?ref=' + encodeURIComponent(code || Store.gid); }
@@ -1544,7 +1596,7 @@
         <tbody>${scoreRows(g, row, sumRow)}</tbody>
       </table></div>
       <button class="btn sms-btn" data-sms type="button">Texto aux joueurs</button>
-      ${g.status === 'terminée' ? viralCard('game') : ''}
+      ${g.status === 'terminée' ? avisCard('game') + viralCard('game') : ''}
         ${owner ? `<div class="row game-actions bottom-actions">${g.status === 'terminée'
           ? '<span class="note">Partie terminée.</span><button class="btn ghost small" data-reopen type="button">Rouvrir</button>'
           : '<button class="btn small" data-finish type="button">Terminer la partie</button>'}
@@ -2648,7 +2700,7 @@
         <tr class="sum"><td colspan="3">${f === 'skins' ? 'Skins' : f === 'neuf' || f === 'wolf' ? 'Points' : 'Trous'}</td>${pts.map(x => `<td>${(x > 0 && f !== 'neuf' ? '+' : '') + fmtPts(x)}</td>`).join('')}</tr></tbody>
       </table></div>
       <button class="btn sms-btn" data-sms type="button">Texto aux joueurs</button>
-      ${g.status === 'terminée' ? viralCard('game') : ''}
+      ${g.status === 'terminée' ? avisCard('game') + viralCard('game') : ''}
       ${owner ? `<div class="row game-actions bottom-actions">${g.status === 'terminée'
         ? '<span class="note">Partie terminée.</span><button class="btn ghost small" data-reopen type="button">Rouvrir</button>'
         : '<button class="btn small" data-finish type="button">Terminer la partie</button>'}

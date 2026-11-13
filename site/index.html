@@ -217,6 +217,16 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
 .extra svg { color: var(--fairway); margin-bottom: 10px; }
 @media (max-width: 860px) { .extra-grid { grid-template-columns: 1fr; } }
 
+
+/* Avis des joueurs (vrais avis, publiés avec leur accord) */
+.avis[hidden] { display: none; }
+.avis-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
+.avis-grid li { background: var(--white); border: 1.5px solid var(--line); border-radius: 14px; padding: 22px; display: flex; flex-direction: column; gap: 12px; }
+.avis-grid .st { color: var(--flag); letter-spacing: 2px; font-size: 18px; }
+.avis-grid blockquote { margin: 0; font-size: 19px; line-height: 1.45; flex: 1; }
+.avis-grid cite { font-style: normal; color: var(--pencil); font-size: 15px; }
+.avis-grid cite b { color: var(--ink); }
+
 /* Pied */
 .foot { background: var(--pine); color: #b9c8bf; padding: 48px 0; font-size: 16px; }
 .foot .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 24px; }
@@ -285,6 +295,14 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
   </div>
 </section>
 
+
+<section id="avis" class="avis" hidden>
+  <div class="wrap">
+    <h2>Ce qu’en disent les joueurs</h2>
+    <p class="intro">Des avis laissés dans l’app par des golfeurs qui l’utilisent, publiés avec leur accord.</p>
+    <ul class="avis-grid" id="avisList"></ul>
+  </div>
+</section>
 
 <section id="app" class="tour">
   <div class="wrap">
@@ -499,6 +517,22 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
     if (!open) { b.setAttribute('aria-expanded', 'true'); document.getElementById('step' + i).hidden = false; }
     document.getElementById('stepHint').hidden = !open;
   }); });
+})();
+</script>
+<script>
+(function () {
+  fetch('/api/avis').then(function (r) { return r.ok ? r.json() : []; }).then(function (list) {
+    if (!Array.isArray(list) || !list.length) return;
+    var ul = document.getElementById('avisList');
+    list.slice(0, 6).forEach(function (a) {
+      var li = document.createElement('li');
+      var st = document.createElement('span'); st.className = 'st'; st.textContent = '★★★★★'.slice(0, a.stars) ; st.setAttribute('aria-label', a.stars + ' étoiles sur 5');
+      var q = document.createElement('blockquote'); q.textContent = '« ' + a.text + ' »';
+      var c = document.createElement('cite'); var b = document.createElement('b'); b.textContent = a.name; c.appendChild(b); if (a.groupName) c.appendChild(document.createTextNode(', ' + a.groupName));
+      li.appendChild(st); li.appendChild(q); li.appendChild(c); ul.appendChild(li);
+    });
+    document.getElementById('avis').hidden = false;
+  }).catch(function () {});
 })();
 </script>
 </body>

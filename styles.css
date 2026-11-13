@@ -830,3 +830,13 @@ textarea { font-family: inherit; line-height: 1.4; resize: vertical; }
 .push-ico { width: 42px; height: 42px; border-radius: 12px; background: #14231b; color: #e3a90c; display: grid; place-items: center; }
 .push-card h3 { margin: 0 0 4px; } .push-card p { margin: 0 0 10px; line-height: 1.4; } .push-card .row { gap: 8px; flex-wrap: wrap; }
 .live-tag { font-size: 11px; font-weight: 700; background: #b3372b; color: #fff; padding: 2px 8px; border-radius: 999px; vertical-align: middle; margin-left: 6px; }
+/* Avis des joueurs */
+.avis-card h3 { margin: 2px 0 4px; } .avis-card p { margin: 0 0 10px; }
+.av-stars { color: var(--flag, #e3a90b); letter-spacing: 2px; font-size: 18px; }
+.avis-sheet .fld { display: grid; gap: 6px; font-weight: 600; margin-top: 10px; }
+.avis-sheet .fld textarea { font-weight: 400; }
+.av-pick { display: flex; gap: 6px; margin: 6px 0 4px; }
+.av-pick button { font-size: 34px; line-height: 1; background: none; border: 0; padding: 4px; cursor: pointer; color: color-mix(in srgb, var(--ink) 22%, transparent); }
+.av-pick button.on { color: #e3a90b; }
+.av-ok { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; line-height: 1.4; margin: 6px 0 4px; }
+.av-ok input { width: 20px; height: 20px; flex: none; margin-top: 1px; accent-color: var(--green); }

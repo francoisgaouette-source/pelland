@@ -137,6 +137,20 @@ service cloud.firestore {
     }
 
     // ---------- Demandes d'ajout de jeux : envoyées par les membres, lues seulement dans la console ----------
+    // ---------- Avis des joueurs : un par compte ; publié sur fanion.ai seulement si approuvé dans la console ----------
+    match /avis/{uid} {
+      allow get: if (membre() && request.auth.uid == uid) || resource.data.get('approved', false) == true;
+      allow list: if resource.data.get('approved', false) == true;
+      allow create, update: if membre() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['stars', 'text', 'name', 'groupName', 'ok', 'at'])
+        && request.resource.data.stars is int && request.resource.data.stars >= 1 && request.resource.data.stars <= 5
+        && request.resource.data.text is string && request.resource.data.text.size() <= 280
+        && request.resource.data.name is string && request.resource.data.name.size() <= 40
+        && request.resource.data.groupName is string && request.resource.data.groupName.size() <= 60
+        && request.resource.data.ok is bool && request.resource.data.at is int;
+      allow delete: if membre() && request.auth.uid == uid;
+    }
+
     match /requests/{id} {
       allow create: if membre();
       allow read, update, delete: if false;

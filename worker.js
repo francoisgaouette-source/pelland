@@ -180,11 +180,29 @@ async function caddie(env, messages) {
   return (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
 }
 
+
+// --- Avis des joueurs publiés sur fanion.ai : seulement ceux approuvés (approved: true, ajouté dans la console) et consentis (ok: true) ---
+async function avisPublies() {
+  const body = { structuredQuery: { from: [{ collectionId: 'avis' }], where: { fieldFilter: { field: { fieldPath: 'approved' }, op: 'EQUAL', value: { booleanValue: true } } }, limit: 30 } };
+  const r = await fetch(`https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents:runQuery`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) return [];
+  const v = f => f && (f.stringValue ?? f.integerValue ?? f.booleanValue);
+  return (await r.json()).filter(x => x.document).map(x => x.document.fields).filter(f => v(f.ok) === true && v(f.text))
+    .map(f => ({ stars: Math.max(1, Math.min(5, +v(f.stars) || 5)), text: String(v(f.text)).slice(0, 280), name: String(v(f.name) || '').slice(0, 40), groupName: String(v(f.groupName) || '').slice(0, 60), at: +v(f.at) || 0 }))
+    .sort((a, b) => b.at - a.at);
+}
+
 export default {
   async fetch(req, env) {
     const url = new URL(req.url), origin = req.headers.get('Origin') || '';
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req);
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(origin) });
+    if (url.pathname === '/api/avis') {
+      const cache = caches.default, key = new Request(url.origin + '/api/avis');
+      let res = await cache.match(key);
+      if (!res) { res = new Response(JSON.stringify(await avisPublies().catch(() => [])), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=600' } }); await cache.put(key, res.clone()); }
+      return res;
+    }
     if (url.pathname === '/api/push/status') return json({ ready: !!env.VAPID_PRIVATE_JWK }, 200, origin);
     if (url.pathname === '/api/push' && req.method === 'POST') {
       if (!env.VAPID_PRIVATE_JWK) return json({ error: 'Notifications pas encore configurées.' }, 503, origin);
