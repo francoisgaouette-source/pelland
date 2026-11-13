@@ -50,9 +50,9 @@
       if (this.mode === 'firebase' && !this.needLogin) {
         // Compte qui n'est plus relié à aucun joueur (ex. numéro changé depuis) : on revient à l'écran de connexion
         if (await this.ensureMember() === false) { try { await firebase.auth().signOut(); } catch (e) { } this.uid = null; this.email = null; this.needLogin = true; }
-        else { await this.migrateGroups(); await this.migrateData(); await this.migratePhones(); }
+        // Mises à jour ponctuelles des anciennes données : en arrière-plan, sans retarder l'ouverture
+        else setTimeout(async () => { try { await this.migrateGroups(); await this.migrateData(); await this.migratePhones(); } catch (e) { } }, 1500);
       }
-      if (!this.needLogin) await this.ensureSeed();
     },
     // ---------- Comptes ----------
     // Un compte par personne, créé une seule fois : cellulaire confirmé par un code texto, puis un mot de passe.
@@ -3369,8 +3369,7 @@
     $('#view').innerHTML = '<p class="note">Démarrage…</p>';
     await Store.init();
     if (Store.needLogin) {
-      try { S.players = await Store.listPlayers(true); } catch (e) { S.players = []; }
-      try { S.groups = await Store.listGroups(); } catch (e) { S.groups = []; }
+      [S.players, S.groups] = await Promise.all([Store.listPlayers(true).catch(() => []), Store.listGroups().catch(() => [])]);
       S.view = 'login'; render(); return;
     }
     // Lien d'invitation (?joueur=…) ouvert par quelqu'un d'autre que la personne connectée : écran de connexion
@@ -3385,11 +3384,21 @@
       }
       if (target) history.replaceState(null, '', location.pathname);
     }
-    try { S.courses = await Store.listCourses(); } catch (e) { S.courses = [L.PINEGROVE]; }
-    try { S.players = await Store.listPlayers(); } catch (e) { S.players = []; }
-    try { S.quatuors = await Store.listQuatuors(); } catch (e) { S.quatuors = []; }
-    try { S.jeux = await Store.listJeux(); } catch (e) { S.jeux = []; }
-    try { S.groups = await Store.listGroups(); } catch (e) { S.groups = []; }
+    // Ouverture rapide : on affiche tout de suite la dernière copie du groupe gardée sur l'appareil,
+    // puis on charge la version à jour (toutes les lectures en même temps) et on rafraîchit l'écran.
+    const params0 = new URLSearchParams(location.search), snapK = 'fanion.snap.' + Store.gid + '.' + (Store.uid || '');
+    const plain = !['partie', 'code', 'offre', 'compte', 'ecoute', 'pelland', 'joueur'].some(k => params0.has(k));
+    const snap = plain ? ls.get(snapK, null) : null;
+    if (snap && snap.players && snap.players.length) {
+      Object.assign(S, { players: snap.players, quatuors: snap.quatuors || [], jeux: snap.jeux || [], groups: snap.groups || [], courses: [...(snap.courses || []), ...(window.QC_COURSES || []).filter(q => !(snap.courses || []).some(c => c.id === q.id))].sort((x, y) => x.name.localeCompare(y.name, 'fr')) });
+      render();
+    }
+    const [courses, players, quatuors, jeux, groups] = await Promise.all([
+      Store.listCourses().catch(() => [L.PINEGROVE]), Store.listPlayers().catch(() => []), Store.listQuatuors().catch(() => []),
+      Store.listJeux().catch(() => []), Store.listGroups().catch(() => [])]);
+    Object.assign(S, { courses, players, quatuors, jeux, groups });
+    if (!courses.some(c => c.id === L.PINEGROVE.id)) { S.courses = [...courses, L.PINEGROVE]; Store.saveCourse(L.PINEGROVE).catch(() => { }); }
+    try { ls.set(snapK, { players, quatuors, jeux, groups, courses: courses.filter(c => !(window.QC_COURSES || []).some(q => q === c)), at: Date.now() }); } catch (e) { }
     // Groupes créés avant le compteur : on l'initialise une fois avec le nombre de joueurs
     if (Store.mode === 'firebase' && curGroup().nPlayers == null && S.players.length && canOrganize()) { try { await Store.db.collection('players').doc('_groupe_' + Store.gid).set({ nPlayers: S.players.length }, { merge: true }); S.groups = await Store.listGroups(); } catch (e) { console.warn('compteur', e.message); } }
     Push.refresh().catch(() => { });
@@ -3404,6 +3413,6 @@
       // Ouverture par le raccourci Siri : reprendre la dernière partie et écouter
       const last = ls.get('pelland.lastGame', null);
       if (last) openGame(last); else render();
-    } else render();
+    } else if (!snap || (S.view === 'home' && !document.querySelector('#sheetWrap:not([hidden]), #welcome'))) render();
   })();
 })();
