@@ -765,7 +765,7 @@
       ${referralCard()}
       ${Store.needLogin ? '' : `<button class="caddie-tile" data-caddie type="button"><span class="cad-ico" aria-hidden="true">?</span><span><b>Une question ?</b><small>Demandez au Caddie : l’app, les règles des jeux, les forfaits.</small></span></button>`}
       ${viralCard('home')}
-      ${Store.mode === 'firebase' && Store.email ? `<p class="note">Connecté : <b>${esc(ls.get('pelland.me', '') || '')}</b> · <button class="linkbtn" data-go="compte" type="button">Mon compte</button> · <button class="linkbtn" id="logout" type="button">Se déconnecter</button></p>` : ''}
+      ${Store.mode === 'firebase' && Store.email ? `<p class="note"><button class="linkbtn" id="logout" type="button">Se déconnecter</button></p>` : ''}
       <p class="note">${Store.mode === 'firebase' ? 'Base partagée active : les autres joueurs suivent la partie en direct dans Parties en cours.' : 'Mode local : les parties restent sur ce téléphone.'}</p>
       ${Store.mode === 'local' && Store.error ? `<div class="warn"><b>Pourquoi le mode local :</b> ${esc(Store.error)}</div>` : ''}`;
   }
@@ -776,6 +776,12 @@
     gr = gr || curGroup();
     if (gr.plan === 'groupe' && (!gr.paidUntil || gr.paidUntil > Date.now())) return { name: 'Groupe', max: 16, until: gr.paidUntil || null, paid: true };
     return { name: 'Gratuit', max: 4, until: null, paid: false, expired: gr.plan === 'groupe' };
+  }
+  // « Mon compte » sous le nom de la personne connectée (et, pour le propriétaire, le choix de l'organisateur)
+  function acctAct(sameOrg) {
+    const acct = Store.mode === 'firebase' && Store.email ? `<button class="linkbtn" data-go="compte" type="button">Mon compte</button>` : '';
+    const pick = sameOrg !== undefined ? `<button class="linkbtn" data-pickorg type="button">${sameOrg ? 'Nommer un organisateur' : 'Changer l’organisateur'}</button>` : '';
+    return acct || pick ? `<div class="who-act">${[acct, pick].filter(Boolean).join('<span aria-hidden="true"> · </span>')}</div>` : '';
   }
   function groupInfo(compact) {
     const own = (S.players || []).find(p => p.id === ownerId()), pl = planOf(), n = (S.players || []).length, over = n > pl.max;
@@ -788,9 +794,9 @@
     const tagP = '<span class="role-tag own" title="Détient le forfait du groupe">Propriétaire</span>', tagO = '<span class="role-tag org" title="Prépare les parties">Organisateur</span>';
     return `<div class="grp-info${compact ? ' compact' : ''}">
       <div class="who-line"><b>${own ? esc(own.name) : 'Aucun propriétaire'}</b>${own ? tagP : ''}${own && sameOrg ? tagO : ''}</div>
-      ${!sameOrg ? `<div class="who-line"><b>${esc(org.name)}</b>${tagO}</div>` : ''}
-      ${isParticipant() ? `<div class="who-line me-line"><b>${esc((S.players.find(p => p.id === meId()) || {}).name || '')}</b><span class="role-tag part">Participant</span><button class="linkbtn" data-welcome type="button">Ce que je peux faire</button></div>` : ''}
-      ${meOwner ? `<div class="who-act"><button class="linkbtn" data-pickorg type="button">${sameOrg ? 'Nommer un organisateur' : 'Changer l’organisateur'}</button></div>` : ''}
+      ${meOwner ? acctAct(sameOrg) : ''}
+      ${!sameOrg ? `<div class="who-line"><b>${esc(org.name)}</b>${tagO}</div>${org.id === meId() ? acctAct() : ''}` : ''}
+      ${isParticipant() ? `<div class="who-line me-line"><b>${esc((S.players.find(p => p.id === meId()) || {}).name || '')}</b><span class="role-tag part">Participant</span><button class="linkbtn" data-welcome type="button">Ce que je peux faire</button></div>${acctAct()}` : ''}
       <div class="plan-line"><span>Forfait</span><b>${pl.name}${pl.expired ? ' (saison terminée)' : ''}</b><small class="${over ? 'over' : ''}">${n} / ${pl.max} joueurs${until}</small>${buy}</div>
     </div>`;
   }
