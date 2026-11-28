@@ -1,6 +1,6 @@
 # Le Fanion — consignes pour Claude Code
 
-Ce dépôt (`le-fanion`, autrefois `pelland`) contient **Le Fanion**, l'app de golf (personnage : **Léo**, le caddie), et **L'Échange** (app.lechange.ai), son app sœur des sports de raquette. Les deux partagent le tronc commun `src/commun/`. Le Fanion passe de app.fanion.ai à app.lefanion.ai.
+Ce dépôt (`le-fanion`, autrefois `pelland`) contient **Le Fanion**, l'app de golf (personnage : **Samuel**, le caddie), et **L'Échange** (app.lechange.ai), son app sœur des sports de raquette. Les deux partagent le tronc commun `src/commun/`. Le Fanion passe de app.fanion.ai à app.lefanion.ai.
 
 Quelques noms internes (dont l'ancien projet Firebase) gardent le nom technique `pelland` : ne les renomme pas.
 

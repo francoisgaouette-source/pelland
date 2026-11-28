@@ -203,10 +203,10 @@
         catch (e) { ro.disabled = false; toast('Retrait impossible : ' + e.message); }
       };
       const vc = $('#verifCarte'); if (vc) vc.onclick = async () => {
-        vc.disabled = true; const et = $('#verifEtat'); et.textContent = 'Léo compare avec la carte du club sur le web… (jusqu’à une minute)';
+        vc.disabled = true; const et = $('#verifEtat'); et.textContent = 'Samuel compare avec la carte du club sur le web… (jusqu’à une minute)';
         try {
           const r = await verifierCarte(S.courses.find(x => x.id === c.id) || c, false);
-          et.textContent = r.etat === 'ajour' ? '✓ La carte est à jour.' : r.etat === 'incertain' ? 'Léo n’a pas trouvé de carte complète et fiable : rien n’a changé.' : r.etat === 'deja' ? 'Une mise à jour attend déjà l’approbation.'
+          et.textContent = r.etat === 'ajour' ? '✓ La carte est à jour.' : r.etat === 'incertain' ? 'Samuel n’a pas trouvé de carte complète et fiable : rien n’a changé.' : r.etat === 'deja' ? 'Une mise à jour attend déjà l’approbation.'
             : `La carte a changé (${r.changes.length} différence${r.changes.length > 1 ? 's' : ''}) : la mise à jour ${P.admin ? 'est dans « Terrains à approuver »' : 'est envoyée pour approbation'}.`;
           if (r.etat === 'ajour') S.courses = await Store.listCourses();
         } catch (e) { et.textContent = 'Vérification impossible : ' + e.message; }

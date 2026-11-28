@@ -1,4 +1,4 @@
-  // ---------------- Léo, le caddie en personne : visage dans le coin, salut à l'arrivée, visite guidée ----------------
+  // ---------------- Samuel, le caddie en personne : visage dans le coin, salut à l'arrivée, visite guidée ----------------
   let leo = null;
   const LEO_CACHE = ['game', 'setup', 'compEdit', 'comp', 'compTv', 'offre', 'login', 'join', 'jeuEdit', 'course'];   // écrans de saisie : on ne cache rien
   const ssGet = k => { try { return sessionStorage.getItem(k); } catch (e) { return null; } };

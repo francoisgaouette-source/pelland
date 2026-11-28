@@ -31,7 +31,7 @@
   function render() {
     const v = $('#view');
     $('#back').hidden = S.view === 'home' || S.view === 'login';
-    document.body.classList.toggle('tv-mode', S.view === 'compTv');   // écran télé : sans barre ni bouton de Léo
+    document.body.classList.toggle('tv-mode', S.view === 'compTv');   // écran télé : sans barre ni bouton de Samuel
     $('#dbBadge').textContent = !navigator.onLine ? 'Hors ligne' : Store.mode === 'cloud' ? '' : 'Local';
     // Mon compte : l'ancien bouton aux initiales reste caché ; le visage de Philippe (porte.js) le remplace
     const ab = $('#acctBtn'), acctOk = Store.mode === 'cloud' && !!Store.email && !Store.needLogin && S.view !== 'login';

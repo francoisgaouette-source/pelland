@@ -1,5 +1,5 @@
   // =====================================================================
-  // Contenu propre au golf, lu par le tronc commun (accueil, aperçus, Léo, textes d'invitation)
+  // Contenu propre au golf, lu par le tronc commun (accueil, aperçus, Samuel, textes d'invitation)
   // =====================================================================
   const SPORT = {
     // Tuiles réservées à l'organisateur : explication, aperçu dessiné et fiche
@@ -35,18 +35,18 @@
           <li><b>Suivre les parties en direct</b> : scores, points et argent, trou par trou.</li>
           <li><b>Revoir les parties jouées</b> et qui doit quoi à qui.</li>
           <li><b>Voir le classement</b> des compétitions.</li>
-          <li><b>Poser vos questions</b> à Léo, votre caddie : touchez son visage dans le coin.</li>`,
+          <li><b>Poser vos questions</b> à Samuel, votre caddie : touchez son visage dans le coin.</li>`,
     bienvenueOrg: '<li>Inviter les joueurs</li><li>Offrir les dates et former les quatuors</li><li>Créer les parties</li><li>Gérer les terrains et les jeux</li>',
     // Bien démarrer
     etapeJoueurs: n => `${n} joueur${n > 1 ? 's' : ''} avec cellulaire : il en faut 3 pour un premier quatuor.`,
     etapeOffre: 'Vos joueurs répondent par texto ; l’app forme les quatuors.',
     etapePartie: 'Choisissez le terrain et le jeu ; l’app compte tout, en direct.',
-    // Léo
+    // Samuel
     ecrans: { home: 'Accueil', players: 'Inviter des joueurs', quatuors: 'Parties à préparer', setup: 'Créer une partie', jeux: 'Banque de jeux', courses: 'Banque de terrains', live: 'Parties en cours', history: 'Parties et compétitions jouées', comps: 'Banque de compétitions', compte: 'Mon compte' },
     questionsLeo: ['Comment inviter mes joueurs ?', 'Comment marche la press ?', 'Combien coûte le forfait Groupe ?'],
     leoAccueil: 'Posez-moi vos questions sur l’app, les règles des jeux ou les forfaits.',
     visite: nom => [
-      { puce: 'Bonjour !', titre: `Bienvenue${nom ? ', ' + nom : ''} ! Moi, c’est Léo, votre caddie.`, texte: `Je vous fais faire le tour de « ${groupName()} » en six coups. Ça prend une minute.` },
+      { puce: 'Bonjour !', titre: `Bienvenue${nom ? ', ' + nom : ''} ! Moi, c’est Samuel, votre caddie.`, texte: `Je vous fais faire le tour de « ${groupName()} » en six coups. Ça prend une minute.` },
       { puce: 'Étape 1', titre: 'Inviter des joueurs', texte: 'Le nom et le cellulaire de chacun : l’invitation part par texto. Chaque joueur crée son compte une fois, pour tous ses groupes.' },
       { puce: 'Étape 2', titre: 'Parties à préparer', texte: 'Offrez quelques dates. Chacun coche les siennes, et je forme les quatuors à la date butoir.' },
       { puce: 'Étapes 3 et 4', titre: 'Créer une partie, la suivre en direct', texte: 'Terrain, équipes, jeu et montants. Un joueur entre les scores ; les autres suivent la partie sur leur téléphone.' },

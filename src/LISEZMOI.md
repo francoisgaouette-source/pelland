@@ -17,7 +17,7 @@ Supabase, elle fonctionne en mode local.
 
 - `commun/` : le tronc commun, partagé avec les apps sœurs (dont l'app des sports de raquette) : démarrage,
   base de données (groupes, joueurs, banque, présences, offres de dates, avis, notifications), compte HoldingAI,
-  rôles, forfaits et parrainage, accueil des nouveaux, boucle de retour (idées), Léo, textos et notifications.
+  rôles, forfaits et parrainage, accueil des nouveaux, boucle de retour (idées), Samuel, textos et notifications.
 - `golf/` : le module golf : terrains et cartes, parties, jeux, quatuors, pointage, compétitions, impressions.
 - `raquette/` : le module des sports de raquette : règles des six sports (`regles.js`), rotations (`rotation.js`),
   lieux et soirées (`donnees.js`, `vues.js`), et sa page (`page/` : index.html, manifest, config.js, sw.js, couleurs).
@@ -44,4 +44,4 @@ Le tronc commun ne doit appeler aucune fonction d'un module directement : seulem
 - Mise en ligne de L'Échange : `wrangler.lechange.jsonc` (Cloudflare, domaine lechange.ai). Il reste le projet
   Supabase et le client HoldingAI (à mettre dans `raquette/page/config.js`), puis les services du serveur (textos,
   notifications, assistant), qui demandent de rendre `worker.js` multi-app.
-- Le dessin de Léo (caddie-guide.js) n'est pas branché pour L'Échange.
+- Le dessin de Samuel (caddie-guide.js) n'est pas branché pour L'Échange.

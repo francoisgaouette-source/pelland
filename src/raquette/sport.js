@@ -1,5 +1,5 @@
   // =====================================================================
-  // Contenu propre aux sports de raquette, lu par le tronc commun (accueil, aperçus, Léo, textes d'invitation)
+  // Contenu propre aux sports de raquette, lu par le tronc commun (accueil, aperçus, Samuel, textes d'invitation)
   // =====================================================================
   const SPORT = {
     verrous: {

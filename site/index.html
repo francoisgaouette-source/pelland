@@ -407,7 +407,7 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
   <div class="wrap">
     <div class="extra-grid">
       <div class="extra"><svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zM10 19a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><h3>Notifications</h3><p>Des dates offertes, une partie qui commence, une compétition créée : le groupe est averti sur son téléphone, sans texto de plus.</p></div>
-      <div class="extra"><span class="leo-av" aria-hidden="true"></span><h3>Léo, votre caddie</h3><p>Une question sur l’app, une règle ou un handicap d’équipe ? Léo répond, en français, à toute heure. Il vous fait aussi visiter l’app la première fois.</p></div>
+      <div class="extra"><span class="leo-av" aria-hidden="true"></span><h3>Samuel, votre caddie</h3><p>Une question sur l’app, une règle ou un handicap d’équipe ? Samuel répond, en français, à toute heure. Il vous fait aussi visiter l’app la première fois.</p></div>
       <div class="extra"><svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12v8H4v-8M2 8h20v4H2zM12 8v12M12 8c-2-4-6-4-6-1s6 1 6 1zm0 0c2-4 6-4 6-1s-6 1-6 1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><h3>Parrainage</h3><p>Partagez votre lien : pour chaque groupe qui passe au forfait Groupe grâce à vous, vous obtenez 5 $ de rabais sur votre prochaine saison.</p></div>
     </div>
   </div>
@@ -441,7 +441,7 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
           <li>1 groupe, jusqu’à 4 joueurs</li>
           <li>Tous les jeux et toutes les compétitions</li>
           <li>Pointage en direct et qui doit quoi</li>
-          <li>Notifications et Léo, votre caddie</li>
+          <li>Notifications et Samuel, votre caddie</li>
         </ul>
         <a class="btn line" href="https://app.lefanion.ai/">Commencer gratuitement</a>
       </div>
@@ -491,7 +491,7 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
       <details><summary>Je joue dans plusieurs groupes. Faut-il plusieurs comptes ?</summary><p>Non. Un seul compte, lié à votre cellulaire, donne accès à tous les groupes où vous êtes invité. Après la connexion, vous choisissez le groupe dans « Mon compte ».</p></details>
       <details><summary>Quelles compétitions peut-on organiser ?</summary><p>Le membre-membre par équipes de 2 en match play, en Stableford ou en coups, et le Texas scramble par équipes de 2 à 4 avec départs minimums. Les handicaps d’équipe suivent le système mondial, les équipes sont réparties en classes, et le classement se met à jour à chaque score entré.</p></details>
       <details><summary>Comment suis-je averti des nouvelles parties ?</summary><p>Activez les notifications dans l’app : vous êtes averti quand des dates sont offertes, qu’une partie commence ou se termine, ou qu’une compétition est créée. L’invitation au groupe, elle, part par texto du téléphone de l’organisateur.</p></details>
-      <details><summary>Qui est Léo ?</summary><p>Léo, c’est votre caddie : un assistant dans l’app. Il vous fait visiter l’app la première fois, vous salue à chaque arrivée avec ce qui se passe dans le groupe, et répond à vos questions, en français : comment inviter un joueur, les règles d’un jeu, le calcul d’un handicap d’équipe, les forfaits. Il n’a pas accès à vos scores ni aux données de votre groupe.</p></details>
+      <details><summary>Qui est Samuel ?</summary><p>Samuel, c’est votre caddie : un assistant dans l’app. Il vous fait visiter l’app la première fois, vous salue à chaque arrivée avec ce qui se passe dans le groupe, et répond à vos questions, en français : comment inviter un joueur, les règles d’un jeu, le calcul d’un handicap d’équipe, les forfaits. Il n’a pas accès à vos scores ni aux données de votre groupe.</p></details>
       <details><summary>Comment se passe l’achat ?</summary><p>L’organisateur paie 79 $ plus taxes par carte de crédit (49 $ au prix fondateur, avant le 31 mars 2027), sur une page de paiement sécurisée (Stripe). Il indique le nom de son groupe et reçoit un reçu par courriel. Le groupe passe à 16 joueurs dans les 24 heures.</p></details>
       <details><summary>Est-ce un abonnement qui se renouvelle tout seul ?</summary><p>Non. Vous payez une saison à la fois. Aucun montant n’est prélevé sans votre accord.</p></details>
       <details><summary>Et si ça ne fait pas l’affaire ?</summary><p>Vous avez 30 jours après l’achat pour demander un remboursement complet, sans justification. Écrivez à <a href="mailto:bonjour@fanion.ai">bonjour@fanion.ai</a>.</p></details>
@@ -542,10 +542,10 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
   }).catch(function () {});
 })();
 </script>
-<script src="caddie-guide.js?v=20261115a"></script>
+<script src="caddie-guide.js?v=20261128samuel"></script>
 <script>
 (function () {
-  // Léo, le caddie de Fanion : il propose une visite d'une minute aux visiteurs
+  // Samuel, le caddie de Fanion : il propose une visite d'une minute aux visiteurs
   if (!window.CaddieGuide) return;
   var APP = 'https://app.lefanion.ai/';
   var K = 'fanion.site.leo';
@@ -555,7 +555,7 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
     note('vu');
     CaddieGuide.ouvrir({
       etapes: [
-        { puce: 'Bonjour !', titre: 'Moi, c’est Léo, le caddie du fanion.ai.', texte: 'Je vous montre en une minute comment le fanion.ai organise votre gang de golf, du texto du jeudi soir jusqu’au 19e trou.' },
+        { puce: 'Bonjour !', titre: 'Moi, c’est Samuel, le caddie du fanion.ai.', texte: 'Je vous montre en une minute comment le fanion.ai organise votre gang de golf, du texto du jeudi soir jusqu’au 19e trou.' },
         { puce: 'Les dates', titre: 'Fini les 40 textos', texte: 'L’organisateur offre quelques dates. Chacun coche les siennes avec le lien reçu, et je forme les quatuors à la date butoir.' },
         { puce: 'La partie', titre: 'Le pointage en direct', texte: 'Un joueur entre les scores, au net, avec les coups de chacun. Les autres suivent la partie sur leur téléphone, trou par trou.' },
         { puce: 'Les jeux', titre: 'Les gageures, calculées', texte: 'Game à Pelland, Nassau, Vegas, skins, Wolf ou votre jeu maison. À la fin, je dis qui doit quoi à qui. L’argent, lui, se règle au 19e.' },
@@ -566,10 +566,10 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
     });
   }
   document.querySelectorAll('.leo-av').forEach(function (e) { e.innerHTML = CaddieGuide.avatar(); });
-  var p = CaddieGuide.presence({ surFace: visite, label: 'Faire la visite du fanion.ai avec Léo' });
+  var p = CaddieGuide.presence({ surFace: visite, label: 'Faire la visite du fanion.ai avec Samuel' });
   if (!lu()) setTimeout(function () {
     if (document.querySelector('.cd-fond')) return;
-    p.dire({ titre: 'Bonjour ! Moi, c’est Léo.', texte: 'Je vous fais visiter le fanion.ai en une minute ?', bouton: 'Faire la visite', action: visite, onFermer: function () { note('ferme'); } });
+    p.dire({ titre: 'Bonjour ! Moi, c’est Samuel.', texte: 'Je vous fais visiter le fanion.ai en une minute ?', bouton: 'Faire la visite', action: visite, onFermer: function () { note('ferme'); } });
   }, 2500);
 })();
 </script>

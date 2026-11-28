@@ -1,5 +1,5 @@
 {
-  "_aFaire": "Personnage de l’assistant (Léo pour l’instant), projet Supabase et client L’Établi : à faire avant le lancement (étape 5).",
+  "_aFaire": "Personnage de l’assistant (Samuel pour l’instant), projet Supabase et client L’Établi : à faire avant le lancement (étape 5).",
   "sortie": "dist/raquette/app.js",
   "page": "raquette/page",
   "copier": [
@@ -24,7 +24,7 @@
     "accroche": "Pickleball, tennis, badminton, padel, squash, tennis de table : soirées, rotations et pointage.",
     "description": "l’app des sports de raquette entre amis",
     "groupeDefaut": "Mon groupe",
-    "personnage": "Léo",
+    "personnage": "Samuel",
     "role": "votre assistant",
     "roleMaj": "Votre assistant",
     "leRole": "l’assistant",

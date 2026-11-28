@@ -1,4 +1,4 @@
-// Léo, le caddie de Fanion, en personne : un jeune caddie dessiné (casquette au fanion, dossard, sac sur l'épaule)
+// Samuel, le caddie de Fanion, en personne : un jeune caddie dessiné (casquette au fanion, dossard, sac sur l'épaule)
 // qui fait visiter l'app étape par étape, salue à chaque arrivée et reste dans le coin pour répondre aux questions.
 // Partagé par l'app (app.lefanion.ai) et le site (fanion.ai).
 //   CaddieGuide.ouvrir({ etapes: [{ titre, texte, puce? }], fin: { titre, texte, bouton, action }, onFermer })
@@ -6,7 +6,7 @@
 //   CaddieGuide.avatar() → le SVG du personnage
 (function () {
   'use strict';
-  const NOM = 'Léo';
+  const NOM = 'Samuel';
 
   const AVATAR = `<svg class="cd-av" viewBox="0 0 200 200" aria-hidden="true" focusable="false">
   <circle cx="100" cy="100" r="98" fill="#DDEBE1"/>
@@ -94,7 +94,7 @@ body:has(.cd-fond) .cd-lanceur,body:has(#welcome) .cd-lanceur{display:none}
   function style() { if (styleOk) return; styleOk = true; const s = document.createElement('style'); s.textContent = CSS; document.head.appendChild(s); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
-  // La visite : une étape à la fois, Léo parle dans sa bulle
+  // La visite : une étape à la fois, Samuel parle dans sa bulle
   function ouvrir(opts) {
     style();
     const etapes = (opts.etapes || []).slice();
@@ -153,7 +153,7 @@ body:has(.cd-fond) .cd-lanceur,body:has(#welcome) .cd-lanceur{display:none}
     return { fermer };
   }
 
-  // Léo toujours présent : son visage dans le coin ; il peut dire un mot dans une bulle
+  // Samuel toujours présent : son visage dans le coin ; il peut dire un mot dans une bulle
   let active = null;
   function presence(opts) {
     style();

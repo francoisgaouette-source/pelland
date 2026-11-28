@@ -53,7 +53,7 @@
     if (ad && (ad.state || ad.country)) return { region: [ad.state || ad.county, ad.country].filter(Boolean).join(', '), ville: ad.city || ad.town || ad.village || '' };
     return { region: `environs de ${lat.toFixed(2)}, ${lng.toFixed(2)}`, ville: '' };
   }
-  // ---- Léo garde les cartes à jour : il revérifie chaque terrain sur le web environ une fois par saison
+  // ---- Samuel garde les cartes à jour : il revérifie chaque terrain sur le web environ une fois par saison
   const VERIF_JOURS = 300, VERIF_PAR_JOUR = 2;
   const derniereVerif = c => Number(c.verifieLe || c.approuveLe || 0);
   const fmtN = x => String(x).replace('.', ',');
@@ -83,7 +83,7 @@
     if ([...P.todo, ...P.mine].some(p => p.statut === 'propose' && p.courseId === c.id)) return { etat: 'deja', changes: r.changes };
     const g = curGroup(), moi = (S.players.find(p => p.id === meId()) || {}).name || ls.get('pelland.me', '') || '';
     const web = { region: c.region || '', sources: d.sources || [], alertes: [], notes: d.notes || '', confiance: d.confiance || 'basse', carte: d.carte || null, cartePage: d.cartePage || null };
-    const p = await Store.proposeCourse({ ...r.course, web }, { type: 'maj', courseId: c.id, changes: r.changes.slice(0, 40), proposePar: auto ? 'Léo (vérification automatique)' : moi, groupeNom: g.name || '' });
+    const p = await Store.proposeCourse({ ...r.course, web }, { type: 'maj', courseId: c.id, changes: r.changes.slice(0, 40), proposePar: auto ? 'Samuel (vérification automatique)' : moi, groupeNom: g.name || '' });
     P.mine.push(p); if (P.admin) P.todo.push(p);
     return { etat: 'change', changes: r.changes };
   }
@@ -108,13 +108,13 @@
     const memo = ls.get(REGION_K, null);   // { region, auto } : dernière région détectée ou choisie
     const html = (etat) => {
       const r = etat.region;
-      const tete = etat.cherche ? `<div class="region-moi"><div class="spin small"></div><span>Léo cherche votre région d’après votre position…</span></div>`
+      const tete = etat.cherche ? `<div class="region-moi"><div class="spin small"></div><span>Samuel cherche votre région d’après votre position…</span></div>`
         : r ? `<div class="region-moi"><span class="note">${etat.auto ? (etat.ville ? `📍 Vous êtes près de ${esc(etat.ville)}` : '📍 Votre région, d’après votre position') : 'Dernière région utilisée'}</span>
             <button class="btn" data-region="${esc(r)}" type="button">Chercher les clubs · ${esc(r)}</button></div>`
         : `<div class="region-moi"><span class="note">${etat.refus ? 'Position non disponible : choisissez une région ou tapez un lieu.' : 'Choisissez une région ou tapez un lieu.'}</span>
             ${etat.refus || etat.echec ? '<button class="btn ghost small" data-relocal type="button">📍 Utiliser ma position</button>' : ''}</div>`;
       return `<h3>Ajouter un terrain</h3>
-        <p class="note">Léo cherche sur le web tous les clubs de golf de la région et prépare la carte de pointage du terrain choisi. Vous la vérifiez, puis l’approuvez ou la refusez avant qu’elle entre dans la banque.</p>
+        <p class="note">Samuel cherche sur le web tous les clubs de golf de la région et prépare la carte de pointage du terrain choisi. Vous la vérifiez, puis l’approuvez ou la refusez avant qu’elle entre dans la banque.</p>
         ${tete}
         <form class="region-libre" data-libre><input id="regionLibre" type="text" maxlength="80" placeholder="Autre lieu (ville, pays)" autocomplete="off"><button class="btn small" type="submit">Chercher</button></form>
         <h4 class="region-autres">${r && REGIONS_QC.includes(r) ? 'Autres régions du Québec' : 'Régions du Québec'}</h4>
@@ -165,10 +165,10 @@
   function vClubs() {
     $('#barTitle').textContent = W.region || 'Clubs';
     const enBanque = c => { const n = normNom(c.nom); return n && S.courses.some(x => { const m = normNom(x.name); return m && (m.includes(n) || n.includes(m)); }); };
-    if (!W.charge) return `<section class="card leo-cherche"><div class="spin"></div><p><b>Léo cherche les clubs de golf · ${esc(W.region)}</b></p><p class="note">Recherche sur le web, ça prend de 20 à 60 secondes.</p></section>`;
-    if (W.prep) return `<section class="card leo-cherche"><div class="spin"></div><p><b>Léo prépare la carte de pointage</b></p><p>${esc(W.prep)}</p><p class="note">Il lit le site du club et les sites de cartes de pointage : normales, handicaps, tertres, évaluation et slope. Comptez jusqu’à une minute.</p></section>`;
+    if (!W.charge) return `<section class="card leo-cherche"><div class="spin"></div><p><b>Samuel cherche les clubs de golf · ${esc(W.region)}</b></p><p class="note">Recherche sur le web, ça prend de 20 à 60 secondes.</p></section>`;
+    if (W.prep) return `<section class="card leo-cherche"><div class="spin"></div><p><b>Samuel prépare la carte de pointage</b></p><p>${esc(W.prep)}</p><p class="note">Il lit le site du club et les sites de cartes de pointage : normales, handicaps, tertres, évaluation et slope. Comptez jusqu’à une minute.</p></section>`;
     return `${W.err ? `<p class="note err-txt">${esc(W.err)}</p>` : ''}
-      ${W.clubs.length ? `<p class="note">${W.clubs.length} club${W.clubs.length > 1 ? 's' : ''} trouvé${W.clubs.length > 1 ? 's' : ''}. Touchez un parcours : Léo prépare sa carte, vous la vérifiez puis l’approuvez.</p>
+      ${W.clubs.length ? `<p class="note">${W.clubs.length} club${W.clubs.length > 1 ? 's' : ''} trouvé${W.clubs.length > 1 ? 's' : ''}. Touchez un parcours : Samuel prépare sa carte, vous la vérifiez puis l’approuvez.</p>
       <div class="list">${W.clubs.map((c, i) => { const deja = enBanque(c); const pcs = c.parcours && c.parcours.length > 1 ? c.parcours : null;
         return `<div class="item club-item${deja ? ' deja' : ''}"><div><b>${esc(c.nom)}</b><span>${esc(c.ville || '')}${c.prive ? ' · privé' : ''}${deja ? ' · déjà dans la banque' : ''}</span></div>
           <div class="club-pcs">${pcs ? pcs.map((p, j) => `<button class="btn ghost small" data-club="${i}" data-pc="${j}" type="button">${esc(p.nom || 'Parcours ' + (j + 1))}${p.trous && p.trous !== 18 ? ' (' + p.trous + ' t.)' : ''}</button>`).join('') : `<button class="btn ghost small" data-club="${i}" type="button">${deja ? 'Préparer quand même' : 'Préparer la carte'}</button>`}</div></div>`; }).join('')}</div>` : (W.err ? '' : '<p class="note">Aucun club trouvé pour cette région.</p>')}
@@ -203,10 +203,10 @@
     $('#barTitle').textContent = c.proposition ? (c.proposition.maj ? 'Mise à jour à approuver' : 'Terrain à approuver') : c.web ? 'Carte à réviser' : c.id ? 'Modifier le terrain' : 'Nouveau terrain';
     const imgs = S.cardImgs || [];
     const w = c.web, prop = c.proposition, admin = P.admin;
-    const propBand = prop ? `<section class="card web-band"><h2>${prop.maj ? 'La carte a changé' : 'Proposé pour la banque'}</h2><p>${prop.maj ? 'Léo a revérifié ce terrain sur le web et trouvé des différences avec la banque' : 'Par ' + esc(prop.par || 'un joueur') + (prop.groupeNom ? ' (' + esc(prop.groupeNom) + ')' : '')}. Vérifiez avec la carte du club, corrigez au besoin, puis approuvez ou effacez.</p>
+    const propBand = prop ? `<section class="card web-band"><h2>${prop.maj ? 'La carte a changé' : 'Proposé pour la banque'}</h2><p>${prop.maj ? 'Samuel a revérifié ce terrain sur le web et trouvé des différences avec la banque' : 'Par ' + esc(prop.par || 'un joueur') + (prop.groupeNom ? ' (' + esc(prop.groupeNom) + ')' : '')}. Vérifiez avec la carte du club, corrigez au besoin, puis approuvez ou effacez.</p>
       ${prop.changes && prop.changes.length ? `<ul class="maj-liste">${prop.changes.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}</section>` : '';
     const webBand = w ? `<section class="card web-band conf-${esc(w.confiance)}">
-        <h2>Carte préparée par Léo · à réviser</h2>
+        <h2>Carte préparée par Samuel · à réviser</h2>
         <p>Trouvée sur le web (fiabilité ${w.confiance === 'haute' ? 'élevée' : w.confiance === 'moyenne' ? 'moyenne' : 'faible'}). Comparez chaque normale, handicap, évaluation et slope avec la carte officielle du club, corrigez au besoin, puis approuvez ou refusez.</p>
         ${carteSourceHtml(w.carte, w.cartePage)}
         ${w.alertes.length ? `<ul class="web-alertes">${w.alertes.map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}
@@ -247,7 +247,7 @@
           <p class="note">L’équipe du fanion.ai vérifie chaque nouveau terrain avant de l’ajouter à la banque. Vous le verrez dans Terrains dès qu’il est approuvé.</p>`
         : !c.id && !admin ? `<button class="btn" id="saveCourse" type="button">Envoyer pour approbation</button><p class="note">L’équipe du fanion.ai vérifie chaque nouveau terrain avant de l’ajouter à la banque.</p>`
         : `<button class="btn" id="saveCourse" type="button">Enregistrer le terrain</button>`}
-      ${!prop && c.id && S.courses.some(x => x.id === c.id) ? `<section class="card verif-card"><h3>Carte à jour ?</h3><p class="note">${derniereVerif(c) ? 'Dernière vérification : ' + new Date(derniereVerif(c)).toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' }) + '.' : 'Jamais vérifiée sur le web.'} Léo revérifie chaque terrain environ une fois par saison ; si la carte du club a changé, la mise à jour passe par l’approbation.</p>
+      ${!prop && c.id && S.courses.some(x => x.id === c.id) ? `<section class="card verif-card"><h3>Carte à jour ?</h3><p class="note">${derniereVerif(c) ? 'Dernière vérification : ' + new Date(derniereVerif(c)).toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' }) + '.' : 'Jamais vérifiée sur le web.'} Samuel revérifie chaque terrain environ une fois par saison ; si la carte du club a changé, la mise à jour passe par l’approbation.</p>
         <button class="btn ghost small" id="verifCarte" type="button">🔄 Vérifier maintenant</button><div id="verifEtat" class="note"></div></section>` : ''}
       ${!prop && c.id && S.courses.some(x => x.id === c.id) ? (S.confirmRetire === c.id
         ? `<div class="row retire-row"><span class="note">Effacer « ${esc(c.name)} » de la banque du groupe ?</span><button class="btn small" id="retireOk" type="button" style="background:var(--red)">Effacer</button><button class="btn ghost small" id="retireNo" type="button">Annuler</button></div>`
