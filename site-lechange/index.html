@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="fr-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>L’Échange · les sports de raquette entre amis</title>
+<meta name="description" content="Pickleball, tennis, badminton, padel, squash, tennis de table : L’Échange organise vos soirées entre amis, fait les rotations et tient le pointage.">
+<meta property="og:title" content="L’Échange · le terrain tourne, tout le monde joue">
+<meta property="og:description" content="Soirées, rotations et pointage pour les sports de raquette entre amis.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=DM+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* L’Échange : jetons du livre de marque de L’Établi (bordeaux, menthe, fond crème) */
+:root {
+  --fond: #FAF6EF; --carte: #FFFFFF; --filet: #E6DED2; --encre: #1D1B18; --encre-douce: #6B665E;
+  --marque: #7A2338; --marque-fonce: #5E1A2B; --accent: #6CC3A0; --douce: #ECE0E3; --sur-marque: #FFFFFF;
+  --titre: 'Bricolage Grotesque', system-ui, sans-serif;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'DM Mono', ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { margin: 0; background: var(--fond); color: var(--encre); font: 17px/1.55 var(--sans); }
+a { color: var(--marque); }
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+section { padding: 88px 0; }
+h1, h2, h3 { font-family: var(--titre); font-weight: 700; margin: 0; }
+h2 { font-size: clamp(34px, 5vw, 52px); line-height: 1.02; letter-spacing: -.01em; margin-bottom: 16px; }
+.intro { font-size: 20px; color: var(--encre-douce); max-width: 36em; margin: 0 0 40px; }
+.btn { display: inline-flex; align-items: center; min-height: 50px; padding: 0 24px; border-radius: 999px; font-weight: 600; font-size: 18px; text-decoration: none; }
+.btn.main { background: var(--marque); color: var(--sur-marque); }
+.btn.main:hover { background: var(--marque-fonce); }
+.btn.ligne { border: 1.5px solid var(--marque); color: var(--marque); }
+
+/* 1. Menu */
+.entete { background: var(--carte); border-bottom: 1px solid var(--filet); position: sticky; top: 0; z-index: 5; }
+.entete .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 68px; }
+.marque { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--encre); font: 700 24px var(--titre); }
+.marque img { width: 32px; height: 32px; }
+.nav { display: flex; align-items: center; gap: 24px; }
+.nav a { color: var(--encre); text-decoration: none; font-weight: 500; white-space: nowrap; }
+.nav a:hover { color: var(--marque); }
+.nav .login { color: var(--encre-douce); }
+.nav .try { background: var(--marque); color: var(--sur-marque); padding: 8px 18px; border-radius: 999px; font-weight: 600; }
+.nav .try:hover { color: var(--sur-marque); background: var(--marque-fonce); }
+@media (max-width: 820px) { .nav a.lien { display: none; } .nav { gap: 14px; } }
+@media (max-width: 480px) { .entete .wrap { padding: 0 16px; gap: 10px; } .marque { font-size: 20px; gap: 8px; } .marque img { width: 26px; height: 26px; } .nav { gap: 10px; } .nav a { font-size: 15px; } .nav .try { padding: 7px 12px; } }
+
+/* 2. Accueil */
+.accueil { padding: 64px 0 72px; }
+.accueil .wrap { display: grid; grid-template-columns: 1.1fr .9fr; gap: 48px; align-items: center; }
+.accueil h1 { font-size: clamp(46px, 7vw, 84px); line-height: .96; letter-spacing: -.02em; margin-bottom: 20px; }
+.accueil h1 em { font-style: normal; color: var(--marque); }
+.accueil .lead { font-size: 21px; color: var(--encre-douce); margin: 0 0 28px; max-width: 32em; }
+.accueil .petit { font-size: 15px; color: var(--encre-douce); margin: 18px 0 0; }
+@media (max-width: 860px) { .accueil .wrap { grid-template-columns: 1fr; } }
+
+/* L’app à l’écran (maquette) */
+.tel { width: 320px; max-width: 100%; margin: 0 auto; background: var(--fond); border: 10px solid #1D1B18; border-radius: 36px; padding: 18px 16px; display: grid; gap: 12px; box-shadow: 0 24px 48px rgba(0,0,0,.14); }
+.tel .t-nom { font: 700 22px var(--titre); color: var(--marque); }
+.tel .t-sig { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--encre-douce); margin-top: -10px; }
+.tel .t-carte { background: var(--carte); border: 1px solid var(--filet); border-radius: 12px; padding: 12px; }
+.tel .t-douce { background: var(--douce); border: 0; }
+.tel .t-lbl { font-size: 12px; color: var(--encre-douce); }
+.tel .t-score { display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; }
+.tel .t-score b { display: block; font-size: 14px; }
+.tel .t-big { font: 500 36px/1 var(--mono); }
+.tel .t-ligne { display: flex; justify-content: space-between; font-size: 14px; padding: 6px 0; border-top: 1px solid var(--filet); }
+.tel .t-ligne:first-of-type { border-top: 0; }
+.tel .t-pastille { border: 1.5px solid var(--accent); border-radius: 999px; padding: 0 8px; font-size: 12px; font-weight: 600; }
+.tel .t-bulle { background: var(--douce); border-radius: 16px 16px 4px 16px; padding: 10px 12px; font-size: 14px; box-shadow: 0 6px 24px rgba(0,0,0,.14); }
+.tel .t-bulle b { display: block; font-size: 12px; }
+
+/* 3. Le problème */
+.probleme { background: var(--carte); }
+.probleme blockquote { margin: 0; font: 700 clamp(22px, 3vw, 30px)/1.25 var(--titre); color: var(--marque); max-width: 26em; }
+.probleme blockquote small { display: block; margin-top: 8px; font: 15px var(--sans); color: var(--encre-douce); }
+
+/* 4. Comment ça marche */
+.trois { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.trois li { background: var(--carte); border: 1px solid var(--filet); border-radius: 12px; padding: 24px; }
+.trois b { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--marque); color: var(--sur-marque); font: 700 20px var(--titre); margin-bottom: 14px; }
+.trois h3 { font-size: 24px; margin-bottom: 6px; }
+.trois p { margin: 0; color: var(--encre-douce); }
+@media (max-width: 760px) { .trois { grid-template-columns: 1fr; } }
+
+/* 5. L’app */
+.app { background: var(--marque); color: #F6E9EC; }
+.app h2 { color: var(--sur-marque); }
+.app .intro { color: #E9CBD3; }
+.app .wrap { display: grid; grid-template-columns: 1fr 340px; gap: 56px; align-items: center; }
+.app .tel { color: var(--encre); }
+.app ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 18px; }
+.app li { padding-left: 34px; position: relative; }
+.app li::before { content: ''; position: absolute; left: 0; top: 6px; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); }
+.app li b { display: block; color: var(--sur-marque); font-size: 19px; }
+@media (max-width: 860px) { .app .wrap { grid-template-columns: 1fr; } }
+
+/* Section propre à L’Échange : les six sports */
+.sports-grille { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.sport { background: var(--carte); border: 1px solid var(--filet); border-radius: 12px; padding: 20px; }
+.sport h3 { font-size: 24px; margin-bottom: 4px; }
+.sport p { margin: 0; color: var(--encre-douce); font-size: 16px; }
+.sport .chiffre { font-family: var(--mono); color: var(--encre); }
+@media (max-width: 860px) { .sports-grille { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 520px) { .sports-grille { grid-template-columns: 1fr; } }
+
+/* 6. Le personnage */
+.personnage { background: var(--carte); }
+.personnage .wrap { display: grid; grid-template-columns: 96px 1fr; gap: 32px; align-items: start; }
+.portrait { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; border: 3px solid var(--douce); background: var(--douce); }
+.bulle { display: inline-block; background: var(--douce); border-radius: 16px 16px 16px 4px; padding: 12px 18px; box-shadow: 0 6px 24px rgba(0,0,0,.14); }
+.bulle .qui { font-size: 13px; font-weight: 600; }
+.bulle p { margin: 2px 0 0; }
+@media (max-width: 600px) { .personnage .wrap { grid-template-columns: 1fr; gap: 16px; } }
+
+/* 7. Confiance */
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; max-width: 46em; }
+.checks li { padding-left: 32px; position: relative; }
+.checks li::before { content: '✓'; position: absolute; left: 0; color: var(--marque); font-weight: 700; }
+
+/* 8. Prix */
+.prix { background: var(--carte); }
+.plans { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 820px; }
+.plan { border: 1px solid var(--filet); border-radius: 12px; padding: 28px; background: var(--fond); display: flex; flex-direction: column; gap: 10px; }
+.plan h3 { font-size: 26px; }
+.plan .montant { font: 500 36px var(--mono); }
+.plan .montant small { font: 15px var(--sans); color: var(--encre-douce); }
+.plan ul { margin: 0 0 8px; padding-left: 20px; }
+.plan .btn { align-self: flex-start; margin-top: auto; }
+@media (max-width: 700px) { .plans { grid-template-columns: 1fr; } }
+
+/* 9. Questions */
+.faq details { border-bottom: 1px solid var(--filet); padding: 16px 0; max-width: 820px; }
+.faq summary { cursor: pointer; font-weight: 600; font-size: 19px; }
+.faq details p { margin: 10px 0 0; color: var(--encre-douce); }
+
+/* 10. Dernier appel */
+.appel { background: var(--douce); padding: 72px 0; }
+.appel .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px; }
+.appel h2 { margin: 0; }
+.appel-qui { display: flex; align-items: center; gap: 10px; margin: 14px 0 0; font-size: 18px; }
+.appel-qui img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+
+/* 11. Pied de page commun */
+.pied { background: var(--carte); border-top: 1px solid var(--filet); padding: 40px 0; font-size: 16px; }
+.pied .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 24px; }
+.signature { display: flex; align-items: center; gap: 12px; }
+.signature img { width: 36px; height: 36px; }
+.sig-nom { font: 700 22px var(--titre); line-height: 1.1; }
+.sig-etabli { display: flex; align-items: center; gap: 5px; margin-top: 4px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--encre-douce); }
+.liens { display: flex; gap: 24px; flex-wrap: wrap; }
+.liens a { color: var(--encre); }
+.copy { flex-basis: 100%; font-size: 14px; color: var(--encre-douce); }
+</style>
+</head>
+<body>
+
+<header id="entete" class="entete">
+  <div class="wrap">
+    <a class="marque" href="#"><img src="symbole.svg" alt="">L’Échange</a>
+    <nav class="nav" aria-label="Sections">
+      <a class="lien" href="#comment">Comment ça marche</a>
+      <a class="lien" href="#personnage">Samuel</a>
+      <a class="lien" href="#prix">Prix</a>
+      <a class="lien" href="#questions">Questions</a>
+      <a class="login" href="https://app.lechange.ai/">Se connecter</a>
+      <a class="try" href="https://app.lechange.ai/">Essayer</a>
+    </nav>
+  </div>
+</header>
+
+<section id="accueil" class="accueil">
+  <div class="wrap">
+    <div>
+      <h1>Le terrain tourne, <em>tout le monde joue.</em></h1>
+      <p class="lead">Pickleball, tennis, badminton, padel, squash, tennis de table : L’Échange organise vos soirées entre amis, fait les rotations et tient le pointage. Personne n’attend trop longtemps sur le banc.</p>
+      <a class="btn main" href="https://app.lechange.ai/">Essayer gratuitement</a>
+      <p class="petit">Gratuit pour un groupe de 4 joueurs. Dans le navigateur de votre téléphone ou de votre ordinateur. Fait au Québec, en français.</p>
+    </div>
+    <div class="tel" role="img" aria-label="L’accueil de L’Échange : le pointage du terrain 2, la prochaine rotation et une bulle de Samuel.">
+      <div aria-hidden="true">
+        <div class="t-nom">L’Échange</div>
+      </div>
+      <div class="t-sig" aria-hidden="true">Fait à L’Établi</div>
+      <div class="t-carte t-douce" aria-hidden="true">
+        <div class="t-lbl">Terrain 2 · pickleball</div>
+        <div class="t-score"><div><b>Toi et Alex</b><span class="t-big">11</span></div><span class="t-big" style="color:var(--encre-douce)">-</span><div style="text-align:right"><b>Julie et Marc</b><span class="t-big">7</span></div></div>
+      </div>
+      <div class="t-carte" aria-hidden="true">
+        <div class="t-lbl">Prochaine rotation</div>
+        <div class="t-ligne"><span>Terrain 1</span><span>Toi et Karine</span></div>
+        <div class="t-ligne"><span>Au banc</span><span>Marc</span></div>
+        <div class="t-ligne"><span>Terrain libre</span><span class="t-pastille">Terrain 3</span></div>
+      </div>
+      <div class="t-bulle" aria-hidden="true"><b>Samuel · L’Échange</b>11-7 pour vous. Tu changes de terrain.</div>
+    </div>
+  </div>
+</section>
+
+<section id="probleme" class="probleme">
+  <div class="wrap">
+    <h2>Qui joue avec qui, ce soir ?</h2>
+    <p class="intro">Deux ou trois terrains réservés le mardi soir, neuf joueurs, et dix minutes perdues à décider qui joue avec qui. Puis quelqu’un reste trop longtemps sur le banc, et personne ne se souvient du pointage de la troisième manche.</p>
+    <blockquote>« Plus de billets dans un chapeau pour faire les équipes. »<small>Ce que L’Échange remplace.</small></blockquote>
+  </div>
+</section>
+
+<section id="comment" class="comment">
+  <div class="wrap">
+    <h2>Comment ça marche</h2>
+    <p class="intro">L’organisateur prépare la soirée en deux minutes. Ensuite, l’app s’occupe du reste, manche après manche.</p>
+    <ol class="trois">
+      <li><b>1</b><h3>Invitez vos joueurs</h3><p>Le nom et le cellulaire de chacun : l’invitation part par texto.</p></li>
+      <li><b>2</b><h3>Offrez une soirée</h3><p>Une date, un lieu, le nombre de terrains. Chacun répond « je viens ».</p></li>
+      <li><b>3</b><h3>Lancez les rotations</h3><p>Cochez les présents et touchez Lancer : chaque manche dit qui joue avec qui, sur quel terrain. À la fin, le classement de la soirée.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section id="app" class="app">
+  <div class="wrap">
+    <div>
+      <h2>Toute la soirée sur un écran</h2>
+      <p class="intro">L’app vit sur le terrain, téléphone posé sur le banc, entre deux points. Tout se lit d’un coup d’œil.</p>
+      <ul>
+        <li><b>Une carte par terrain</b>Les équipes de la manche, et qui est au banc.</li>
+        <li><b>Le pointage en deux gros chiffres</b>Un joueur par terrain entre le pointage à la fin de la manche.</li>
+        <li><b>Le banc qui tourne</b>Avec un nombre impair, l’app répartit le banc pour que ce ne soit pas toujours le même qui attend.</li>
+        <li><b>Le classement de la soirée</b>Qui a gagné le plus de manches, à la fin de la soirée.</li>
+      </ul>
+    </div>
+    <div class="tel" role="img" aria-label="La prochaine rotation dans L’Échange : terrains, équipes et banc.">
+      <div class="t-carte" aria-hidden="true">
+        <div class="t-lbl">Manche 3 · 9 joueurs, 2 terrains</div>
+        <div class="t-ligne"><span>Terrain 1</span><span>Toi et Alex · Julie et Marc</span></div>
+        <div class="t-ligne"><span>Terrain 2</span><span>Karine et Éric · Luc et Ana</span></div>
+        <div class="t-ligne"><span>Au banc</span><span>Daniel</span></div>
+      </div>
+      <div class="t-bulle" aria-hidden="true"><b>Samuel · L’Échange</b>9 joueurs, 2 terrains. Un de trop : je fais tourner le banc.</div>
+    </div>
+  </div>
+</section>
+
+<section id="sports" class="sports">
+  <div class="wrap">
+    <h2>Six sports, les bonnes règles</h2>
+    <p class="intro">Chaque sport a sa façon de compter. L’app connaît la manche et l’écart à gagner, en simple ou en double.</p>
+    <div class="sports-grille">
+      <div class="sport"><h3>Pickleball</h3><p>Double ou simple. Manche à <span class="chiffre">11</span> points, gagner par <span class="chiffre">2</span>.</p></div>
+      <div class="sport"><h3>Tennis</h3><p>Double ou simple. Manche à <span class="chiffre">6</span> jeux, gagner par <span class="chiffre">2</span>, avec bris d’égalité.</p></div>
+      <div class="sport"><h3>Badminton</h3><p>Double ou simple. Manche à <span class="chiffre">21</span> points, gagner par <span class="chiffre">2</span>, maximum <span class="chiffre">30</span>.</p></div>
+      <div class="sport"><h3>Padel</h3><p>En double. Manche à <span class="chiffre">6</span> jeux, gagner par <span class="chiffre">2</span>, avec bris d’égalité.</p></div>
+      <div class="sport"><h3>Squash</h3><p>Simple ou double. Manche à <span class="chiffre">11</span> points, gagner par <span class="chiffre">2</span>.</p></div>
+      <div class="sport"><h3>Tennis de table</h3><p>Simple ou double. Manche à <span class="chiffre">11</span> points, gagner par <span class="chiffre">2</span>.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="personnage" class="personnage">
+  <div class="wrap">
+    <img class="portrait" src="https://compte.letabli.ai/personnages/samuel.webp" alt="Samuel" width="96" height="96" loading="lazy">
+    <div>
+      <h2>Samuel, votre assistant</h2>
+      <p class="intro">Le même Samuel que dans Le Fanion, au filet cette fois. Posez-lui vos questions sur l’app, les rotations ou les forfaits : il répond en français, à toute heure.</p>
+      <div class="bulle"><div class="qui">Samuel · L’Échange</div><p>Terrain 2 : Julie et Marc contre toi et Alex.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="confiance" class="confiance">
+  <div class="wrap">
+    <h2>Vos données restent à vous</h2>
+    <p class="intro">L’Échange organise vos soirées. Il ne fait rien d’autre avec ce que vous y mettez.</p>
+    <ul class="checks">
+      <li>Les joueurs, les soirées et les pointages de votre groupe ne sont visibles que par les membres du groupe.</li>
+      <li>Un seul compte pour toutes les apps de L’Établi : si vous jouez déjà avec Le Fanion, vous avez déjà votre compte.</li>
+      <li>Une question sur vos données ? Écrivez-nous à <a href="mailto:bonjour@lechange.ai">bonjour@lechange.ai</a>.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="prix" class="prix">
+  <div class="wrap">
+    <h2>Un prix par groupe</h2>
+    <p class="intro">Pas d’abonnement par joueur : un seul forfait pour tout le groupe.</p>
+    <div class="plans">
+      <div class="plan">
+        <h3>Gratuit</h3>
+        <div class="montant">0 $ <small>pour toujours</small></div>
+        <ul>
+          <li>1 groupe, jusqu’à 4 joueurs</li>
+          <li>Soirées, rotations et pointage</li>
+          <li>Les six sports</li>
+        </ul>
+        <a class="btn ligne" href="https://app.lechange.ai/">Commencer gratuitement</a>
+      </div>
+      <div class="plan">
+        <h3>Groupe</h3>
+        <div class="montant"><small>Prix annoncé bientôt</small></div>
+        <ul>
+          <li>Jusqu’à 16 joueurs</li>
+          <li>Tout ce qu’offre la formule Gratuit</li>
+        </ul>
+        <a class="btn ligne" href="mailto:bonjour@lechange.ai?subject=L%E2%80%99%C3%89change%20-%20Forfait%20Groupe">M’avertir</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="questions" class="faq">
+  <div class="wrap">
+    <h2>Questions</h2>
+    <details><summary>Faut-il télécharger une app ?</summary><p>Non. Ouvrez <a href="https://app.lechange.ai/">app.lechange.ai</a> sur votre téléphone, puis ajoutez L’Échange à votre écran d’accueil (sur iPhone : bouton Partager, puis « Sur l’écran d’accueil »). Elle s’ouvre ensuite comme une app.</p></details>
+    <details><summary>Quels sports sont couverts ?</summary><p>Le pickleball, le tennis, le badminton, le padel, le squash et le tennis de table, en simple ou en double selon le sport.</p></details>
+    <details><summary>Combien de joueurs dans un groupe ?</summary><p>Jusqu’à 4 avec la formule Gratuit, assez pour un double. Le forfait Groupe va jusqu’à 16 joueurs.</p></details>
+    <details><summary>Et si on est un nombre impair ?</summary><p>L’app met un joueur au banc à chaque manche et répartit le banc entre tout le monde, pour que ce ne soit pas toujours le même qui attend.</p></details>
+    <details><summary>Qui entre le pointage ?</summary><p>Un joueur par terrain, à la fin de la manche. Tout le monde voit les résultats et, à la fin, le classement de la soirée.</p></details>
+    <details><summary>Je joue déjà au golf avec Le Fanion. Faut-il un autre compte ?</summary><p>Non. Le même compte sert à toutes les apps de L’Établi : vous vous connectez à L’Échange avec votre cellulaire et votre mot de passe habituels.</p></details>
+  </div>
+</section>
+
+<section id="appel" class="appel">
+  <div class="wrap">
+    <div>
+      <h2>Le terrain vous attend.</h2>
+      <p class="appel-qui"><img src="https://compte.letabli.ai/personnages/samuel.webp" alt="" width="40" height="40" loading="lazy">« Rien au calendrier. On joue quand ? » Samuel, votre assistant</p>
+    </div>
+    <a class="btn main" href="https://app.lechange.ai/">Essayer gratuitement</a>
+  </div>
+</section>
+
+<footer id="pied" class="pied">
+  <div class="wrap">
+    <div class="signature">
+      <img src="symbole.svg" alt="">
+      <div><div class="sig-nom">L’Échange</div>
+        <div class="sig-etabli"><svg width="12" height="12" viewBox="0 0 64 64" aria-hidden="true"><rect x="40" y="10" width="14" height="10" rx="2" fill="#B8954A"/><rect x="45" y="20" width="4" height="4" fill="#B8954A"/><rect x="4" y="24" width="56" height="9" rx="2.5" fill="currentColor"/><rect x="10" y="33" width="6" height="25" rx="1.5" fill="currentColor"/><rect x="48" y="33" width="6" height="25" rx="1.5" fill="currentColor"/><rect x="16" y="45" width="32" height="4" fill="currentColor"/><rect x="2" y="27" width="5" height="12" rx="1.5" fill="#B8954A"/></svg>Fait à L’Établi</div></div>
+    </div>
+    <div class="liens">
+      <a href="mailto:bonjour@lechange.ai">Nous écrire</a>
+      <a href="https://letabli.ai/#apps">Les autres apps de L’Établi</a>
+    </div>
+    <div class="copy">© 2026 L’Établi. Fait au Québec.</div>
+  </div>
+</footer>
+
+</body>
+</html>

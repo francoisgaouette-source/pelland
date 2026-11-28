@@ -1,0 +1,13 @@
+// Cloudflare (lechange.ai) : le site de L’Échange, dossier site-lechange/ (l’app reste sur app.lechange.ai, voir wrangler.lechange.jsonc).
+// Mise en ligne : npx wrangler deploy -c wrangler.lechange-site.jsonc
+// La première mise en ligne relie lechange.ai et www.lechange.ai à ce site dans Cloudflare.
+{
+  "name": "lechange-site",
+  "compatibility_date": "2026-10-23",
+  "main": "./site-lechange/_worker.js",
+  "assets": { "directory": "./site-lechange", "binding": "ASSETS", "run_worker_first": true },
+  "routes": [
+    { "pattern": "lechange.ai", "custom_domain": true },
+    { "pattern": "www.lechange.ai", "custom_domain": true }
+  ]
+}

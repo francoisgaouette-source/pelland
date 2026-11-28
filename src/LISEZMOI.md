@@ -45,3 +45,6 @@ Le tronc commun ne doit appeler aucune fonction d'un module directement : seulem
   Supabase et le client HoldingAI (à mettre dans `raquette/page/config.js`), puis les services du serveur (textos,
   notifications, assistant), qui demandent de rendre `worker.js` multi-app.
 - Le dessin de Samuel (caddie-guide.js) n'est pas branché pour L'Échange.
+- Le site de L'Échange (lechange.ai) est à part, dans `site-lechange/` : une page qui suit le gabarit commun des
+  sites de L'Établi. Il se publie avec `npx wrangler deploy -c wrangler.lechange-site.jsonc` (www renvoie vers
+  lechange.ai). Il manque encore le prix du forfait Groupe et les pages Confidentialité et Conditions.
