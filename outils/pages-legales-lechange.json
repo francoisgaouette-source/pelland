@@ -1,0 +1,41 @@
+{
+  "nom": "L’Échange",
+  "deNom": "de L’Échange",
+  "leNom": "L’Échange",
+  "courriel": "bonjour@lechange.ai",
+  "app": "https://app.lechange.ai/",
+  "accueil": "./",
+  "symbole": "symbole.svg",
+  "marque": "#7A2338",
+  "douce": "#ECE0E3",
+  "police": "'Bricolage Grotesque', system-ui, sans-serif",
+  "policeGoogle": "Bricolage+Grotesque:opsz,wght@12..96,700",
+  "unite": "groupe",
+  "organisateurs": true,
+  "textos": true,
+  "prixPayant": false,
+  "recueil": [
+    "Joueurs : prénom et numéro de cellulaire (pour l’invitation par texto et la connexion).",
+    "Soirées : lieux et terrains, présences, rotations, pointages et classement.",
+    "Samuel, l’assistant : les questions posées dans l’app et ses réponses. Elles sont transmises à Anthropic (Claude) pour produire la réponse."
+  ],
+  "pourquoi": [
+    "Faire fonctionner l’app pour votre groupe : connexion, soirées, rotations, pointage et classement.",
+    "Envoyer les invitations du groupe par texto.",
+    "Répondre à vos questions et à vos demandes."
+  ],
+  "fournisseurs": "Supabase (hébergement de la base de données, au Canada), le compte L’Établi (connexion) et Anthropic (assistant)",
+  "conservation": "Les renseignements d’un groupe sont conservés tant que le groupe existe. Un joueur retiré est effacé de la liste du groupe ; les soirées déjà jouées gardent son nom pour le pointage, sauf si vous demandez l’effacement.",
+  "service": "L’Échange est une application web qui aide un groupe d’amis à organiser ses soirées de sports de raquette (pickleball, tennis, badminton, padel, squash, tennis de table) : invitations, rotations, pointage et classement.",
+  "formules": [
+    "Gratuit : un groupe de 4 joueurs au plus.",
+    "Groupe : jusqu’à 16 joueurs, offert plus tard."
+  ],
+  "prix": [
+    "La formule Gratuit ne coûte rien.",
+    "Le prix du forfait Groupe sera annoncé avant son lancement. Rien ne sera facturé sans votre accord."
+  ],
+  "remboursement": "Aucun achat n’est possible pour l’instant. Les conditions de remboursement seront précisées ici avant le lancement du forfait Groupe.",
+  "particularite": null,
+  "exactitude": "Les rotations, les pointages et le classement sont calculés à partir des présences et des pointages entrés par les joueurs : vérifiez-les en cas de doute."
+}

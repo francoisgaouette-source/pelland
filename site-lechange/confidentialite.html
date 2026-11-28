@@ -5,20 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Politique de confidentialité · L’Échange</title>
 <meta name="robots" content="noindex">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="symbole.svg">
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&display=swap" rel="stylesheet">
 <style>
+/* Pages légales communes de L’Établi (outil pages-legales.js) : ne pas modifier à la main, refaire avec l’outil. */
 body { margin: 0; background: #FAF6EF; color: #1D1B18; font: 17px/1.6 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
 a { color: #7A2338; }
 .entete { background: #fff; border-bottom: 1px solid #E6DED2; }
-.entete .wrap, main, .pied .wrap { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+.wrap { max-width: 760px; margin: 0 auto; padding: 0 24px; }
 .entete .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; }
 .marque { display: flex; align-items: center; gap: 10px; text-decoration: none; color: #1D1B18; font: 700 22px 'Bricolage Grotesque', system-ui, sans-serif; }
 .marque img { width: 30px; height: 30px; }
 main { padding-top: 48px; padding-bottom: 64px; }
-h1 { font: 700 40px/1.1 'Bricolage Grotesque', system-ui, sans-serif; margin: 0 0 16px; }
+h1 { font: 700 clamp(32px, 5vw, 42px)/1.1 'Bricolage Grotesque', system-ui, sans-serif; margin: 0 0 16px; }
 h2 { font: 700 22px 'Bricolage Grotesque', system-ui, sans-serif; margin: 32px 0 8px; }
-.brouillon { background: #ECE0E3; border-radius: 12px; padding: 12px 16px; font-size: 15px; }
+.avertissement { background: #ECE0E3; border-radius: 12px; padding: 12px 16px; font-size: 15px; }
+.vigueur { color: #6B665E; }
+ul { padding-left: 22px; }
+li { margin: 4px 0; }
 .pied { background: #fff; border-top: 1px solid #E6DED2; padding: 28px 0; font-size: 15px; color: #6B665E; }
 .pied .liens { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 8px; }
 .pied a { color: #1D1B18; }
@@ -26,22 +30,54 @@ h2 { font: 700 22px 'Bricolage Grotesque', system-ui, sans-serif; margin: 32px 0
 </head>
 <body>
 <header class="entete"><div class="wrap"><a class="marque" href="./"><img src="symbole.svg" alt="">L’Échange</a><a href="https://app.lechange.ai/">Se connecter</a></div></header>
-<main>
+<main class="wrap">
 <h1>Politique de confidentialité</h1>
-<p class="brouillon">Brouillon à compléter et à faire valider par un avocat avant d’ouvrir les ventes, en particulier pour la Loi 25 (Québec). Les éléments entre [crochets] sont à remplir.</p>
-<h2>1. Responsable</h2>
-<p>Les Stratégies Vortex Inc. (L’Établi), [adresse]. Personne responsable de la protection des renseignements personnels : [nom], <a href="mailto:bonjour@lechange.ai">bonjour@lechange.ai</a>.</p>
+<p class="avertissement">Version de travail. À faire valider avant l’ouverture des ventes, en conformité avec la Loi sur la protection des renseignements personnels dans le secteur privé (Loi 25). Les éléments entre crochets sont à compléter.</p>
+<p class="vigueur">En vigueur le [date]. Cette politique explique quels renseignements L’Échange recueille, pourquoi, qui y a accès et comment exercer vos droits.</p>
+
+<h2>1. Responsable de la protection des renseignements personnels</h2>
+<p>[Prénom Nom], [titre], Les Stratégies Vortex Inc. (L’Établi). Courriel : <a href="mailto:bonjour@lechange.ai">bonjour@lechange.ai</a>.</p>
+
 <h2>2. Ce que nous recueillons</h2>
-<ul><li>Pour chaque membre : prénom et numéro de cellulaire (pour l’invitation par texto et la connexion).</li><li>Pour le groupe : les lieux et leurs terrains, les soirées, les présences, les rotations, les pointages et le classement.</li></ul>
-<p>La connexion se fait avec le compte commun des apps de L’Établi (compte.letabli.ai), lié au numéro de cellulaire.</p>
-<h2>3. Qui y a accès</h2>
-<p>Les données d’un groupe ne sont visibles que par ses membres. Nous ne vendons ni ne louons aucune donnée.</p>
-<h2>4. Où elles sont gardées</h2>
-<p>Les données sont hébergées au Canada (Supabase, région Canada centre).</p>
-<h2>5. Intelligence artificielle</h2>
-<p>Pour répondre à une question posée à Samuel, l’assistant, la question est transmise à Anthropic (Claude), aux États-Unis, le temps du traitement. [Préciser la durée de conservation chez le fournisseur et l’absence d’entraînement sur ces données, selon les conditions en vigueur.]</p>
-<h2>6. Conservation et suppression</h2>
-<p>[Durée de conservation.] Vous pouvez demander la suppression de vos données en écrivant à <a href="mailto:bonjour@lechange.ai">bonjour@lechange.ai</a>.</p>
+<ul>
+  <li>Joueurs : prénom et numéro de cellulaire (pour l’invitation par texto et la connexion).</li>
+  <li>Soirées : lieux et terrains, présences, rotations, pointages et classement.</li>
+  <li>Samuel, l’assistant : les questions posées dans l’app et ses réponses. Elles sont transmises à Anthropic (Claude) pour produire la réponse.</li>
+  <li>Compte : la connexion se fait avec le compte commun des apps de L’Établi (compte.letabli.ai), lié à votre numéro de cellulaire.</li>
+  <li>Technique : données de connexion nécessaires au fonctionnement de l’app. Nous n’utilisons ni témoins publicitaires ni outils de pistage.</li>
+</ul>
+
+<h2>3. Pourquoi</h2>
+<ul>
+  <li>Faire fonctionner l’app pour votre groupe : connexion, soirées, rotations, pointage et classement.</li>
+  <li>Envoyer les invitations du groupe par texto.</li>
+  <li>Répondre à vos questions et à vos demandes.</li>
+</ul>
+<p>Nous n’utilisons pas vos renseignements à d’autres fins sans votre consentement, et nous ne les vendons jamais.</p>
+
+<h2>4. Consentement</h2>
+<p>La personne qui ajoute quelqu’un du groupe doit avoir son accord. Chaque personne peut retirer son consentement en tout temps en demandant son retrait du groupe.</p>
+
+<h2>5. Qui y a accès</h2>
+<ul>
+  <li>Les membres connectés de votre groupe voient les renseignements de ce groupe seulement.</li>
+  <li>Nos fournisseurs, uniquement pour fournir le service : Supabase (hébergement de la base de données, au Canada), le compte L’Établi (connexion) et Anthropic (assistant). Ces fournisseurs peuvent conserver des données à l’extérieur du Québec, notamment aux États-Unis. Nous avons évalué que leurs protections sont adéquates avant de leur confier vos renseignements.</li>
+</ul>
+
+<h2>6. Conservation</h2>
+<p>Les renseignements d’un groupe sont conservés tant que le groupe existe. Un joueur retiré est effacé de la liste du groupe ; les soirées déjà jouées gardent son nom pour le pointage, sauf si vous demandez l’effacement.</p>
+
+<h2>7. Vos droits</h2>
+<p>Vous pouvez demander l’accès à vos renseignements, leur correction, leur effacement, la fin de leur diffusion ou leur transfert dans un format courant. Écrivez à <a href="mailto:bonjour@lechange.ai">bonjour@lechange.ai</a> ; nous répondons dans les 30 jours. Vous pouvez aussi porter plainte auprès de la Commission d’accès à l’information du Québec.</p>
+
+<h2>8. Sécurité et incidents</h2>
+<p>L’accès aux données est protégé par une connexion et des règles qui limitent chaque groupe à ses propres données. En cas d’incident de confidentialité qui présente un risque de préjudice sérieux, nous avisons les personnes touchées et la Commission d’accès à l’information.</p>
+
+<h2>9. Ce site</h2>
+<p>Ce site n’utilise aucun témoin. Les polices de caractères sont servies par Google Fonts, qui reçoit l’adresse IP de votre appareil pour les afficher.</p>
+
+<h2>10. Modifications</h2>
+<p>Nous publierons ici toute modification et vous en aviserons par courriel si elle est importante.</p>
 </main>
 <footer class="pied"><div class="wrap">
 <div class="liens"><a href="./">L’Échange</a><a href="confidentialite.html">Confidentialité</a><a href="conditions.html">Conditions</a><a href="mailto:bonjour@lechange.ai">Nous écrire</a><a href="https://letabli.ai/#apps">Les autres apps de L’Établi</a></div>

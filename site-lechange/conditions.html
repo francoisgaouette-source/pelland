@@ -5,20 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Conditions d’utilisation · L’Échange</title>
 <meta name="robots" content="noindex">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="symbole.svg">
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&display=swap" rel="stylesheet">
 <style>
+/* Pages légales communes de L’Établi (outil pages-legales.js) : ne pas modifier à la main, refaire avec l’outil. */
 body { margin: 0; background: #FAF6EF; color: #1D1B18; font: 17px/1.6 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
 a { color: #7A2338; }
 .entete { background: #fff; border-bottom: 1px solid #E6DED2; }
-.entete .wrap, main, .pied .wrap { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+.wrap { max-width: 760px; margin: 0 auto; padding: 0 24px; }
 .entete .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; }
 .marque { display: flex; align-items: center; gap: 10px; text-decoration: none; color: #1D1B18; font: 700 22px 'Bricolage Grotesque', system-ui, sans-serif; }
 .marque img { width: 30px; height: 30px; }
 main { padding-top: 48px; padding-bottom: 64px; }
-h1 { font: 700 40px/1.1 'Bricolage Grotesque', system-ui, sans-serif; margin: 0 0 16px; }
+h1 { font: 700 clamp(32px, 5vw, 42px)/1.1 'Bricolage Grotesque', system-ui, sans-serif; margin: 0 0 16px; }
 h2 { font: 700 22px 'Bricolage Grotesque', system-ui, sans-serif; margin: 32px 0 8px; }
-.brouillon { background: #ECE0E3; border-radius: 12px; padding: 12px 16px; font-size: 15px; }
+.avertissement { background: #ECE0E3; border-radius: 12px; padding: 12px 16px; font-size: 15px; }
+.vigueur { color: #6B665E; }
+ul { padding-left: 22px; }
+li { margin: 4px 0; }
 .pied { background: #fff; border-top: 1px solid #E6DED2; padding: 28px 0; font-size: 15px; color: #6B665E; }
 .pied .liens { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 8px; }
 .pied a { color: #1D1B18; }
@@ -26,21 +30,51 @@ h2 { font: 700 22px 'Bricolage Grotesque', system-ui, sans-serif; margin: 32px 0
 </head>
 <body>
 <header class="entete"><div class="wrap"><a class="marque" href="./"><img src="symbole.svg" alt="">L’Échange</a><a href="https://app.lechange.ai/">Se connecter</a></div></header>
-<main>
+<main class="wrap">
 <h1>Conditions d’utilisation</h1>
-<p class="brouillon">Brouillon à compléter et à faire valider par un avocat avant d’ouvrir les ventes, en particulier pour la Loi 25 (Québec). Les éléments entre [crochets] sont à remplir.</p>
-<h2>1. Le service</h2>
-<p>L’Échange est offert par Les Stratégies Vortex Inc. (L’Établi), [adresse]. L’Échange permet à un groupe d’amis d’organiser des soirées de sports de raquette (pickleball, tennis, badminton, padel, squash, tennis de table) : invitations, rotations, pointage et classement.</p>
-<h2>2. Prix</h2>
-<p>La formule Gratuit permet un groupe de jusqu’à 4 joueurs. Le forfait Groupe (jusqu’à 16 joueurs) sera offert plus tard; son prix sera annoncé avant, et rien ne sera facturé sans votre accord.</p>
-<h2>3. Propriétaire du groupe</h2>
-<p>La personne qui crée un groupe en est la propriétaire. Elle peut inviter ou retirer des membres et nommer des organisateurs.</p>
-<h2>4. Exactitude</h2>
-<p>Les rotations et le classement sont calculés à partir des présences et des pointages entrés par les joueurs : vérifiez-les en cas de doute.</p>
-<h2>5. Données personnelles</h2>
-<p>Voir la <a href="confidentialite.html">politique de confidentialité</a>.</p>
-<h2>6. Contact</h2>
-<p><a href="mailto:bonjour@lechange.ai">bonjour@lechange.ai</a></p>
+<p class="avertissement">Version de travail. À faire valider par un avocat avant l’ouverture des ventes. Les éléments entre crochets sont à compléter.</p>
+<p class="vigueur">En vigueur le [date]. Ces conditions encadrent l’utilisation de L’Échange.</p>
+
+<h2>1. Qui sommes-nous</h2>
+<p>L’Échange est offert par Les Stratégies Vortex Inc. (L’Établi), [adresse], Québec, numéro d’entreprise du Québec (NEQ) [numéro]. Courriel : <a href="mailto:bonjour@lechange.ai">bonjour@lechange.ai</a>.</p>
+
+<h2>2. Le service</h2>
+<p>L’Échange est une application web qui aide un groupe d’amis à organiser ses soirées de sports de raquette (pickleball, tennis, badminton, padel, squash, tennis de table) : invitations, rotations, pointage et classement.</p>
+<ul>
+  <li>Gratuit : un groupe de 4 joueurs au plus.</li>
+  <li>Groupe : jusqu’à 16 joueurs, offert plus tard.</li>
+</ul>
+
+<h2>3. Prix et paiement</h2>
+<ul>
+  <li>La formule Gratuit ne coûte rien.</li>
+  <li>Le prix du forfait Groupe sera annoncé avant son lancement. Rien ne sera facturé sans votre accord.</li>
+</ul>
+
+<h2>4. Propriétaire du groupe</h2>
+<p>La personne qui crée le groupe en est propriétaire : elle invite ou retire des membres et peut nommer des organisateurs.</p>
+
+<h2>5. Remboursement</h2>
+<p>Aucun achat n’est possible pour l’instant. Les conditions de remboursement seront précisées ici avant le lancement du forfait Groupe.</p>
+
+<h2>6. Utilisation acceptable</h2>
+<ul>
+  <li>Ajoutez seulement des personnes qui acceptent de faire partie du groupe et de recevoir des textos de celui-ci.</li>
+  <li>N’utilisez pas L’Échange pour envoyer des messages non désirés ou pour un usage commercial non autorisé.</li>
+  <li>Nous pouvons suspendre le groupe qui ne respecte pas ces conditions, après vous en avoir avisé.</li>
+</ul>
+
+<h2>7. Exactitude et disponibilité</h2>
+<p>Les rotations, les pointages et le classement sont calculés à partir des présences et des pointages entrés par les joueurs : vérifiez-les en cas de doute. Nous faisons notre possible pour que l’app soit disponible en tout temps, mais des interruptions peuvent survenir.</p>
+
+<h2>8. Responsabilité</h2>
+<p>Le service étant offert gratuitement, notre responsabilité envers vous est limitée dans toute la mesure permise par la loi, sauf en cas de faute lourde ou intentionnelle de notre part, ou lorsque la loi ne permet pas une telle limite.</p>
+
+<h2>9. Modifications</h2>
+<p>Nous pouvons modifier ces conditions. Nous vous aviserons par courriel au moins 30 jours avant qu’un changement important s’applique.</p>
+
+<h2>10. Lois applicables</h2>
+<p>Ces conditions sont régies par les lois du Québec et du Canada qui s’y appliquent.</p>
 </main>
 <footer class="pied"><div class="wrap">
 <div class="liens"><a href="./">L’Échange</a><a href="confidentialite.html">Confidentialité</a><a href="conditions.html">Conditions</a><a href="mailto:bonjour@lechange.ai">Nous écrire</a><a href="https://letabli.ai/#apps">Les autres apps de L’Établi</a></div>

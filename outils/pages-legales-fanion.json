@@ -1,0 +1,47 @@
+{
+  "nom": "Le Fanion",
+  "deNom": "du Fanion",
+  "leNom": "Le Fanion",
+  "courriel": "bonjour@fanion.ai",
+  "app": "https://app.lefanion.ai/",
+  "accueil": "./",
+  "symbole": "favicon.svg",
+  "marque": "#1f6b46",
+  "douce": "#eef1ec",
+  "police": "'Barlow Condensed', 'Arial Narrow', sans-serif",
+  "policeGoogle": "Barlow+Condensed:wght@700",
+  "unite": "groupe",
+  "organisateurs": true,
+  "textos": true,
+  "prixPayant": true,
+  "recueil": [
+    "Joueurs : nom, numéro de téléphone (qui sert aussi à la connexion), index de handicap et tertre choisi.",
+    "Parties : scores, disponibilités, présences et montants calculés entre joueurs.",
+    "Acheteur : nom, courriel, nom du groupe et adresse de facturation, transmis par Stripe. Nous ne recevons jamais le numéro de carte.",
+    "Samuel, l’assistant : les questions posées dans l’app et ses réponses. Elles sont transmises à Anthropic (Claude) pour produire la réponse, puis gardées pour nous aider à améliorer l’app."
+  ],
+  "pourquoi": [
+    "Faire fonctionner l’app pour votre groupe : connexion, organisation des parties, pointage et calculs.",
+    "Envoyer les textos du groupe : invitations, dates offertes, rappels et résultats.",
+    "Traiter le paiement, émettre le reçu et répondre à vos demandes."
+  ],
+  "fournisseurs": "Supabase (hébergement de la base de données, au Canada), le compte L’Établi (connexion), Stripe (paiement), Twilio (textos) et Anthropic (assistant)",
+  "conservation": "Les renseignements d’un groupe sont conservés tant que le groupe existe. Un joueur retiré est effacé de la liste du groupe ; les parties déjà jouées gardent son nom pour le pointage, sauf si vous demandez l’effacement. Les données de facturation sont conservées le temps exigé par les lois fiscales.",
+  "service": "Le Fanion est une application web qui aide un groupe de golfeurs à s’organiser : dates offertes, disponibilités, formation des quatuors, pointage, coups de handicap et calcul des montants entre joueurs selon les règles du groupe.",
+  "formules": [
+    "Gratuit : un groupe de 4 joueurs au plus.",
+    "Groupe : jusqu’à 16 joueurs, pour une saison de 12 mois à compter de la date d’achat."
+  ],
+  "prix": [
+    "Le prix est de 79 $ par groupe pour une saison, plus la TPS (5 %) et la TVQ (9,975 %), soit 90,83 $ au total. Les groupes inscrits avant le 31 mars 2027 paient le prix fondateur de 49 $ (56,34 $ taxes comprises), garanti pour les saisons suivantes tant que le groupe renouvelle. Le prix total est affiché avant le paiement.",
+    "Le paiement se fait par carte de crédit sur la page sécurisée de Stripe. Le Fanion ne reçoit ni ne conserve votre numéro de carte.",
+    "Un reçu détaillant les taxes est envoyé par courriel.",
+    "L’achat n’est pas un abonnement : il ne se renouvelle pas automatiquement et aucun montant n’est prélevé sans votre accord. Le groupe passe à 16 joueurs dans les 24 heures suivant le paiement."
+  ],
+  "remboursement": "Vous pouvez demander un remboursement complet dans les 30 jours suivant l’achat, sans avoir à le justifier, en écrivant à bonjour@fanion.ai. Le remboursement est fait sur la carte utilisée, dans les 15 jours suivant la demande. Le groupe revient alors à la formule gratuite. Ce droit s’ajoute à ceux que vous accorde la Loi sur la protection du consommateur.",
+  "particularite": {
+    "titre": "Les gageures entre amis",
+    "texte": "Le Fanion calcule les montants que les joueurs conviennent de se devoir entre eux, selon les règles choisies par le groupe. Le Fanion ne reçoit, ne détient et ne transfère jamais d’argent entre les joueurs, et ne prend aucune part dans ces montants. Chaque groupe est responsable de ses ententes."
+  },
+  "exactitude": "Les données des terrains (normales, difficulté des trous, évaluations des tertres) proviennent de sources publiques ou des utilisateurs et peuvent contenir des erreurs : vérifiez-les avec la carte du club."
+}
