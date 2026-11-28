@@ -6,8 +6,8 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<title>Le fanion.ai · le golf entre amis, organisé</title>
-<meta name="description" content="Le fanion.ai organise votre groupe de golf : dates offertes, quatuors formés automatiquement, pointage en direct, compétitions membre-membre et Texas scramble, et qui doit quoi au 19e. Fait au Québec, en français.">
+<title>Le Fanion · le golf entre amis, organisé</title>
+<meta name="description" content="Le Fanion organise votre groupe de golf : dates offertes, quatuors formés automatiquement, pointage en direct, compétitions membre-membre et Texas scramble, et qui doit quoi au 19e. Fait au Québec, en français.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&display=swap">
@@ -238,6 +238,42 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
 .foot .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 24px; }
 .foot a { color: #e2ebe5; }
 .foot .links { display: flex; gap: 24px; flex-wrap: wrap; }
+
+/* ---- Gabarit commun des sites de L'Établi ---- */
+.comment { background: var(--mist); padding-bottom: 0; }
+.comment .trois { list-style: none; margin: 8px 0 40px; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.comment .trois li { display: flex; gap: 14px; align-items: flex-start; }
+.comment .trois b { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--fairway); color: var(--white); font: 700 22px var(--display); }
+.comment .trois h3 { margin: 4px 0 4px; font-family: var(--display); font-weight: 700; font-size: 26px; }
+.comment .trois p { margin: 0; color: var(--pencil); }
+@media (max-width: 760px) { .comment .trois { grid-template-columns: 1fr; } }
+.app-bloc, .comps-bloc, .prix-bloc { padding: 0; }
+.sous { padding: 88px 0; }
+.extras.sous { padding-top: 0; }
+.personnage { background: var(--white); }
+.personnage .wrap { display: grid; grid-template-columns: 96px 1fr; gap: 32px; align-items: start; }
+.personnage .portrait { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; border: 3px solid var(--flag); }
+.personnage .intro { margin-bottom: 24px; }
+.personnage .bulle { display: inline-block; background: #e6eee8; border-radius: 16px 16px 16px 4px; padding: 12px 18px; box-shadow: 0 6px 24px rgba(0,0,0,.12); }
+.personnage .bulle .qui { font-size: 14px; font-weight: 600; }
+.personnage .bulle p { margin: 2px 0 0; font-size: 18px; }
+@media (max-width: 600px) { .personnage .wrap { grid-template-columns: 1fr; gap: 16px; } }
+.confiance { background: var(--mist); }
+.confiance .checks { max-width: 46em; }
+.confiance .conf-lien { margin: 24px 0 0; }
+.confiance .conf-lien a { color: var(--fairway); font-weight: 600; }
+.appel { background: var(--flag); color: var(--pine); padding: 72px 0; }
+.appel .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px; }
+.appel h2 { margin: 0; }
+.appel .btn.main { background: var(--pine); color: var(--white); }
+.appel .btn.main:hover { background: var(--pine-2); }
+.appel-qui { display: flex; align-items: center; gap: 10px; margin: 14px 0 0; font-size: 18px; }
+.appel-qui img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid var(--pine); }
+.foot .wrap { align-items: center; }
+.foot .signature { display: flex; align-items: center; gap: 12px; }
+.foot .sig-nom { font-family: var(--display); font-weight: 800; font-size: 26px; color: var(--white); line-height: 1.1; }
+.foot .sig-etabli { display: flex; align-items: center; gap: 5px; margin-top: 4px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #b9c8bf; }
+.foot .copy { flex-basis: 100%; font-size: 14px; color: #8fa59a; }
 </style>
 </head>
 <body>
@@ -246,45 +282,35 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
   <div class="wrap">
     <a class="mark" href="#">
       <svg width="26" height="30" viewBox="0 0 26 30" aria-hidden="true"><path d="M5 2v26" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M6 3l15 5.5L6 14z" fill="#e3a90b"/><ellipse cx="9" cy="28" rx="7" ry="1.6" fill="#1f6b46"/></svg>
-      le fanion.ai
+      Le Fanion
     </a>
     <nav class="nav" aria-label="Sections">
       <a href="#comment">Comment ça marche</a>
-      <a href="#jeux">Les jeux</a>
-      <a href="#competitions">Compétitions</a>
-      <a href="regles/">Règles</a>
+      <a href="#personnage">Samuel</a>
       <a href="#prix">Prix</a>
       <a href="#questions">Questions</a>
       <a class="login" href="https://app.lefanion.ai/">Se connecter</a>
-      <a class="try" href="achat.html">Acheter</a>
+      <a class="try" href="https://app.lefanion.ai/">Essayer</a>
     </nav>
   </div>
 </header>
 
-<div class="hero">
+<section id="accueil" class="hero">
   <div class="wrap">
     <div>
       <h1>Votre gang de golf, organisée.</h1>
-      <p class="lead">Le fanion.ai offre les dates, forme les quatuors, compte les points pendant la partie et dit qui doit quoi à la fin. Il mène aussi vos compétitions, classement en direct. Fini les 40 textos du jeudi soir.</p>
+      <p class="lead">Le Fanion offre les dates, forme les quatuors, compte les points pendant la partie et dit qui doit quoi à la fin. Il mène aussi vos compétitions, classement en direct. Fini les 40 textos du jeudi soir.</p>
       <div class="ctas">
         <a class="btn main" href="https://app.lefanion.ai/">Essayer gratuitement</a>
         <a class="btn ghost" href="#prix">Voir les prix</a>
       </div>
       <p class="small">Gratuit jusqu’à 4 joueurs. Sur iPhone, Android et ordinateur. Fait au Québec, en français.</p>
     </div>
-    <div class="phone"><img src="img/partie.png" alt="Une partie en cours dans le fanion.ai : le trou 8, les équipes Bleus et Rouges, les coups de handicap de chaque joueur."></div>
+    <div class="phone"><img src="img/partie.png" alt="Une partie en cours dans Le Fanion : le trou 8, les équipes Bleus et Rouges, les coups de handicap de chaque joueur."></div>
   </div>
-</div>
+</section>
 
-<div class="strip">
-  <div class="wrap strip-head"><p class="strip-title">De l’invitation au 19e, en 10 trous</p></div>
-  <div class="wrap" role="tablist" aria-label="Les 10 étapes">
-    <button type="button" data-step="0" aria-expanded="false"><b>1</b>Terrain</button><button type="button" data-step="1" aria-expanded="false"><b>2</b>Dates</button><button type="button" data-step="2" aria-expanded="false"><b>3</b>Dispos</button><button type="button" data-step="3" aria-expanded="false"><b>4</b>Quatuors</button><button type="button" data-step="4" aria-expanded="false"><b>5</b>Départ</button><button type="button" data-step="5" aria-expanded="false"><b>6</b>Scores</button><button type="button" data-step="6" aria-expanded="false"><b>7</b>Points</button><button type="button" data-step="7" aria-expanded="false"><b>8</b>Skins</button><button type="button" data-step="8" aria-expanded="false"><b>9</b>Revirements</button><button type="button" data-step="9" aria-expanded="false"><b>10</b>Qui doit quoi</button>
-  </div>
-</div>
-<div class="step-panels"><div class="wrap"><p class="step-hint" id="stepHint">Touchez une étape pour voir comment ça marche.</p><div class="step-panel" id="step0" hidden><div class="sp-text"><h3><span>1</span>Le terrain</h3><p>Choisissez parmi les terrains du Québec déjà dans l’app ou un terrain virtuel de simulateur. Votre terrain n’y est pas ? Prenez la carte de pointage en photo : l’app lit les normales, les handicaps et les tertres.</p><ul class="sp-pts"><li>Chaque terrain garde ses tertres, avec leur normale et la difficulté de chaque trou.</li><li>Corrigez une valeur à la main en tout temps ; votre version remplace celle du catalogue.</li><li>Les terrains ajoutés restent dans la banque du groupe pour la saison suivante.</li></ul></div><img class="sp-shot" src="img/etapes/etape1.jpg" alt="La liste des terrains du Québec dans le fanion.ai" loading="lazy" width="390" height="844"></div><div class="step-panel" id="step1" hidden><div class="sp-text"><h3><span>2</span>Les dates offertes</h3><p>L’organisateur choisit le terrain, quelques dates et une date butoir pour répondre.</p><ul class="sp-pts"><li>Le lien part par texto, du téléphone de l’organisateur, en un seul envoi au groupe.</li><li>Ceux qui ont activé les notifications sont avertis aussi dans l’app.</li><li>Réponses ouvertes jusqu’à la date butoir, puis fermées.</li></ul></div><img class="sp-shot" src="img/etapes/etape2.jpg" alt="Le formulaire pour offrir des dates de parties" loading="lazy" width="390" height="844"></div><div class="step-panel" id="step2" hidden><div class="sp-text"><h3><span>3</span>Les disponibilités</h3><p>Chacun touche le lien et coche les dates où il est libre. Ça prend dix secondes.</p><ul class="sp-pts"><li>L’organisateur voit, date par date, qui est libre et combien de quatuors ça donne.</li><li>Un joueur peut changer ses réponses tant que la date butoir n’est pas passée.</li><li>Un rappel à ceux qui n’ont pas encore répondu, en un toucher.</li></ul></div><img class="sp-shot" src="img/etapes/etape3.jpg" alt="Un joueur coche ses disponibilités" loading="lazy" width="390" height="844"></div><div class="step-panel" id="step3" hidden><div class="sp-text"><h3><span>4</span>Les quatuors</h3><p>À la date butoir, l’app forme les groupes en évitant de remettre ensemble ceux qui ont souvent joué ensemble.</p><ul class="sp-pts"><li>Des groupes de 3 quand le compte n’est pas rond.</li><li>Ou au hasard, en un toucher ; on peut aussi les faire à la main.</li><li>Le nombre de quatuors possibles s’affiche pour chaque date, avant même de les former.</li></ul></div><img class="sp-shot" src="img/etapes/etape4.jpg" alt="Quatuors formés automatiquement" loading="lazy" width="390" height="844"></div><div class="step-panel" id="step4" hidden><div class="sp-text"><h3><span>5</span>Le départ</h3><p>L’organisateur crée la partie : terrain, tertres, joueurs, équipes, jeu et montants.</p><ul class="sp-pts"><li>Le handicap de parcours se calcule à partir de l’index et du tertre de chacun.</li><li>Les coups reçus sont placés sur les trous les plus difficiles.</li><li>Les équipes se font seules (le meilleur avec le moins bon, les deux du milieu ensemble) ou à la main.</li></ul></div><img class="sp-shot" src="img/etapes/etape5.jpg" alt="Les coups de chaque joueur et les équipes" loading="lazy" width="390" height="844"></div><div class="step-panel" id="step5" hidden><div class="sp-text"><h3><span>6</span>Les scores</h3><p>Un seul joueur entre les scores, trou par trou ; les autres suivent la partie en direct sur leur téléphone.</p><ul class="sp-pts"><li>Sans réseau sur le terrain ? Les scores sont gardés et envoyés au retour du signal.</li><li>Une erreur ? On revient en arrière et on corrige le trou.</li><li>9 ou 18 trous, au choix.</li></ul></div><img class="sp-shot" src="img/etapes/etape6.jpg" alt="La saisie des scores d’un trou et de la skin" loading="lazy" width="390" height="844"></div><div class="step-panel" id="step6" hidden><div class="sp-text"><h3><span>7</span>Les points</h3><p>Chaque trou se compte selon votre jeu, au net, avec les coups de chacun.</p><ul class="sp-pts"><li>La game à Pelland, le 9 points, Best Ball, Nassau, Vegas, Wolf, Sixes et Skins sont prêts à jouer.</li><li>Créez votre propre jeu maison, avec vos règles et vos montants.</li><li>Le détail de chaque trou montre d’où viennent les points.</li></ul></div><img class="sp-shot" src="img/etapes/etape7.jpg" alt="La carte de pointage avec le calcul de chaque trou" loading="lazy" width="390" height="844"></div><div class="step-panel" id="step7" hidden><div class="sp-text"><h3><span>8</span>Les skins</h3><p>La skin va au joueur qui la gagne ; s’il ne fait pas la normale au brut, le point va à l’autre équipe.</p><ul class="sp-pts"><li>Press : l’équipe en déficit fait compter le trou double, skin et oiselets compris.</li><li>Reroll : l’autre équipe répond, et le trou compte quatre fois.</li><li>Oiselets et cabane sont comptés automatiquement.</li></ul></div><img class="sp-shot" src="img/etapes/etape8.jpg" alt="Le détail d’un trou avec la skin" loading="lazy" width="390" height="844"></div><div class="step-panel" id="step8" hidden><div class="sp-text"><h3><span>9</span>Les revirements</h3><p>Chaque fois que l’équipe qui mène perd son avance, la game monte du montant convenu.</p><ul class="sp-pts"><li>Un retour à égalité compte comme un revirement.</li><li>Le gain de chacun, revirements compris, se met à jour à chaque trou.</li><li>Le montant par revirement se choisit au départ, comme celui de la game.</li></ul></div><img class="sp-shot" src="img/etapes/etape9.jpg" alt="Les montants : la game, les revirements et les normales 3" loading="lazy" width="390" height="844"></div><div class="step-panel" id="step9" hidden><div class="sp-text"><h3><span>10</span>Qui doit quoi</h3><p>À la fin, l’app fait le compte par joueur : la game, les revirements, l’écart de points et les normales 3.</p><ul class="sp-pts"><li>Une normale 3 non gagnée est reportée à la suivante.</li><li>Les parties jouées restent dans l’historique, avec la carte de pointage.</li><li>L’app ne touche jamais à l’argent : chacun règle au 19e.</li></ul></div><img class="sp-shot" src="img/etapes/etape10.jpg" alt="Le meneur et le gain par joueur" loading="lazy" width="390" height="844"></div></div></div>
-
-<section id="comment" class="how">
+<section id="probleme" class="how">
   <div class="wrap">
     <div>
       <h2>De l’invitation au 19e trou</h2>
@@ -302,15 +328,26 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
 </section>
 
 
-<section id="avis" class="avis" hidden>
+<section id="comment" class="comment">
   <div class="wrap">
-    <h2>Ce qu’en disent les joueurs</h2>
-    <p class="intro">Des avis laissés dans l’app par des golfeurs qui l’utilisent, publiés avec leur accord.</p>
-    <ul class="avis-grid" id="avisList"></ul>
+    <h2>Comment ça marche</h2>
+    <ol class="trois">
+      <li><b>1</b><div><h3>Invitez la gang</h3><p>Offrez des dates par texto : chacun coche celles où il est libre.</p></div></li>
+      <li><b>2</b><div><h3>Jouez</h3><p>Les quatuors se forment, un joueur entre les scores, les points se comptent trou par trou.</p></div></li>
+      <li><b>3</b><div><h3>Réglez au 19e</h3><p>Chacun sait ce qu’il doit ou ce qu’il gagne. L’app ne touche jamais à l’argent.</p></div></li>
+    </ol>
   </div>
+<div class="strip">
+  <div class="wrap strip-head"><p class="strip-title">De l’invitation au 19e, en 10 trous</p></div>
+  <div class="wrap" role="tablist" aria-label="Les 10 étapes">
+    <button type="button" data-step="0" aria-expanded="false"><b>1</b>Terrain</button><button type="button" data-step="1" aria-expanded="false"><b>2</b>Dates</button><button type="button" data-step="2" aria-expanded="false"><b>3</b>Dispos</button><button type="button" data-step="3" aria-expanded="false"><b>4</b>Quatuors</button><button type="button" data-step="4" aria-expanded="false"><b>5</b>Départ</button><button type="button" data-step="5" aria-expanded="false"><b>6</b>Scores</button><button type="button" data-step="6" aria-expanded="false"><b>7</b>Points</button><button type="button" data-step="7" aria-expanded="false"><b>8</b>Skins</button><button type="button" data-step="8" aria-expanded="false"><b>9</b>Revirements</button><button type="button" data-step="9" aria-expanded="false"><b>10</b>Qui doit quoi</button>
+  </div>
+</div>
+<div class="step-panels"><div class="wrap"><p class="step-hint" id="stepHint">Touchez une étape pour voir comment ça marche.</p><div class="step-panel" id="step0" hidden><div class="sp-text"><h3><span>1</span>Le terrain</h3><p>Choisissez parmi les terrains du Québec déjà dans l’app ou un terrain virtuel de simulateur. Votre terrain n’y est pas ? Prenez la carte de pointage en photo : l’app lit les normales, les handicaps et les tertres.</p><ul class="sp-pts"><li>Chaque terrain garde ses tertres, avec leur normale et la difficulté de chaque trou.</li><li>Corrigez une valeur à la main en tout temps ; votre version remplace celle du catalogue.</li><li>Les terrains ajoutés restent dans la banque du groupe pour la saison suivante.</li></ul></div><img class="sp-shot" src="img/etapes/etape1.jpg" alt="La liste des terrains du Québec dans Le Fanion" loading="lazy" width="390" height="844"></div><div class="step-panel" id="step1" hidden><div class="sp-text"><h3><span>2</span>Les dates offertes</h3><p>L’organisateur choisit le terrain, quelques dates et une date butoir pour répondre.</p><ul class="sp-pts"><li>Le lien part par texto, du téléphone de l’organisateur, en un seul envoi au groupe.</li><li>Ceux qui ont activé les notifications sont avertis aussi dans l’app.</li><li>Réponses ouvertes jusqu’à la date butoir, puis fermées.</li></ul></div><img class="sp-shot" src="img/etapes/etape2.jpg" alt="Le formulaire pour offrir des dates de parties" loading="lazy" width="390" height="844"></div><div class="step-panel" id="step2" hidden><div class="sp-text"><h3><span>3</span>Les disponibilités</h3><p>Chacun touche le lien et coche les dates où il est libre. Ça prend dix secondes.</p><ul class="sp-pts"><li>L’organisateur voit, date par date, qui est libre et combien de quatuors ça donne.</li><li>Un joueur peut changer ses réponses tant que la date butoir n’est pas passée.</li><li>Un rappel à ceux qui n’ont pas encore répondu, en un toucher.</li></ul></div><img class="sp-shot" src="img/etapes/etape3.jpg" alt="Un joueur coche ses disponibilités" loading="lazy" width="390" height="844"></div><div class="step-panel" id="step3" hidden><div class="sp-text"><h3><span>4</span>Les quatuors</h3><p>À la date butoir, l’app forme les groupes en évitant de remettre ensemble ceux qui ont souvent joué ensemble.</p><ul class="sp-pts"><li>Des groupes de 3 quand le compte n’est pas rond.</li><li>Ou au hasard, en un toucher ; on peut aussi les faire à la main.</li><li>Le nombre de quatuors possibles s’affiche pour chaque date, avant même de les former.</li></ul></div><img class="sp-shot" src="img/etapes/etape4.jpg" alt="Quatuors formés automatiquement" loading="lazy" width="390" height="844"></div><div class="step-panel" id="step4" hidden><div class="sp-text"><h3><span>5</span>Le départ</h3><p>L’organisateur crée la partie : terrain, tertres, joueurs, équipes, jeu et montants.</p><ul class="sp-pts"><li>Le handicap de parcours se calcule à partir de l’index et du tertre de chacun.</li><li>Les coups reçus sont placés sur les trous les plus difficiles.</li><li>Les équipes se font seules (le meilleur avec le moins bon, les deux du milieu ensemble) ou à la main.</li></ul></div><img class="sp-shot" src="img/etapes/etape5.jpg" alt="Les coups de chaque joueur et les équipes" loading="lazy" width="390" height="844"></div><div class="step-panel" id="step5" hidden><div class="sp-text"><h3><span>6</span>Les scores</h3><p>Un seul joueur entre les scores, trou par trou ; les autres suivent la partie en direct sur leur téléphone.</p><ul class="sp-pts"><li>Sans réseau sur le terrain ? Les scores sont gardés et envoyés au retour du signal.</li><li>Une erreur ? On revient en arrière et on corrige le trou.</li><li>9 ou 18 trous, au choix.</li></ul></div><img class="sp-shot" src="img/etapes/etape6.jpg" alt="La saisie des scores d’un trou et de la skin" loading="lazy" width="390" height="844"></div><div class="step-panel" id="step6" hidden><div class="sp-text"><h3><span>7</span>Les points</h3><p>Chaque trou se compte selon votre jeu, au net, avec les coups de chacun.</p><ul class="sp-pts"><li>La game à Pelland, le 9 points, Best Ball, Nassau, Vegas, Wolf, Sixes et Skins sont prêts à jouer.</li><li>Créez votre propre jeu maison, avec vos règles et vos montants.</li><li>Le détail de chaque trou montre d’où viennent les points.</li></ul></div><img class="sp-shot" src="img/etapes/etape7.jpg" alt="La carte de pointage avec le calcul de chaque trou" loading="lazy" width="390" height="844"></div><div class="step-panel" id="step7" hidden><div class="sp-text"><h3><span>8</span>Les skins</h3><p>La skin va au joueur qui la gagne ; s’il ne fait pas la normale au brut, le point va à l’autre équipe.</p><ul class="sp-pts"><li>Press : l’équipe en déficit fait compter le trou double, skin et oiselets compris.</li><li>Reroll : l’autre équipe répond, et le trou compte quatre fois.</li><li>Oiselets et cabane sont comptés automatiquement.</li></ul></div><img class="sp-shot" src="img/etapes/etape8.jpg" alt="Le détail d’un trou avec la skin" loading="lazy" width="390" height="844"></div><div class="step-panel" id="step8" hidden><div class="sp-text"><h3><span>9</span>Les revirements</h3><p>Chaque fois que l’équipe qui mène perd son avance, la game monte du montant convenu.</p><ul class="sp-pts"><li>Un retour à égalité compte comme un revirement.</li><li>Le gain de chacun, revirements compris, se met à jour à chaque trou.</li><li>Le montant par revirement se choisit au départ, comme celui de la game.</li></ul></div><img class="sp-shot" src="img/etapes/etape9.jpg" alt="Les montants : la game, les revirements et les normales 3" loading="lazy" width="390" height="844"></div><div class="step-panel" id="step9" hidden><div class="sp-text"><h3><span>10</span>Qui doit quoi</h3><p>À la fin, l’app fait le compte par joueur : la game, les revirements, l’écart de points et les normales 3.</p><ul class="sp-pts"><li>Une normale 3 non gagnée est reportée à la suivante.</li><li>Les parties jouées restent dans l’historique, avec la carte de pointage.</li><li>L’app ne touche jamais à l’argent : chacun règle au 19e.</li></ul></div><img class="sp-shot" src="img/etapes/etape10.jpg" alt="Le meneur et le gain par joueur" loading="lazy" width="390" height="844"></div></div></div>
 </section>
 
-<section id="app" class="tour">
+<section id="app" class="app-bloc">
+<div class="tour sous">
   <div class="wrap">
     <div>
       <h2>Tout le groupe sur un écran</h2>
@@ -334,6 +371,35 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
     </div>
     <div class="shot"><img src="img/accueil-etapes.jpg" alt="L’accueil de l’app : les étapes 1 à 6, d’Inviter des joueurs à Parties et compétitions jouées." loading="lazy" width="390" height="844"></div>
   </div>
+</div>
+<div id="roles" class="roles sous">
+  <div class="wrap">
+    <h2>Chacun sa place dans la gang</h2>
+    <p class="intro">Un seul compte par golfeur, lié à son cellulaire, pour tous ses groupes. Dans chaque groupe, chacun a son rôle.</p>
+    <div class="role-cards">
+      <div class="role"><span class="pill own">Propriétaire</span><p>Il a créé le groupe et choisi le forfait. Il peut confier l’organisation à un autre joueur.</p></div>
+      <div class="role"><span class="pill org">Organisateur</span><p>Il invite les joueurs, offre les dates, crée les parties et les compétitions. Souvent le propriétaire lui-même.</p></div>
+      <div class="role"><span class="pill par">Participant</span><p>Il répond aux dates, suit les parties et les classements en direct, et voit qui doit quoi. Il joue, c’est tout.</p></div>
+    </div>
+    <div class="welcome-row">
+      <div>
+        <h3>Un accueil à son nom</h3>
+        <p>La première fois qu’un invité entre dans le groupe, une étiquette de sac à son nom l’accueille et lui explique ce qu’il peut faire.</p>
+        <p>Les outils de l’organisateur restent visibles, mais grisés : un toucher montre un aperçu de ce qu’ils font. Personne ne se sent perdu, et l’envie d’organiser sa propre gang vient toute seule.</p>
+      </div>
+      <div class="shot"><img src="img/bienvenue.jpg" alt="L’accueil d’une participante : une étiquette de sac à son nom et la liste de ce qu’elle peut faire." loading="lazy" width="390" height="844"></div>
+      <div class="shot"><img src="img/apercu.jpg" alt="L’aperçu de la tuile Parties à préparer, réservée à l’organisateur." loading="lazy" width="390" height="844"></div>
+    </div>
+  </div>
+</div>
+<div class="extras sous">
+  <div class="wrap">
+    <div class="extra-grid">
+      <div class="extra"><svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zM10 19a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><h3>Notifications</h3><p>Des dates offertes, une partie qui commence, une compétition créée : le groupe est averti sur son téléphone, sans texto de plus.</p></div>
+      <div class="extra"><svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12v8H4v-8M2 8h20v4H2zM12 8v12M12 8c-2-4-6-4-6-1s6 1 6 1zm0 0c2-4 6-4 6-1s-6 1-6 1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><h3>Parrainage</h3><p>Partagez votre lien : pour chaque groupe qui passe au forfait Groupe grâce à vous, vous obtenez 5 $ de rabais sur votre prochaine saison.</p></div>
+    </div>
+  </div>
+</div>
 </section>
 
 <section id="jeux" class="games">
@@ -353,14 +419,15 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
     </dl>
     <p class="rules-link"><a href="regles/">Toutes les règles en détail, avec exemples et calcul des mises →</a></p>
     <div class="after">
-      <p>À la fin, le fanion.ai fait le compte : la mise de départ, les revirements, les points et les normales 3. Chacun sait ce qu’il doit, sans calculatrice au bar. L’app note les gageures ; elle ne touche jamais à l’argent.</p>
+      <p>À la fin, Le Fanion fait le compte : la mise de départ, les revirements, les points et les normales 3. Chacun sait ce qu’il doit, sans calculatrice au bar. L’app note les gageures ; elle ne touche jamais à l’argent.</p>
       <div class="shot"><img src="img/carte.png" alt="Le meneur, le gain par joueur en ce moment et la carte de pointage avec le calcul de chaque trou."></div>
     </div>
   </div>
 </section>
 
 
-<section id="competitions" class="comps">
+<section id="competitions" class="comps-bloc">
+<div class="comps sous">
   <div class="wrap">
     <div>
       <h2>Vos compétitions, comme au club</h2>
@@ -380,44 +447,12 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
     </div>
     <div class="shot"><img src="img/competition.jpg" alt="Le classement d’un membre-membre en match play : classe A, trois équipes, fiche gagnés-nuls-perdus et résultat de chaque match." loading="lazy" width="390" height="844"></div>
   </div>
-</section>
-
-<section id="roles" class="roles">
-  <div class="wrap">
-    <h2>Chacun sa place dans la gang</h2>
-    <p class="intro">Un seul compte par golfeur, lié à son cellulaire, pour tous ses groupes. Dans chaque groupe, chacun a son rôle.</p>
-    <div class="role-cards">
-      <div class="role"><span class="pill own">Propriétaire</span><p>Il a créé le groupe et choisi le forfait. Il peut confier l’organisation à un autre joueur.</p></div>
-      <div class="role"><span class="pill org">Organisateur</span><p>Il invite les joueurs, offre les dates, crée les parties et les compétitions. Souvent le propriétaire lui-même.</p></div>
-      <div class="role"><span class="pill par">Participant</span><p>Il répond aux dates, suit les parties et les classements en direct, et voit qui doit quoi. Il joue, c’est tout.</p></div>
-    </div>
-    <div class="welcome-row">
-      <div>
-        <h3>Un accueil à son nom</h3>
-        <p>La première fois qu’un invité entre dans le groupe, une étiquette de sac à son nom l’accueille et lui explique ce qu’il peut faire.</p>
-        <p>Les outils de l’organisateur restent visibles, mais grisés : un toucher montre un aperçu de ce qu’ils font. Personne ne se sent perdu, et l’envie d’organiser sa propre gang vient toute seule.</p>
-      </div>
-      <div class="shot"><img src="img/bienvenue.jpg" alt="L’accueil d’une participante : une étiquette de sac à son nom et la liste de ce qu’elle peut faire." loading="lazy" width="390" height="844"></div>
-      <div class="shot"><img src="img/apercu.jpg" alt="L’aperçu de la tuile Parties à préparer, réservée à l’organisateur." loading="lazy" width="390" height="844"></div>
-    </div>
-  </div>
-</section>
-
-<section class="extras">
-  <div class="wrap">
-    <div class="extra-grid">
-      <div class="extra"><svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zM10 19a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><h3>Notifications</h3><p>Des dates offertes, une partie qui commence, une compétition créée : le groupe est averti sur son téléphone, sans texto de plus.</p></div>
-      <div class="extra"><span class="leo-av" aria-hidden="true"></span><h3>Samuel, votre caddie</h3><p>Une question sur l’app, une règle ou un handicap d’équipe ? Samuel répond, en français, à toute heure. Il vous fait aussi visiter l’app la première fois.</p></div>
-      <div class="extra"><svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12v8H4v-8M2 8h20v4H2zM12 8v12M12 8c-2-4-6-4-6-1s6 1 6 1zm0 0c2-4 6-4 6-1s-6 1-6 1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><h3>Parrainage</h3><p>Partagez votre lien : pour chaque groupe qui passe au forfait Groupe grâce à vous, vous obtenez 5 $ de rabais sur votre prochaine saison.</p></div>
-    </div>
-  </div>
-</section>
-
-<section class="sim">
+</div>
+<div class="sim sous">
   <div class="wrap">
     <div>
       <h2>L’hiver, en simulateur</h2>
-      <p>Votre groupe joue tout l’hiver dans un centre de simulateurs ? Le fanion.ai suit.</p>
+      <p>Votre groupe joue tout l’hiver dans un centre de simulateurs ? Le Fanion suit.</p>
     </div>
     <ul>
       <li>Parties de 9 ou 18 trous.</li>
@@ -426,9 +461,44 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
       <li>Propriétaire d’un centre ? <a href="mailto:bonjour@fanion.ai" style="color:inherit">Écrivez-nous</a> pour l’offrir à vos ligues.</li>
     </ul>
   </div>
+</div>
 </section>
 
-<section id="prix">
+<section id="personnage" class="personnage">
+  <div class="wrap">
+    <img class="portrait" src="https://compte.letabli.ai/personnages/samuel.webp" alt="Samuel" width="96" height="96" loading="lazy">
+    <div>
+      <h2>Samuel, votre caddie</h2>
+      <p class="intro">Une question sur l’app, une règle ou un handicap d’équipe ? Samuel répond, en français, à toute heure. Il vous fait visiter l’app la première fois et vous salue à chaque arrivée avec ce qui se passe dans le groupe.</p>
+      <div class="bulle"><div class="qui">Samuel · Le Fanion</div><p>Samedi 8 h 10. Il reste une place.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="confiance" class="confiance">
+  <div class="wrap">
+    <h2>Vos données restent à vous</h2>
+    <p class="intro">Le Fanion organise vos parties. Il ne fait rien d’autre avec ce que vous y mettez.</p>
+    <ul class="checks">
+      <li>Les noms, numéros et parties de votre groupe ne sont visibles que par les membres du groupe.</li>
+      <li>Samuel n’a pas accès à vos scores ni aux données de votre groupe.</li>
+      <li>L’app calcule qui doit quoi, mais ne touche jamais à l’argent : vous réglez entre vous.</li>
+      <li>Le paiement se fait sur une page sécurisée (Stripe). Aucun montant n’est prélevé sans votre accord.</li>
+      <li>30 jours après l’achat pour demander un remboursement complet, sans justification.</li>
+    </ul>
+    <p class="conf-lien"><a href="confidentialite.html">Lire la politique de confidentialité</a></p>
+  </div>
+</section>
+
+<section id="prix" class="prix-bloc">
+<div id="avis" class="avis sous" hidden>
+  <div class="wrap">
+    <h2>Ce qu’en disent les joueurs</h2>
+    <p class="intro">Des avis laissés dans l’app par des golfeurs qui l’utilisent, publiés avec leur accord.</p>
+    <ul class="avis-grid" id="avisList"></ul>
+  </div>
+</div>
+<div class="sous">
   <div class="wrap">
     <h2>Un prix par groupe, pour la saison</h2>
     <p class="intro">Pas d’abonnement par joueur : l’organisateur paie une fois, et le groupe en profite toute la saison.</p>
@@ -476,14 +546,15 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
     </div>
     <p class="plans-note">Plus de 64 joueurs, un club ou un centre de simulateurs ? <a href="mailto:bonjour@fanion.ai">Écrivez-nous</a>.</p>
   </div>
+</div>
 </section>
 
 <section id="questions" class="faq">
   <div class="wrap">
     <h2>Questions</h2>
     <div class="list">
-      <details><summary>Je suis déjà client : où est l’app ?</summary><p>Touchez « Se connecter » en haut de cette page, ou ouvrez <a href="https://app.lefanion.ai/">l’app le fanion.ai</a>. Entrez votre cellulaire et votre mot de passe, puis choisissez votre groupe. Ajoutez-la ensuite à votre écran d’accueil pour la retrouver en un geste.</p></details>
-      <details><summary>Faut-il télécharger une app ?</summary><p>Non. Ouvrez le lien sur votre téléphone, puis ajoutez le fanion.ai à votre écran d’accueil (sur iPhone : bouton Partager, puis « Sur l’écran d’accueil »). Elle s’ouvre ensuite comme une app.</p></details>
+      <details><summary>Je suis déjà client : où est l’app ?</summary><p>Touchez « Se connecter » en haut de cette page, ou ouvrez <a href="https://app.lefanion.ai/">l’app Le Fanion</a>. Entrez votre cellulaire et votre mot de passe, puis choisissez votre groupe. Ajoutez-la ensuite à votre écran d’accueil pour la retrouver en un geste.</p></details>
+      <details><summary>Faut-il télécharger une app ?</summary><p>Non. Ouvrez le lien sur votre téléphone, puis ajoutez Le Fanion à votre écran d’accueil (sur iPhone : bouton Partager, puis « Sur l’écran d’accueil »). Elle s’ouvre ensuite comme une app.</p></details>
       <details><summary>Est-ce que ça marche sans réseau sur le terrain ?</summary><p>Oui. Les scores entrés sans réseau sont gardés sur le téléphone et envoyés dès que le signal revient.</p></details>
       <details><summary>Est-ce que tout le monde doit avoir l’app ?</summary><p>Seul le responsable de la partie entre les scores. Les autres suivent la partie en direct s’ils le veulent, et répondent aux dates offertes avec le lien reçu par texto.</p></details>
       <details><summary>Comment les joueurs se connectent-ils ?</summary><p>La première fois, chacun crée son compte : il faut un cellulaire, on reçoit un code par texto, puis on choisit un mot de passe. Ensuite, on se connecte avec son cellulaire et son mot de passe, puis on choisit son groupe : le même compte donne accès à tous ses groupes.</p></details>
@@ -495,24 +566,39 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
       <details><summary>Comment se passe l’achat ?</summary><p>L’organisateur paie 79 $ plus taxes par carte de crédit (49 $ au prix fondateur, avant le 31 mars 2027), sur une page de paiement sécurisée (Stripe). Il indique le nom de son groupe et reçoit un reçu par courriel. Le groupe passe à 16 joueurs dans les 24 heures.</p></details>
       <details><summary>Est-ce un abonnement qui se renouvelle tout seul ?</summary><p>Non. Vous payez une saison à la fois. Aucun montant n’est prélevé sans votre accord.</p></details>
       <details><summary>Et si ça ne fait pas l’affaire ?</summary><p>Vous avez 30 jours après l’achat pour demander un remboursement complet, sans justification. Écrivez à <a href="mailto:bonjour@fanion.ai">bonjour@fanion.ai</a>.</p></details>
-      <details><summary>L’app gère-t-elle l’argent des gageures ?</summary><p>Non. Le fanion.ai calcule qui doit quoi selon vos règles, mais ne touche jamais à l’argent. Vous réglez entre vous, comme d’habitude.</p></details>
+      <details><summary>L’app gère-t-elle l’argent des gageures ?</summary><p>Non. Le Fanion calcule qui doit quoi selon vos règles, mais ne touche jamais à l’argent. Vous réglez entre vous, comme d’habitude.</p></details>
       <details><summary>Où sont gardées nos données ?</summary><p>Les noms, numéros et parties de votre groupe ne sont visibles que par les membres du groupe. Consultez notre politique de confidentialité.</p></details>
     </div>
   </div>
 </section>
 
-<footer class="foot">
+<section id="appel" class="appel">
   <div class="wrap">
-    <div>© 2026 le fanion.ai · Fait au Québec</div>
-    <div class="links">
-      <a href="mailto:bonjour@fanion.ai">bonjour@fanion.ai</a>
-      <a href="conditions.html">Conditions d’utilisation</a>
-      <a href="confidentialite.html">Politique de confidentialité</a>
-      <a href="achat.html">Acheter</a>
-      <a href="https://app.lefanion.ai/">Se connecter à l’app</a>
+    <div>
+      <h2>Votre gang de golf vous attend.</h2>
+      <p class="appel-qui"><img src="https://compte.letabli.ai/personnages/samuel.webp" alt="" width="40" height="40" loading="lazy">« Samedi 8 h 10. Il reste une place. » Samuel, votre caddie</p>
     </div>
+    <a class="btn main" href="https://app.lefanion.ai/">Essayer gratuitement</a>
+  </div>
+</section>
+
+<footer id="pied" class="foot">
+  <div class="wrap">
+    <div class="signature">
+      <svg width="30" height="34" viewBox="0 0 26 30" aria-hidden="true"><path d="M5 2v26" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M6 3l15 5.5L6 14z" fill="#e3a90b"/><ellipse cx="9" cy="28" rx="7" ry="1.6" fill="#1f6b46"/></svg>
+      <div><div class="sig-nom">Le Fanion</div>
+        <div class="sig-etabli"><svg width="12" height="12" viewBox="0 0 64 64" aria-hidden="true"><rect x="40" y="10" width="14" height="10" rx="2" fill="#B8954A"/><rect x="45" y="20" width="4" height="4" fill="#B8954A"/><rect x="4" y="24" width="56" height="9" rx="2.5" fill="currentColor"/><rect x="10" y="33" width="6" height="25" rx="1.5" fill="currentColor"/><rect x="48" y="33" width="6" height="25" rx="1.5" fill="currentColor"/><rect x="16" y="45" width="32" height="4" fill="currentColor"/><rect x="2" y="27" width="5" height="12" rx="1.5" fill="#B8954A"/></svg>Fait à L’Établi</div></div>
+    </div>
+    <div class="links">
+      <a href="confidentialite.html">Confidentialité</a>
+      <a href="conditions.html">Conditions</a>
+      <a href="mailto:bonjour@fanion.ai">Nous écrire</a>
+      <a href="https://letabli.ai/#apps">Les autres apps de L’Établi</a>
+    </div>
+    <div class="copy">© 2026 L’Établi. Fait au Québec.</div>
   </div>
 </footer>
+
 
 <script>
 (function () {
@@ -555,7 +641,7 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
     note('vu');
     CaddieGuide.ouvrir({
       etapes: [
-        { puce: 'Bonjour !', titre: 'Moi, c’est Samuel, le caddie du fanion.ai.', texte: 'Je vous montre en une minute comment le fanion.ai organise votre gang de golf, du texto du jeudi soir jusqu’au 19e trou.' },
+        { puce: 'Bonjour !', titre: 'Moi, c’est Samuel, le caddie du Fanion.', texte: 'Je vous montre en une minute comment Le Fanion organise votre gang de golf, du texto du jeudi soir jusqu’au 19e trou.' },
         { puce: 'Les dates', titre: 'Fini les 40 textos', texte: 'L’organisateur offre quelques dates. Chacun coche les siennes avec le lien reçu, et je forme les quatuors à la date butoir.' },
         { puce: 'La partie', titre: 'Le pointage en direct', texte: 'Un joueur entre les scores, au net, avec les coups de chacun. Les autres suivent la partie sur leur téléphone, trou par trou.' },
         { puce: 'Les jeux', titre: 'Les gageures, calculées', texte: 'Game à Pelland, Nassau, Vegas, skins, Wolf ou votre jeu maison. À la fin, je dis qui doit quoi à qui. L’argent, lui, se règle au 19e.' },
@@ -566,10 +652,10 @@ details p { margin: 0 0 20px; color: var(--pencil); max-width: 40em; }
     });
   }
   document.querySelectorAll('.leo-av').forEach(function (e) { e.innerHTML = CaddieGuide.avatar(); });
-  var p = CaddieGuide.presence({ surFace: visite, label: 'Faire la visite du fanion.ai avec Samuel' });
+  var p = CaddieGuide.presence({ surFace: visite, label: 'Faire la visite du Fanion avec Samuel' });
   if (!lu()) setTimeout(function () {
     if (document.querySelector('.cd-fond')) return;
-    p.dire({ titre: 'Bonjour ! Moi, c’est Samuel.', texte: 'Je vous fais visiter le fanion.ai en une minute ?', bouton: 'Faire la visite', action: visite, onFermer: function () { note('ferme'); } });
+    p.dire({ titre: 'Bonjour ! Moi, c’est Samuel.', texte: 'Je vous fais visiter Le Fanion en une minute ?', bouton: 'Faire la visite', action: visite, onFermer: function () { note('ferme'); } });
   }, 2500);
 })();
 </script>
